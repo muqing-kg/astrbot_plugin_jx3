@@ -24,17 +24,17 @@
 
 /* 状态样式 */
 .card.past {
-    background: rgba(71, 91, 108, 0.72);
+    background: rgba(148, 163, 176, 0.22);
     color: var(--jx3-text-secondary);
 }
 
 .card.today {
-    background: rgba(53, 113, 165, 0.9);
+    background: rgba(31, 111, 139, 0.16);
     color: var(--jx3-text);
 }
 
 .card.future {
-    background: rgba(13, 41, 66, 0.82);
+    background: rgba(255, 255, 255, 0.88);
     color: var(--jx3-text);
     border: 1px solid var(--jx3-border-faint);
 }

@@ -210,12 +210,12 @@ def hint_push_ok(kind: str, enabled: bool) -> str:
 def hint_need_token() -> str:
     return (
         "该功能需要 JX3API Token，当前会话尚未配置。\n"
-        "请前往 https://www.jx3api.com/ 购买 Token。\n"
+        "请前往 https://www.jx3api.com 购买 Token。\n"
         "\n"
         "配置方式（请私聊机器人，不要在群里发送 Token）：\n"
         "1. 在目标群发送 /sid ，复制该群 UMO\n"
         "2. 私聊发送：/Token <UMO> <你的Token>\n"
-        "例如：/Token 微信-唐小珂:GroupMessage:11933400922 xxxxx\n"
+        "例如：/Token <UMO> <你的Token>\n"
         "\n"
         "也可让机器人管理员在插件页面为该会话填写，或勾选「使用全局 Token」。"
     )
@@ -227,7 +227,7 @@ def hint_need_ticket() -> str:
         "推栏默认使用全局配置；如需本会话单独使用，请私聊机器人（不要在群里发送）：\n"
         "1. 在目标群发送 /sid ，复制该群 UMO\n"
         "2. 私聊发送：/推栏 <UMO> <你的推栏标识>\n"
-        "例如：/推栏 微信-唐小珂:GroupMessage:11933400922 xxxxx"
+        "例如：/推栏 <UMO> <你的推栏标识>"
     )
 
 
