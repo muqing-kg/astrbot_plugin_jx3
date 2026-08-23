@@ -1,6 +1,6 @@
     .header {
         color: var(--jx3-text);
-        background: linear-gradient(180deg, rgba(17, 52, 81, 0.96), rgba(9, 35, 57, 0.96));
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 248, 251, 0.96));
         border: 1px solid var(--jx3-border-soft);
         border-radius: 8px;
         padding: 22px 26px;
@@ -17,7 +17,7 @@
     }
 
     .table-wrapper {
-        background: rgba(7, 26, 43, 0.76);
+        background: rgba(247, 250, 252, 0.96);
         border: 1px solid var(--jx3-border-soft);
         border-radius: 8px;
         overflow: hidden;
@@ -62,7 +62,7 @@
         height: 34px;
         border-radius: 6px;
         flex: 0 0 auto;
-        background: rgba(7, 26, 43, 0.6);
+        background: rgba(232, 238, 242, 0.9);
     }
 
     .item-name {

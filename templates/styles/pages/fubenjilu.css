@@ -92,9 +92,9 @@
      * 奖励已经获取，显示灰色
      */
     .boss-item.finished {
-        color: #d5e0e9;
-        background: #24384b;
-        border: 1px solid #60788f;
+        color: #334655;
+        background: #e7eef3;
+        border: 1px solid #9eb3c4;
     }
 
     .boss-item.finished:hover {
@@ -106,9 +106,9 @@
      * 奖励尚未获取，显示绿色
      */
     .boss-item.unfinished {
-        color: #c8f3dc;
-        background: #183f34;
-        border: 1px solid #438d68;
+        color: #14532d;
+        background: #e8f6ee;
+        border: 1px solid #2c7a4b;
     }
 
     .boss-item.unfinished:hover {
@@ -155,20 +155,20 @@
     }
 
     .boss-item.finished .status-icon {
-        color: #e7eef4;
-        background: rgba(192, 211, 226, 0.16);
+        color: #334655;
+        background: rgba(158, 179, 196, 0.28);
     }
 
     .boss-item.unfinished .status-icon {
-        color: #d7f8e6;
-        background: rgba(98, 188, 146, 0.18);
+        color: #14532d;
+        background: rgba(44, 122, 75, 0.16);
     }
 
     .empty-data {
         padding: 50px 20px;
         color: var(--jx3-text-muted);
         text-align: center;
-        background: rgba(13, 41, 66, 0.82);
+        background: rgba(255, 255, 255, 0.88);
         border: 1px solid var(--jx3-border-faint);
         border-radius: 12px;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);

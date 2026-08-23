@@ -21,7 +21,7 @@
     "description": "全局 JX3API Token",
     "type": "string",
     "default": "",
-    "hint": "前往 https://www.jx3api.com/ 购买。仅当会话勾选「使用全局 Token」时才会使用。"
+    "hint": "前往 https://www.jx3api.com 购买。仅当会话勾选「使用全局 Token」时才会使用。"
   },
   "jx3api_ticket": {
     "description": "全局推栏标识",

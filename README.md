@@ -26,7 +26,7 @@
 
 | 数据源 | 代码入口 | 主要用途 |
 | --- | --- | --- |
-| [JX3API](https://www.jx3api.com/) | `core/jx3api_data.py` | 绝大多数游戏查询、官方资讯、排行、角色和推送数据 |
+| [JX3API](https://www.jx3api.com) | `core/jx3api_data.py` | 绝大多数游戏查询、官方资讯、排行、角色和推送数据 |
 | [剑侠茶馆](https://www.jianxiachaguan.cn/) | `core/aijx3_data.py` | 阵营沙盘图片 |
 | [JX3BOX](https://www.jx3box.com/) | `core/jx3box_data.py` | 奇遇攻略、配装、宏、资历、交易行及刷马/赤兔推送消息 |
 | 本地 SQLite | `core/sqlite.py`、`core/bilei_data.py` | 心法别名、避雷记录、推送状态和基础数据缓存 |
@@ -89,7 +89,7 @@ pip install -r data/plugins/astrbot_plugin_jx3/requirements.txt
 
 ### Token 与 Ticket
 
-JX3API Token 可从 [JX3API](https://www.jx3api.com/) 购买。推栏 Ticket 通常来自推栏客户端的登录请求，属于敏感凭据。
+JX3API Token 可从 [JX3API](https://www.jx3api.com) 购买。推栏 Ticket 通常来自推栏客户端的登录请求，属于敏感凭据。
 
 - 群聊中不要发送 Token 或推栏原文。
 - 先在目标群发送系统命令 `/sid` 复制 UMO，再私聊机器人：
@@ -526,7 +526,7 @@ git diff --check
 
 ## 当前版本状态
 
-以下内容以 v3.3.0 源码为准：
+以下内容以 v3.3.1 源码为准：
 
 1. 每个群/私聊独立绑定一个区服；查询未写区服时使用绑定服，写了区服则以当场写的为准。
 2. 主动推送按会话开关和绑定区服发送，不再使用配置页里的 `kfts` / `xwts` / `smts` / `ctts`。

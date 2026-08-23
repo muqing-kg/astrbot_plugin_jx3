@@ -1,9 +1,16 @@
 const statusEl = document.getElementById("status");
-const rowsEl = document.getElementById("rows");
+const cardsEl = document.getElementById("cards");
 let bridge = null;
 
-function setStatus(text) {
-  statusEl.textContent = text || "";
+function setStatus(text, isError = false) {
+  if (!text) {
+    statusEl.hidden = true;
+    statusEl.textContent = "";
+    return;
+  }
+  statusEl.hidden = false;
+  statusEl.textContent = text;
+  statusEl.classList.toggle("error", Boolean(isError));
 }
 
 function escapeHtml(value) {
@@ -23,8 +30,9 @@ function createDevFallbackBridge() {
         if (value !== undefined && value !== null && value !== "") url.searchParams.set(key, value);
       });
       const response = await fetch(url, { credentials: "same-origin" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || data.msg || `HTTP ${response.status}`);
+      return data;
     },
     apiPost: async (endpoint, body = {}) => {
       const response = await fetch(`${apiBase}${endpoint}`, {
@@ -70,91 +78,119 @@ async function apiPost(endpoint, body) {
   return bridge.apiPost(endpoint, body);
 }
 
-function boolText(v) {
-  return v ? "开" : "关";
+function pill(label, on) {
+  return `<span class="pill ${on ? "on" : ""}">${escapeHtml(label)}</span>`;
 }
 
 function render(payload) {
   const sessions = payload.sessions || [];
-  rowsEl.innerHTML = "";
+  cardsEl.innerHTML = "";
   if (!sessions.length) {
-    rowsEl.innerHTML = '<tr><td colspan="11">暂无会话。群里先发一条指令或完成绑定后会出现在这里。</td></tr>';
+    cardsEl.innerHTML = '<div class="empty">暂无会话。群里先发一条指令或完成绑定后会出现在这里。</div>';
     return;
   }
   for (const row of sessions) {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(row.display_name || "-")}</td>
-      <td class="umo">${escapeHtml(row.umo)}</td>
-      <td>${escapeHtml(row.server || "未绑定")}</td>
-      <td>${escapeHtml(row.token_status)}</td>
-      <td>${escapeHtml(row.ticket_status)}</td>
-      <td>${row.use_global_token ? "是" : "否"}</td>
-      <td>${boolText(row.push_kaifu)}</td>
-      <td>${boolText(row.push_xinwen)}</td>
-      <td>${boolText(row.push_shuma)}</td>
-      <td>${boolText(row.push_chitu)}</td>
-      <td class="ops"></td>
-    `;
-    tr.querySelector(".ops").appendChild(actionRow(row));
-    rowsEl.appendChild(tr);
+    cardsEl.appendChild(sessionCard(row));
   }
 }
 
-function actionRow(row) {
-  const box = document.createElement("div");
-  box.className = "ops";
-  box.innerHTML = `
-    <input data-k="server" placeholder="区服，如梦江南" value="${escapeHtml(row.server || "")}" />
-    <button data-act="bind">保存区服</button>
-    <label><input type="checkbox" data-k="use_global" ${row.use_global_token ? "checked" : ""}/> 使用全局Token</label>
-    <input data-k="token" type="password" placeholder="填写后保存 Token" />
-    <button data-act="token">保存Token</button>
-    <button data-act="clear-token">清除Token</button>
-    <input data-k="ticket" type="password" placeholder="填写后保存推栏" />
-    <button data-act="ticket">保存推栏</button>
-    <button data-act="clear-ticket">清除推栏</button>
-    <div>
-      <button data-act="push" data-kind="开服" data-on="${row.push_kaifu ? 0 : 1}">${row.push_kaifu ? "关闭开服" : "打开开服"}</button>
-      <button data-act="push" data-kind="新闻" data-on="${row.push_xinwen ? 0 : 1}">${row.push_xinwen ? "关闭新闻" : "打开新闻"}</button>
-      <button data-act="push" data-kind="刷马" data-on="${row.push_shuma ? 0 : 1}">${row.push_shuma ? "关闭刷马" : "打开刷马"}</button>
-      <button data-act="push" data-kind="赤兔" data-on="${row.push_chitu ? 0 : 1}">${row.push_chitu ? "关闭赤兔" : "打开赤兔"}</button>
+function sessionCard(row) {
+  const card = document.createElement("article");
+  card.className = "card";
+  card.innerHTML = `
+    <div class="card-head">
+      <div>
+        <h2 class="card-title">${escapeHtml(row.display_name || "未命名会话")}</h2>
+        <p class="umo">${escapeHtml(row.umo || "")}</p>
+      </div>
+      <div class="pills">
+        ${pill(row.server || "未绑定区服", Boolean(row.server))}
+        ${pill("Token " + (row.token_status || "未配置"), Boolean(row.has_token || row.use_global_token))}
+        ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
+        ${pill(row.use_global_token ? "使用全局Token" : "未用全局Token", Boolean(row.use_global_token))}
+      </div>
+    </div>
+    <div class="grid">
+      <label class="field">
+        <span>区服</span>
+        <input data-k="server" placeholder="例如梦江南" value="${escapeHtml(row.server || "")}" />
+      </label>
+      <label class="toggle">
+        <input data-k="use_global" type="checkbox" ${row.use_global_token ? "checked" : ""} />
+        使用全局 Token
+      </label>
+      <label class="field">
+        <span>会话 Token</span>
+        <input data-k="token" type="password" placeholder="填写后保存，不回显原文" />
+      </label>
+      <label class="field">
+        <span>推栏标识</span>
+        <input data-k="ticket" type="password" placeholder="填写后保存，不回显原文" />
+      </label>
+    </div>
+    <div class="actions" style="margin-top:12px">
+      <button data-act="bind" type="button">保存区服</button>
+      <button data-act="token" type="button">保存 Token</button>
+      <button data-act="clear-token" class="ghost" type="button">清除 Token</button>
+      <button data-act="ticket" type="button">保存推栏</button>
+      <button data-act="clear-ticket" class="ghost" type="button">清除推栏</button>
+    </div>
+    <div class="push-row" style="margin-top:12px">
+      <button data-act="push" data-kind="开服" data-on="${row.push_kaifu ? 0 : 1}" class="${row.push_kaifu ? "" : "ghost"}" type="button">${row.push_kaifu ? "关闭开服" : "打开开服"}</button>
+      <button data-act="push" data-kind="新闻" data-on="${row.push_xinwen ? 0 : 1}" class="${row.push_xinwen ? "" : "ghost"}" type="button">${row.push_xinwen ? "关闭新闻" : "打开新闻"}</button>
+      <button data-act="push" data-kind="刷马" data-on="${row.push_shuma ? 0 : 1}" class="${row.push_shuma ? "" : "ghost"}" type="button">${row.push_shuma ? "关闭刷马" : "打开刷马"}</button>
+      <button data-act="push" data-kind="赤兔" data-on="${row.push_chitu ? 0 : 1}" class="${row.push_chitu ? "" : "ghost"}" type="button">${row.push_chitu ? "关闭赤兔" : "打开赤兔"}</button>
     </div>
   `;
-  box.addEventListener("click", async (ev) => {
+
+  const run = async (fn) => {
+    try {
+      await fn();
+      setStatus("已保存");
+      await load();
+    } catch (err) {
+      setStatus(err.message || "保存失败", true);
+    }
+  };
+
+  card.addEventListener("click", async (ev) => {
     const btn = ev.target.closest("button");
     if (!btn) return;
     const act = btn.dataset.act;
-    try {
-      if (act === "bind") {
-        await apiPost("page/sessions/bind", { umo: row.umo, server: box.querySelector('[data-k="server"]').value });
-      } else if (act === "token") {
-        await apiPost("page/sessions/token", { umo: row.umo, token: box.querySelector('[data-k="token"]').value });
-      } else if (act === "ticket") {
-        await apiPost("page/sessions/ticket", { umo: row.umo, ticket: box.querySelector('[data-k="ticket"]').value });
-      } else if (act === "clear-token") {
-        await apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "token" });
-      } else if (act === "clear-ticket") {
-        await apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "ticket" });
-      } else if (act === "push") {
-        await apiPost("page/sessions/push", { umo: row.umo, kind: btn.dataset.kind, enabled: btn.dataset.on === "1" });
-      }
-      setStatus("已保存");
-      await load();
-    } catch (err) {
-      setStatus(err.message);
+    const server = card.querySelector('[data-k="server"]').value.trim();
+    const token = card.querySelector('[data-k="token"]').value.trim();
+    const ticket = card.querySelector('[data-k="ticket"]').value.trim();
+    if (act === "bind") {
+      if (!row.umo || !server) return setStatus("请填写区服", true);
+      await run(() => apiPost("page/sessions/bind", { umo: row.umo, server }));
+    } else if (act === "token") {
+      if (!row.umo || !token) return setStatus("请填写 Token", true);
+      await run(() => apiPost("page/sessions/token", { umo: row.umo, token }));
+    } else if (act === "ticket") {
+      if (!row.umo || !ticket) return setStatus("请填写推栏标识", true);
+      await run(() => apiPost("page/sessions/ticket", { umo: row.umo, ticket }));
+    } else if (act === "clear-token") {
+      await run(() => apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "token" }));
+    } else if (act === "clear-ticket") {
+      await run(() => apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "ticket" }));
+    } else if (act === "push") {
+      await run(() => apiPost("page/sessions/push", { umo: row.umo, kind: btn.dataset.kind, enabled: btn.dataset.on === "1" }));
     }
   });
-  box.querySelector('[data-k="use_global"]').addEventListener("change", async (ev) => {
+
+  card.querySelector('[data-k="use_global"]').addEventListener("change", async (ev) => {
+    const enabled = ev.target.checked;
     try {
-      await apiPost("page/sessions/use-global", { umo: row.umo, enabled: ev.target.checked });
-      setStatus("已保存");
+      if (!row.umo) throw new Error("当前会话缺少标识");
+      await apiPost("page/sessions/use-global", { umo: row.umo, enabled });
+      setStatus(enabled ? "已启用全局 Token" : "已关闭全局 Token");
       await load();
     } catch (err) {
-      setStatus(err.message);
+      ev.target.checked = !enabled;
+      setStatus(err.message || "保存失败", true);
     }
   });
-  return box;
+  return card;
 }
 
 async function load() {
@@ -162,11 +198,13 @@ async function load() {
   render(data);
 }
 
-document.getElementById("refreshBtn").addEventListener("click", () => load().catch((e) => setStatus(e.message)));
+document.getElementById("refreshBtn").addEventListener("click", () => {
+  load().then(() => setStatus("已刷新")).catch((e) => setStatus(e.message, true));
+});
 
 waitForPluginBridge()
   .then((readyBridge) => {
     bridge = readyBridge;
     return load();
   })
-  .catch((e) => setStatus(e.message));
+  .catch((e) => setStatus(e.message, true));
