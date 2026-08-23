@@ -13,6 +13,7 @@ import astrbot.api.message_components as Comp
 from .request import APIClient
 from .sqlite import AsyncSQLiteDB
 from .fun_basic import load_template,gold_to_parts,week_to_num,compare_date_str,format_time,format_remaining
+from .credentials import current_token, current_ticket
 
 
 
@@ -29,18 +30,21 @@ class JX3APIService:
         self._cache_db = cache_sqlite or sqlite
 
         # 获取配置中的 Token
-        self.token = self._config.get("jx3api_token", "")
-        if  self.token == "":
-            logger.warning("获取配置token失败，请正确填写token,否则部分功能无法正常使用")
-        else:
-            logger.debug(f"获取配置token成功。{self.token}")
-        # 获取配置中的 ticket
-        self.ticket = self._config.get("jx3api_ticket", "")
-        if  self.ticket == "":
-            logger.warning("获取配置ticket失败，请正确填写ticket,否则部分功能无法正常使用")
-        else:
-            logger.debug(f"获取配置ticket成功。{self.ticket}")
+        self._global_token = self._config.get("jx3api_token", "") or ""
+        self._global_ticket = self._config.get("jx3api_ticket", "") or ""
+        if not self._global_token:
+            logger.warning("未配置全局 JX3API Token，未勾选使用全局的会话将无法使用付费功能")
+        if not self._global_ticket:
+            logger.warning("未配置全局推栏标识，需要推栏的功能将依赖全局或会话自定义配置")
         
+
+    @property
+    def token(self) -> str:
+        return current_token(self._global_token)
+
+    @property
+    def ticket(self) -> str:
+        return current_ticket(self._global_ticket)
 
     async def close(self):
         """释放底层 APIClient 资源"""
@@ -1795,3 +1799,49 @@ class JX3APIService:
 
     
         
+
+
+    async def token_stats(self, token: str) -> dict:
+        """查询令牌用量。POST /token/stats"""
+        result = self._init_return_data()
+        token = (token or "").strip()
+        if not token:
+            result["msg"] = "未提供 Token"
+            return result
+        data = await self._api.post("https://www.jx3api.com/token/stats", data={"token": token}, out_key=None)
+        if not data:
+            result["msg"] = "令牌无效或查询失败"
+            return result
+        payload = data.get("data") if isinstance(data, dict) and "data" in data else data
+        if not isinstance(payload, dict):
+            result["msg"] = "令牌无效或查询失败"
+            return result
+        level = payload.get("level")
+        used = payload.get("used")
+        remaining = payload.get("remaining")
+        expire_at = payload.get("expireAt")
+        valid = payload.get("valid")
+        lines = ["JX3API 令牌状态"]
+        if valid is not None:
+            lines.append("状态：" + ("有效" if valid else "已失效"))
+        if level is not None:
+            lines.append(f"等级：LV.{level}")
+        if used is not None:
+            lines.append(f"已用：{used} 次")
+        if str(level) == "2" or remaining is not None:
+            if remaining is not None:
+                lines.append(f"剩余：{remaining} 次")
+        if expire_at:
+            from datetime import datetime
+            try:
+                ts = int(expire_at)
+                if ts > 10_000_000_000:
+                    ts //= 1000
+                lines.append("到期：" + datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S"))
+            except Exception:
+                lines.append(f"到期：{expire_at}")
+        elif str(level) == "1":
+            lines.append("到期：永久")
+        result["code"] = 200
+        result["data"] = "\n".join(lines)
+        return result

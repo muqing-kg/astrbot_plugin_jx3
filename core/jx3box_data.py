@@ -13,6 +13,7 @@ import astrbot.api.message_components as Comp
 from .request import APIClient
 from .sqlite import AsyncSQLiteDB
 from .fun_basic import load_template,gold_to_parts,week_to_num,compare_date_str,format_time,format_remaining
+from .credentials import current_token
 
 ACHIEVEMENT_CHOICES = [
     (0, None, "资历总览"),
@@ -55,7 +56,11 @@ class JX3BOXService:
         self._sql_db = sqlite
         self._cache_db = cache_sqlite or sqlite
 
-        self.token = self._config.get("jx3api_token", "")
+        self._global_token = self._config.get("jx3api_token", "") or ""
+
+    @property
+    def token(self) -> str:
+        return current_token(self._global_token)
 
     async def close(self):
         """释放底层 APIClient 资源"""

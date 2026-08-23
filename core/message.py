@@ -72,13 +72,6 @@ class MessageBuilder:
         )
     
 
-    def serverdefault(self,server) -> str:
-        """加载配置默认服务器"""
-        if server == "":
-            return self.server
-        return server
-
-
     async def plain_msg(self, event: AstrMessageEvent, action):
         """最终将数据整理成文本发送"""
         data= await action()
@@ -329,7 +322,7 @@ class MessageBuilder:
 
     async def  yanhuachaxun(self, event: AstrMessageEvent,server: str = "",name: str = "" ):
         """ 烟花 服务器 角色"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.yanhuachaxun( self.serverdefault(server),name))
+        return await self.T2I_image_msg(event, lambda: self.jx3api.yanhuachaxun(server,name))
 
     async def  shuma(self, event: AstrMessageEvent,server: str ): 
         """ 刷马 服务器"""
@@ -696,24 +689,3 @@ class MessageBuilder:
     async def bilei_delete(self, event: AstrMessageEvent, id:int):
         """避雷删除 ID"""
         return await self.plain_msg(event, lambda: self.bilei.delete(id))
-
-
-    async def  kaifhujiank(self, event: AstrMessageEvent):
-        """ 开服监控"""     
-        return_msg = await self.jx3at.get_task_info("kfts")
-        await event.send(event.plain_result(return_msg)) 
-
-    async def  xinwenzhixun(self, event: AstrMessageEvent):
-        """ 新闻推送"""     
-        return_msg = await self.jx3at.get_task_info("xwts")
-        await event.send(event.plain_result(return_msg)) 
-
-    async def  shuamamsg(self, event: AstrMessageEvent):
-        """ 刷马推送"""     
-        return_msg = await self.jx3at.get_task_info("smts")
-        await event.send(event.plain_result(return_msg)) 
-
-    async def  chitusg(self, event: AstrMessageEvent):
-        """ 赤兔推送"""     
-        return_msg = await self.jx3at.get_task_info("ctts")
-        await event.send(event.plain_result(return_msg)) 

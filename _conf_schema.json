@@ -1,150 +1,32 @@
 {
-"prefix": {
+  "prefix": {
     "description": "指令前缀",
     "type": "object",
     "items": {
       "enable": {
-        "description": "是否启用",
+        "description": "是否启用插件前缀",
         "type": "bool",
-        "default": true,
-        "hint": "是否启用指令前缀检查功能"
+        "default": false,
+        "hint": "默认关闭，走 AstrBot 默认前缀 /。开启后需额外匹配下方前缀。"
       },
       "text": {
         "description": "前缀内容",
         "type": "string",
         "default": "剑三",
-        "hint": "为了避免和其他插件的指令冲突可以增加指令的前缀，为空默认值为剑三。"
+        "hint": "仅在启用插件前缀时生效。"
       }
     }
-  },
-  "server": {
-    "description": "默认服务器",
-    "type": "string",
-    "default": "梦江南",
-    "hint": "在指令中未输入服务器时，默认查询的服务器"
   },
   "jx3api_token": {
-    "description": "JX3API Token",
+    "description": "全局 JX3API Token",
     "type": "string",
     "default": "",
-    "hint": "前往https://www.jx3api.com/注册并购买Token。"
+    "hint": "前往 https://www.jx3api.com/ 购买。仅当会话勾选「使用全局 Token」时才会使用。"
   },
   "jx3api_ticket": {
-    "description": "推栏标识",
+    "description": "全局推栏标识",
     "type": "string",
     "default": "",
-    "hint": "通过抓包推栏APP账号登录信息获取推栏标识"
-  },
-  "kfts": {
-    "description": "开服监控配置",
-    "type": "object",
-    "items": {
-      "enable": {
-        "description": "开服监控功能开关",
-        "type": "bool",
-        "default": false,
-        "hint": "是否启用剑网三开服监控功能。"
-      },
-      "time": {
-        "description": "开服监控循环时间",
-        "type": "int",
-        "default": 60,
-        "hint": "请求服务器状态的循环时间，单位秒。"
-      },
-      "umos": {
-        "description": "开服监控推送列表",
-        "type": "list",
-        "hint": "可以填写多个会话唯一ID。",
-        "items": {
-            "type": "string",
-            "description": "会话唯一ID，可通过/std获取"
-        },
-        "default": []
-      }
-    }
-  },
-  "xwts": {
-    "description": "新闻资讯推送",
-    "type": "object",
-    "items": {
-      "enable": {
-        "description": "新闻资讯推送功能开关",
-        "type": "bool",
-        "default": false,
-        "hint": "是否启用剑网三开新闻资讯推送功能。"
-      },
-      "time": {
-        "description": "获取最新资讯循环时间",
-        "type": "int",
-        "default": 280,
-        "hint": "请求最新资讯的循环时间，单位秒。"
-      },
-      "umos": {
-        "description": "推送列表",
-        "type": "list",
-        "hint": "可以填写多个会话唯一ID。",
-        "items": {
-            "type": "string",
-            "description": "会话唯一ID，可通过/std获取"
-        },
-        "default": []
-      }
-    }
-  },
-  "smts": {
-    "description": "刷马消息推送",
-    "type": "object",
-    "items": {
-      "enable": {
-        "description": "刷马消息推送功能开关",
-        "type": "bool",
-        "default": false,
-        "hint": "是否启用剑网三开刷马消息推送功能。"
-      },
-      "time": {
-        "description": "获取最新消息循环时间",
-        "type": "int",
-        "default": 60,
-        "hint": "请求最新消息的循环时间，单位秒。"
-      },
-      "umos": {
-        "description": "推送列表",
-        "type": "list",
-        "hint": "可以填写多个会话唯一ID。",
-        "items": {
-            "type": "string",
-            "description": "会话唯一ID，可通过/std获取"
-        },
-        "default": []
-      }
-    }
-  },
-  "ctts": {
-    "description": "赤兔消息推送",
-    "type": "object",
-    "items": {
-      "enable": {
-        "description": "赤兔消息推送功能开关",
-        "type": "bool",
-        "default": false,
-        "hint": "是否启用剑网三开赤兔消息推送功能。"
-      },
-      "time": {
-        "description": "获取最新消息循环时间",
-        "type": "int",
-        "default": 60,
-        "hint": "请求最新消息的循环时间，单位秒。"
-      },
-      "umos": {
-        "description": "推送列表",
-        "type": "list",
-        "hint": "可以填写多个会话唯一ID。",
-        "items": {
-            "type": "string",
-            "description": "会话唯一ID，可通过/std获取"
-        },
-        "default": []
-      }
-    }
+    "hint": "默认全部会话使用这份推栏标识；会话自定义后优先用自定义。"
   }
 }

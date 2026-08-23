@@ -42,6 +42,15 @@ class APIClient:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close()
 
+    def _redact(self, data: Optional[Dict], keys=("token", "ticket")):
+        if not data:
+            return data
+        hidden = dict(data)
+        for key in keys:
+            if hidden.get(key):
+                hidden[key] = "***"
+        return hidden
+
     async def _request(self, method: str, url: str, params: Optional[Dict] = None, json_data: Optional[Dict] = None) -> Any:
         """
         统一的内部请求处理方法
@@ -51,8 +60,8 @@ class APIClient:
         
         # 记录日志
         logger.debug(f"发起 {method} 请求: {url}")
-        if params: logger.debug(f"Query参数: {params}")
-        if json_data: logger.debug(f"Body数据: {json_data}")
+        if params: logger.debug(f"Query参数: {self._redact(params)}")
+        if json_data: logger.debug(f"Body数据: {self._redact(json_data)}")
 
         try:
             # aiohttp 会自动处理 json=json_data 时的 Content-Type
