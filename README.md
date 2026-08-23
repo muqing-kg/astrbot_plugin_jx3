@@ -53,7 +53,7 @@ data/plugins/astrbot_plugin_jx3
 也可以在 AstrBot 根目录执行：
 
 ```bash
-git clone https://github.com/qsc20001102/astrbot_plugin_jx3.git data/plugins/astrbot_plugin_jx3
+git clone https://github.com/muqing-kg/astrbot_plugin_jx3.git data/plugins/astrbot_plugin_jx3
 ```
 
 使用 AstrBot 所在的 Python 环境安装依赖：

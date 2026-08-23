@@ -45,10 +45,10 @@ from .core.page_api import SessionPageAPI
 
 
 @register("astrbot_plugin_jx3",
-          "fxdyz",
+          "muqing-kg",
           "聚合剑网三游戏数据，提供查询、图片渲染、本地避雷和后台推送。",
           "3.3.0",
-          "https://github.com/qsc20001102/astrbot_plugin_jx3"
+          "https://github.com/muqing-kg/astrbot_plugin_jx3"
 )
 class Jx3ApiPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
