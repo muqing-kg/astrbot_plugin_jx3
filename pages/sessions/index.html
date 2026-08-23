@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>剑三会话配置</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header>
+        <div>
+          <p class="eyebrow">Plugin Page</p>
+          <h1>剑三会话配置</h1>
+          <p class="sub">仅 AstrBot 后台主人可操作。查看每个群/私聊的区服绑定、推送开关和密钥状态。Token 与推栏原文不会显示。请勿把该页面暴露到公网。</p>
+        </div>
+        <button id="refreshBtn" type="button">刷新</button>
+      </header>
+      <p id="status" class="status"></p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>会话</th>
+              <th>UMO</th>
+              <th>区服</th>
+              <th>Token</th>
+              <th>推栏</th>
+              <th>使用全局Token</th>
+              <th>开服</th>
+              <th>新闻</th>
+              <th>刷马</th>
+              <th>赤兔</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

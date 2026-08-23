@@ -1,0 +1,281 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any
+
+from .session_policy import (
+    CREDENTIAL_MISSING,
+    NEED_TICKET,
+    NEED_TOKEN,
+    PUSH_FIELD,
+    PUSH_TYPES,
+    UNBOUND_SERVER,
+    mask_secret,
+    resolve_query_server,
+)
+from .sqlite import AsyncSQLiteDB
+
+__all__ = [
+    "CREDENTIAL_MISSING",
+    "NEED_TICKET",
+    "NEED_TOKEN",
+    "PUSH_TYPES",
+    "UNBOUND_SERVER",
+    "SessionStore",
+    "mask_secret",
+    "resolve_query_server",
+]
+
+
+class SessionStore:
+    def __init__(self, sqlite: AsyncSQLiteDB):
+        self.sql = sqlite
+
+    async def init(self) -> None:
+        await self.sql.execute(
+            """
+            CREATE TABLE IF NOT EXISTS session_config (
+                umo TEXT PRIMARY KEY,
+                display_name TEXT DEFAULT '',
+                server TEXT DEFAULT '',
+                token TEXT DEFAULT '',
+                ticket TEXT DEFAULT '',
+                use_global_token INTEGER DEFAULT 0,
+                push_kaifu INTEGER DEFAULT 0,
+                push_xinwen INTEGER DEFAULT 0,
+                push_shuma INTEGER DEFAULT 0,
+                push_chitu INTEGER DEFAULT 0,
+                updated_at TEXT DEFAULT ''
+            )
+            """
+        )
+        await self.sql.execute(
+            """
+            CREATE TABLE IF NOT EXISTS plugin_admin (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                user_id TEXT DEFAULT '',
+                name TEXT DEFAULT '',
+                claimed_at TEXT DEFAULT ''
+            )
+            """
+        )
+        await self.sql.execute(
+            """
+            INSERT OR IGNORE INTO plugin_admin (id, user_id, name, claimed_at)
+            VALUES (1, '', '', '')
+            """
+        )
+        await self.sql.execute(
+            """
+            CREATE TABLE IF NOT EXISTS push_state (
+                kind TEXT NOT NULL,
+                server TEXT NOT NULL,
+                status TEXT DEFAULT '',
+                PRIMARY KEY (kind, server)
+            )
+            """
+        )
+
+    async def ensure(self, umo: str, display_name: str = "") -> dict[str, Any]:
+        row = await self.get(umo)
+        if row:
+            if display_name and row.get("display_name") != display_name:
+                await self.sql.update(
+                    "session_config",
+                    {"display_name": display_name, "updated_at": _now()},
+                    "umo=?",
+                    (umo,),
+                )
+                row["display_name"] = display_name
+            return row
+        await self.sql.insert(
+            "session_config",
+            {
+                "umo": umo,
+                "display_name": display_name,
+                "server": "",
+                "token": "",
+                "ticket": "",
+                "use_global_token": 0,
+                "push_kaifu": 0,
+                "push_xinwen": 0,
+                "push_shuma": 0,
+                "push_chitu": 0,
+                "updated_at": _now(),
+            },
+        )
+        return await self.get(umo)
+
+    async def get(self, umo: str) -> dict[str, Any] | None:
+        if not umo:
+            return None
+        return await self.sql.select_one("session_config", "umo=?", (umo,))
+
+    async def list_all(self) -> list[dict[str, Any]]:
+        return await self.sql.select_all("session_config")
+
+    async def bind_server(self, umo: str, server: str, display_name: str = "") -> dict[str, Any]:
+        await self.ensure(umo, display_name)
+        data = {"server": server.strip(), "updated_at": _now()}
+        if display_name:
+            data["display_name"] = display_name
+        await self.sql.update("session_config", data, "umo=?", (umo,))
+        return await self.get(umo)
+
+    async def set_push(self, umo: str, kind: str, enabled: bool) -> tuple[bool, str]:
+        if kind not in PUSH_FIELD:
+            return False, "不支持的推送类型"
+        row = await self.ensure(umo)
+        if enabled and not (row.get("server") or "").strip():
+            return False, "请先绑定区服后再打开推送。"
+        await self.sql.update(
+            "session_config",
+            {PUSH_FIELD[kind]: 1 if enabled else 0, "updated_at": _now()},
+            "umo=?",
+            (umo,),
+        )
+        return True, ""
+
+    async def set_token(self, umo: str, token: str) -> None:
+        await self.ensure(umo)
+        await self.sql.update(
+            "session_config",
+            {"token": token.strip(), "updated_at": _now()},
+            "umo=?",
+            (umo,),
+        )
+
+    async def set_ticket(self, umo: str, ticket: str) -> None:
+        await self.ensure(umo)
+        await self.sql.update(
+            "session_config",
+            {"ticket": ticket.strip(), "updated_at": _now()},
+            "umo=?",
+            (umo,),
+        )
+
+    async def set_use_global_token(self, umo: str, enabled: bool) -> None:
+        await self.ensure(umo)
+        await self.sql.update(
+            "session_config",
+            {"use_global_token": 1 if enabled else 0, "updated_at": _now()},
+            "umo=?",
+            (umo,),
+        )
+
+    async def clear_secret(self, umo: str, kind: str) -> None:
+        field = "token" if kind == "token" else "ticket"
+        await self.ensure(umo)
+        await self.sql.update(
+            "session_config",
+            {field: "", "updated_at": _now()},
+            "umo=?",
+            (umo,),
+        )
+
+    def resolve_token(self, row: dict[str, Any] | None, global_token: str = "") -> str:
+        if row:
+            own = (row.get("token") or "").strip()
+            if own:
+                return own
+            if row.get("use_global_token") and (global_token or "").strip():
+                return global_token.strip()
+        return CREDENTIAL_MISSING
+
+    def resolve_ticket(self, row: dict[str, Any] | None, global_ticket: str = "") -> str:
+        if row:
+            own = (row.get("ticket") or "").strip()
+            if own:
+                return own
+        ticket = (global_ticket or "").strip()
+        return ticket or CREDENTIAL_MISSING
+
+    async def push_targets(self, kind: str, server: str = "") -> list[dict[str, Any]]:
+        field = PUSH_FIELD.get(kind)
+        if not field:
+            return []
+        rows = await self.sql.select_all("session_config", f"{field}=?", (1,))
+        if kind == "新闻":
+            return rows
+        server = (server or "").strip()
+        return [row for row in rows if (row.get("server") or "").strip() == server]
+
+    async def servers_with_push(self, kind: str) -> list[str]:
+        field = PUSH_FIELD.get(kind)
+        if not field:
+            return []
+        rows = await self.sql.select_all("session_config", f"{field}=?", (1,))
+        servers = []
+        for row in rows:
+            server = (row.get("server") or "").strip()
+            if server and server not in servers:
+                servers.append(server)
+        return servers
+
+    async def get_push_state(self, kind: str, server: str) -> str:
+        row = await self.sql.select_one("push_state", "kind=? AND server=?", (kind, server))
+        return "" if not row else str(row.get("status") or "")
+
+    async def set_push_state(self, kind: str, server: str, status: str) -> None:
+        row = await self.sql.select_one("push_state", "kind=? AND server=?", (kind, server))
+        if row:
+            await self.sql.update(
+                "push_state",
+                {"status": str(status)},
+                "kind=? AND server=?",
+                (kind, server),
+            )
+            return
+        await self.sql.insert(
+            "push_state",
+            {"kind": kind, "server": server, "status": str(status)},
+        )
+
+    def public_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "umo": row.get("umo", ""),
+            "display_name": row.get("display_name", ""),
+            "server": row.get("server", ""),
+            "token_status": mask_secret(row.get("token") or ""),
+            "ticket_status": mask_secret(row.get("ticket") or ""),
+            "has_token": bool((row.get("token") or "").strip()),
+            "has_ticket": bool((row.get("ticket") or "").strip()),
+            "use_global_token": bool(row.get("use_global_token")),
+            "push_kaifu": bool(row.get("push_kaifu")),
+            "push_xinwen": bool(row.get("push_xinwen")),
+            "push_shuma": bool(row.get("push_shuma")),
+            "push_chitu": bool(row.get("push_chitu")),
+        }
+
+    async def get_admin(self) -> dict[str, Any] | None:
+        return await self.sql.select_one("plugin_admin", "id=?", (1,))
+
+    async def claim_admin(self, user_id: str, name: str = "") -> tuple[bool, str]:
+        row = await self.get_admin()
+        current = ((row or {}).get("user_id") or "").strip()
+        if current and current != user_id:
+            return False, (row or {}).get("name") or current
+        await self.sql.update(
+            "plugin_admin",
+            {"user_id": user_id, "name": name, "claimed_at": _now()},
+            "id=?",
+            (1,),
+        )
+        return True, name or user_id
+
+    async def is_claimed_admin(self, user_id: str) -> bool:
+        row = await self.get_admin()
+        current = ((row or {}).get("user_id") or "").strip()
+        return bool(current) and current == str(user_id or "").strip()
+
+    async def enabled_push_kinds(self) -> list[str]:
+        kinds = []
+        for kind, field in PUSH_FIELD.items():
+            rows = await self.sql.select_all("session_config", f"{field}=?", (1,))
+            if rows:
+                kinds.append(kind)
+        return kinds
+
+
+def _now() -> str:
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")

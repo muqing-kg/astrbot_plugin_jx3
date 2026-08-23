@@ -3,15 +3,26 @@
     <header class="top-info help-header">
         <div>
             <div class="top-name">剑网三综合查询插件</div>
-            <div class="top-summary">共 17 个功能分类 · 69 项功能 · 105 条指令</div>
+            <div class="top-summary">绑定区服后查询可不写区服 · 付费功能需 Token</div>
         </div>
         <div class="top-desc">
-            指令与参数之间使用空格分隔<br>
-            带有 [ ] 的参数为可选参数
+            默认使用 AstrBot 前缀 / ，例如 /绑定 梦江南<br>
+            未写区服时使用当前会话绑定区服；付费指令需配置 Token
         </div>
     </header>
 
     <main class="section-grid">
+        <section class="section span-2">
+            <div class="section-title">会话设置</div>
+            <div class="section-body">
+                <div class="feature"><div class="feature-name">认领管理员</div><div class="commands"><span class="command">认领 剑网3机器人</span></div></div>
+                <div class="feature"><div class="feature-name">绑定区服</div><div class="commands"><span class="command">绑定 区服名</span></div></div>
+                <div class="feature"><div class="feature-name">令牌用量</div><div class="commands"><span class="command">查询令牌</span></div></div>
+                <div class="feature"><div class="feature-name">主动推送</div><div class="commands"><span class="command">打开 新闻</span><span class="command">关闭 新闻</span><span class="command">打开 开服</span><span class="command">打开 刷马</span><span class="command">打开 赤兔</span></div></div>
+                <div class="feature"><div class="feature-name">付费配置</div><div class="commands"><span class="command">私聊 Token UMO 密钥</span><span class="command">私聊 推栏 UMO 标识</span><span class="command">群内用系统 /sid 查 UMO</span></div></div>
+            </div>
+        </section>
+
         <section class="section span-2">
             <div class="section-title">活动情报</div>
             <div class="section-body">
@@ -20,15 +31,15 @@
                 <div class="feature"><div class="feature-name">关隘首领</div><div class="commands"><span class="command">关隘</span></div></div>
                 <div class="feature"><div class="feature-name">赤兔</div><div class="commands"><span class="command">赤兔</span><span class="command">本周赤兔</span></div></div>
                 <div class="feature"><div class="feature-name">阵营事件</div><div class="commands"><span class="command">阵营奉献 [阵营]</span></div></div>
-                <div class="feature"><div class="feature-name">烟花记录</div><div class="commands"><span class="command">烟花 服务器 角色</span></div></div>
-                <div class="feature"><div class="feature-name">马场查询</div><div class="commands"><span class="command">刷马 服务器</span><span class="command">马场 服务器</span></div></div>
+                <div class="feature"><div class="feature-name">烟花记录</div><div class="commands"><span class="command">烟花 [服务器] 角色 需Token</span></div></div>
+                <div class="feature"><div class="feature-name">马场查询</div><div class="commands"><span class="command">刷马 [服务器] 需Token</span><span class="command">马场 [服务器] 需Token</span></div></div>
             </div>
         </section>
 
         <section class="section">
             <div class="section-title">名剑相关</div>
             <div class="section-body">
-                <div class="feature"><div class="feature-name">名剑战绩</div><div class="commands"><span class="command">战绩 服务器 角色 [模式]</span></div></div>
+                <div class="feature"><div class="feature-name">名剑战绩</div><div class="commands"><span class="command">战绩 [服务器] 角色 [模式] 需Token+推栏</span></div></div>
                 <div class="feature"><div class="feature-name">名剑排行</div><div class="commands"><span class="command">名剑排行 [模式] [数量]</span></div></div>
                 <div class="feature"><div class="feature-name">名剑统计</div><div class="commands"><span class="command">名剑统计 [模式]</span></div></div>
             </div>
