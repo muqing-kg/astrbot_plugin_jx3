@@ -4,6 +4,8 @@ from typing import Any
 
 from astrbot.api import logger
 
+from .page_payload import read_json_payload
+
 PLUGIN_NAME = "astrbot_plugin_jx3"
 
 
@@ -28,6 +30,7 @@ class SessionPageAPI:
             ("/page/sessions/ticket", self.set_ticket, ["POST"], "设置会话推栏"),
             ("/page/sessions/use-global", self.set_use_global, ["POST"], "设置是否使用全局 Token"),
             ("/page/sessions/clear-secret", self.clear_secret, ["POST"], "清除会话密钥"),
+            ("/page/sessions/bot", self.set_bot, ["POST"], "设置会话是否启用机器人"),
         ]
         for route, handler, methods, description in routes:
             self.plugin.context.register_web_api(
@@ -38,20 +41,17 @@ class SessionPageAPI:
             )
 
     async def list_sessions(self):
-        rows = await self.plugin.sessions.list_all()
+        rows = await self.plugin.sessions.list_bound()
+        has_global_ticket = bool(self.plugin._global_ticket())
         return self.json_response({
-            "sessions": [self.plugin.sessions.public_row(row) for row in rows],
+            "sessions": [self.plugin.sessions.public_row(row, has_global_ticket=has_global_ticket) for row in rows],
             "has_global_token": bool(self.plugin._global_token()),
-            "has_global_ticket": bool(self.plugin._global_ticket()),
+            "has_global_ticket": has_global_ticket,
             "notice": "该页面仅供 AstrBot 后台主人使用，请勿暴露到公网。",
         })
 
     async def _payload(self) -> dict[str, Any]:
-        try:
-            data = await self.request.json
-            return data if isinstance(data, dict) else {}
-        except Exception:
-            return {}
+        return await read_json_payload(self.request)
 
     async def bind_session(self):
         data = await self._payload()
@@ -107,4 +107,13 @@ class SessionPageAPI:
         if not umo:
             return self.error_response("缺少 umo", status_code=400)
         await self.plugin.sessions.clear_secret(umo, kind)
+        return self.json_response({"ok": True})
+
+    async def set_bot(self):
+        data = await self._payload()
+        umo = str(data.get("umo") or "").strip()
+        enabled = bool(data.get("enabled"))
+        if not umo:
+            return self.error_response("缺少 umo", status_code=400)
+        await self.plugin.sessions.set_bot_enabled(umo, enabled)
         return self.json_response({"ok": True})
