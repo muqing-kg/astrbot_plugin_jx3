@@ -127,6 +127,58 @@ class JX3APIService:
         return_data["code"] = 200
         return return_data
 
+    def _as_list(self, data: Any) -> list:
+        if isinstance(data, list):
+            return data
+        if isinstance(data, dict):
+            for key in ("data", "list", "items", "records"):
+                value = data.get(key)
+                if isinstance(value, list):
+                    return value
+        return []
+
+    def _pick(self, item: Any, *keys, default: str = "") -> str:
+        if not isinstance(item, dict):
+            return default if default else str(item or "")
+        for key in keys:
+            value = item.get(key)
+            if value not in (None, ""):
+                return str(value)
+        return default
+
+    def _now_text(self) -> str:
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    def _table_data(self, title: str, columns: list[str], rows: list[list[str]], subtitle: str = "", note: str = "") -> dict:
+        return {
+            "title": title,
+            "subtitle": subtitle or f"更新时间：{self._now_text()}",
+            "note": note,
+            "columns": columns,
+            "rows": rows,
+        }
+
+    def _arena_mode_code(self, mode: str) -> int:
+        text = str(mode or "").strip().lower()
+        if text in {"", "1", "33", "3v3", "3"}:
+            return 1
+        if text in {"0", "22", "2v2"}:
+            return 0
+        if text in {"2", "55", "5v5", "5"}:
+            return 2
+        return 1
+
+    def _camp_code(self, camp: str) -> int:
+        text = str(camp or "").strip()
+        if text in {"2", "恶人", "恶人谷"}:
+            return 2
+        return 1
+
+    def _wanted_mode(self, mode: str) -> int:
+        text = str(mode or "").strip()
+        if text in {"2", "私密"}:
+            return 2
+        return 1
 
     # --- 业务功能函数 ---
     async def helps(self) -> Dict[str, Any]:
@@ -1801,7 +1853,365 @@ class JX3APIService:
         
 
 
+
+    async def kuafumingjian(self, server: str = "", mode: str = "33") -> Dict[str, Any]:
+        """跨服名剑"""
+        mode_code = self._arena_mode_code(mode)
+        mode_name = {0: "2v2", 1: "3v3", 2: "5v5"}.get(mode_code, "3v3")
+
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            items = self._as_list(data)
+            rows = []
+            for index, item in enumerate(items, 1):
+                rows.append([
+                    self._pick(item, "rankNum", "rank", "nRank", default=str(index)),
+                    self._pick(item, "roleName", "name", "role_name"),
+                    self._pick(item, "forceName", "force", "school"),
+                    self._pick(item, "serverName", "server", "zoneName"),
+                    self._pick(item, "score", "totalScore", "value"),
+                    self._pick(item, "winRate", "win_rate"),
+                ])
+            title = f"跨服名剑 {mode_name}"
+            subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
+            return_data["data"] = self._table_data(title, ["排名", "角色", "门派", "区服", "分数", "胜率"], rows, subtitle)
+
+        params = {"mode": mode_code, "token": self.token}
+        if server:
+            params["server"] = server
+        return await self._request_api("/rank/arena", params, processor, "data_list.html")
+
+    async def wulinzhengba(self, server: str = "", camp: str = "浩气") -> Dict[str, Any]:
+        """武林争霸"""
+        camp_code = self._camp_code(camp)
+        camp_name = "恶人谷" if camp_code == 2 else "浩气盟"
+
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            items = self._as_list(data)
+            rows = []
+            for index, item in enumerate(items, 1):
+                rows.append([
+                    self._pick(item, "rankNum", "rank", default=str(index)),
+                    self._pick(item, "tongName", "tong_name", "name"),
+                    self._pick(item, "masterName", "master_name"),
+                    self._pick(item, "serverName", "server"),
+                    self._pick(item, "score", "totalScore", "titlePoint", "value"),
+                ])
+            title = f"武林争霸 {camp_name}"
+            subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
+            return_data["data"] = self._table_data(title, ["排名", "帮会", "帮主", "区服", "积分"], rows, subtitle)
+
+        params = {"camp": camp_code, "token": self.token}
+        if server:
+            params["server"] = server
+        return await self._request_api("/rank/championship", params, processor, "data_list.html")
+
+    async def bukuai(self, server: str = "") -> Dict[str, Any]:
+        """捕快荣誉"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            items = self._as_list(data)
+            rows = []
+            for index, item in enumerate(items, 1):
+                rows.append([
+                    self._pick(item, "rankNum", "rank", default=str(index)),
+                    self._pick(item, "roleName", "name", "role_name"),
+                    self._pick(item, "forceName", "force"),
+                    self._pick(item, "serverName", "server"),
+                    self._pick(item, "score", "totalScore", "value", "bounty"),
+                ])
+            subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
+            return_data["data"] = self._table_data("捕快荣誉", ["排名", "角色", "门派", "区服", "积分"], rows, subtitle)
+
+        params = {"token": self.token}
+        if server:
+            params["server"] = server
+        return await self._request_api("/rank/constable", params, processor, "data_list.html")
+
+    async def langke(self, server: str = "") -> Dict[str, Any]:
+        """江湖浪客"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            items = self._as_list(data)
+            rows = []
+            for index, item in enumerate(items, 1):
+                rows.append([
+                    self._pick(item, "rankNum", "rank", default=str(index)),
+                    self._pick(item, "roleName", "name", "role_name"),
+                    self._pick(item, "forceName", "force"),
+                    self._pick(item, "serverName", "server"),
+                    self._pick(item, "score", "totalScore", "value", "bounty"),
+                ])
+            subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
+            return_data["data"] = self._table_data("江湖浪客", ["排名", "角色", "门派", "区服", "积分"], rows, subtitle)
+
+        params = {"token": self.token}
+        if server:
+            params["server"] = server
+        return await self._request_api("/rank/outlaw", params, processor, "data_list.html")
+
+    async def juedou(self, server: str = "", mode: str = "公开") -> Dict[str, Any]:
+        """决斗挑战"""
+        mode_code = self._wanted_mode(mode)
+        mode_name = "私密" if mode_code == 2 else "公开"
+
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            items = self._as_list(data)
+            rows = []
+            for index, item in enumerate(items, 1):
+                rows.append([
+                    self._pick(item, "rankNum", "rank", default=str(index)),
+                    self._pick(item, "roleName", "name", "role_name"),
+                    self._pick(item, "forceName", "force"),
+                    self._pick(item, "serverName", "server"),
+                    self._pick(item, "score", "totalScore", "value", "bounty"),
+                ])
+            title = f"决斗挑战 {mode_name}"
+            subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
+            return_data["data"] = self._table_data(title, ["排名", "角色", "门派", "区服", "积分"], rows, subtitle)
+
+        params = {"mode": mode_code, "token": self.token}
+        if server:
+            params["server"] = server
+        return await self._request_api("/rank/wanted", params, processor, "data_list.html")
+
+    async def zilifenbu(self, server: str, name: str, class_id: str = "1", subclass: str = "") -> Dict[str, Any]:
+        """资历分布"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            payload = data if isinstance(data, dict) else {}
+            items = self._as_list(payload.get("data", payload))
+            rows = []
+            for item in items:
+                if not isinstance(item, dict):
+                    continue
+                total = item.get("total") or item.get("totalScore") or item.get("total_points") or 0
+                done = item.get("speed") or item.get("completed") or item.get("completed_points") or 0
+                rows.append([
+                    self._pick(item, "name", "subClass", "subclass", "detail"),
+                    str(done),
+                    str(total),
+                    self._pick(item, "percent", "percent_text", default=""),
+                ])
+            role = self._pick(payload, "roleName", "name", default=name)
+            title = f"{role} 资历分布"
+            subtitle = f"{server} · 更新时间：{self._now_text()}"
+            return_data["data"] = self._table_data(title, ["分类", "已完成", "总计", "进度"], rows, subtitle)
+
+        params = {"server": server, "name": name, "class": class_id, "token": self.token, "ticket": self.ticket}
+        if subclass:
+            params["subclass"] = subclass
+        return await self._request_api("/tuilan/achievement", params, processor, "data_list.html")
+
+    async def waiguanjiage(self, Name: str, server: str = "") -> Dict[str, Any]:
+        """外观价格"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            payload = data if isinstance(data, dict) else {}
+            groups = payload.get("list")
+            if isinstance(groups, list) and groups and isinstance(groups[0], list):
+                named = []
+                labels = ["公示期", "在售期", server or "查询区服", "电信区", "双线区", "无界区"]
+                for index, group in enumerate(groups):
+                    named.append({"name": labels[index] if index < len(labels) else f"分组{index+1}", "list": group})
+                payload = dict(payload)
+                payload["list"] = named
+            return_data["data"] = payload
+
+        params = {"name": Name, "token": self.token}
+        if server:
+            params["server"] = server
+        return await self._request_api("/trade/item/records", params, processor, "wujia.html")
+
+    async def waiguansousuo(self, name: str) -> Dict[str, Any]:
+        """外观搜索"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            items = self._as_list(data)
+            rows = []
+            for item in items:
+                rows.append([
+                    self._pick(item, "name"),
+                    self._pick(item, "alias", "wblalias"),
+                    self._pick(item, "class", "subclass"),
+                    self._pick(item, "value"),
+                    self._pick(item, "date"),
+                ])
+            subtitle = f"关键词：{name} · 更新时间：{self._now_text()}"
+            return_data["data"] = self._table_data("外观搜索", ["名称", "别名", "分类", "参考价", "时间"], rows, subtitle)
+
+        return await self._request_api("/trade/item/search", {"name": name, "token": self.token}, processor, "data_list.html")
+
+    async def shapan(self, server: str) -> Dict[str, Any]:
+        """沙盘据点"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            payload = data if isinstance(data, dict) else {}
+            items = self._as_list(payload)
+            rows = []
+            for item in items:
+                rows.append([
+                    self._pick(item, "castleName", "castle_name"),
+                    self._pick(item, "tongName", "tong_name"),
+                    self._pick(item, "campName", "camp_name"),
+                    self._pick(item, "masterName", "master_name"),
+                    self._pick(item, "defend", "sacrifice", "count", default=""),
+                ])
+            title = f"{self._pick(payload, 'server', default=server)} 沙盘据点"
+            subtitle = f"更新时间：{format_time(payload.get('update')) or self._now_text()}"
+            return_data["data"] = self._table_data(title, ["据点", "帮会", "阵营", "帮主", "防守"], rows, subtitle)
+
+        return await self._request_api("/sand/records", {"server": server, "token": self.token}, processor, "data_list.html")
+
+    async def mingpianyushe(self, server: str, name: str) -> Dict[str, Any]:
+        """名片预设"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            payload = data if isinstance(data, dict) else {}
+            url = payload.get("showAvatar") or payload.get("url") or payload.get("preset")
+            if not url:
+                return_data["msg"] = "未获取到名片预设图"
+                return
+            role = self._pick(payload, "roleName", default=name)
+            server_name = self._pick(payload, "serverName", default=server)
+            like = self._pick(payload, "showLike", "like", default="0")
+            return_data["data"] = [
+                Comp.Plain(f"{server_name}-{role}"),
+                Comp.Image.fromURL(url),
+                Comp.Plain(f"点赞：{like}"),
+            ]
+
+        return await self._request_api(
+            "/card/preset",
+            {"server": server, "name": name, "token": self.token, "ticket": self.ticket},
+            processor,
+            "",
+        )
+
+    async def mingpianjilu(self, server: str, name: str) -> Dict[str, Any]:
+        """名片记录"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            payload = data if isinstance(data, dict) else {}
+            url = payload.get("showAvatar")
+            if not url:
+                return_data["msg"] = "未获取到名片图片"
+                return
+            role = self._pick(payload, "roleName", default=name)
+            server_name = self._pick(payload, "serverName", default=server)
+            return_data["data"] = [
+                Comp.Plain(f"{server_name}-{role}"),
+                Comp.Image.fromURL(url),
+            ]
+
+        return await self._request_api("/card/record", {"server": server, "name": name, "token": self.token}, processor, "")
+
+    async def qiyugonglue(self, name: str) -> Dict[str, Any]:
+        """奇遇攻略"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            payload = data if isinstance(data, dict) else {"name": name, "desc": str(data or "")}
+            rows = []
+            if isinstance(payload, dict):
+                for key, label in (
+                    ("name", "名称"),
+                    ("level", "等级"),
+                    ("type", "类型"),
+                    ("method", "触发"),
+                    ("desc", "说明"),
+                    ("note", "备注"),
+                    ("reward", "奖励"),
+                ):
+                    value = payload.get(key)
+                    if value not in (None, ""):
+                        rows.append([label, str(value)])
+                extras = payload.get("data") or payload.get("list")
+                if isinstance(extras, list):
+                    for item in extras:
+                        rows.append([
+                            self._pick(item, "name", "title", default="条目"),
+                            self._pick(item, "desc", "text", "value"),
+                        ])
+            if not rows:
+                rows = [["名称", name], ["说明", "暂无攻略内容"]]
+            return_data["data"] = self._table_data(f"{name} 奇遇攻略", ["项目", "内容"], rows)
+
+        return await self._request_api("/event/strategy", {"name": name, "token": self.token}, processor, "data_list.html")
+
+    async def peizhuang(self, name: str, tags: str = "") -> Dict[str, Any]:
+        """配装搜索"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            items = self._as_list(data)
+            if not items and isinstance(data, dict):
+                items = [data]
+            lines = [f"{name} 配装"]
+            if tags:
+                lines[0] += f"（{tags}）"
+            for item in items:
+                title = self._pick(item, "title", "name", "zlp", default="配装")
+                url = self._pick(item, "url", "link", "href")
+                mode = self._pick(item, "mode", "tags", "type")
+                piece = f"【{mode}】{title}" if mode else title
+                if url:
+                    piece += f"\n{url}"
+                lines.append(piece)
+            return_data["data"] = "\n\n".join(lines) if len(lines) > 1 else f"{name} 暂无配装结果"
+
+        params = {"name": name, "token": self.token, "ticket": self.ticket}
+        if tags:
+            params["mode"] = tags
+        return await self._request_api("/school/search", params, processor, "")
+
+    async def jisuji(self, cooldown: float = 1.5) -> Dict[str, Any]:
+        """急速计算"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            items = self._as_list(data)
+            if not items and isinstance(data, dict):
+                maybe = data.get("list") or data.get("data")
+                items = maybe if isinstance(maybe, list) else [data]
+            rows = []
+            for item in items:
+                rows.append([
+                    self._pick(item, "haste", "hastePercent", "percent", "value"),
+                    self._pick(item, "frame", "uNowFrame", "nowFrame"),
+                    self._pick(item, "time", "duration", "actual"),
+                ])
+            title = f"急速计算 CD {cooldown}"
+            return_data["data"] = self._table_data(title, ["急速", "帧数", "实际时长"], rows)
+
+        return await self._request_api("/skill/calculate", {"cooldown": cooldown, "token": self.token}, processor, "data_list.html")
+
+    async def shilianmiaoshang(self, season: str, floor: int) -> Dict[str, Any]:
+        """试炼秒伤"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            items = self._as_list(data)
+            rows = []
+            for item in items:
+                rows.append([
+                    self._pick(item, "name", "boss", "bossName"),
+                    self._pick(item, "hp", "blood", "life"),
+                    self._pick(item, "perfect", "dps180", "mainPerfect"),
+                    self._pick(item, "pass", "dps300", "mainPass"),
+                    self._pick(item, "shortPerfect", "dps120"),
+                    self._pick(item, "shortPass", "dps180short"),
+                ])
+            title = f"{season} 第{floor}层秒伤"
+            return_data["data"] = self._table_data(title, ["首领", "血量", "完美秒伤", "通关秒伤", "短时完美", "短时通关"], rows)
+
+        return await self._request_api("/trial/bosses", {"season": season, "floor": floor, "token": self.token}, processor, "data_list.html")
+
+    async def shiliansaiji(self) -> Dict[str, Any]:
+        """试炼赛季"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            items = self._as_list(data)
+            rows = []
+            for item in items:
+                bosses = item.get("bosses") or item.get("list") or item.get("order") or []
+                if isinstance(bosses, list):
+                    boss_text = " / ".join(str(x.get("name") if isinstance(x, dict) else x) for x in bosses)
+                else:
+                    boss_text = str(bosses)
+                rows.append([
+                    self._pick(item, "name", "season", "title"),
+                    self._pick(item, "start", "begin", "date"),
+                    boss_text,
+                ])
+            return_data["data"] = self._table_data("试炼赛季", ["赛季", "时间", "首领顺序"], rows)
+
+        return await self._request_api("/trial/seasons", {"token": self.token}, processor, "data_list.html")
+
     async def token_stats(self, token: str) -> dict:
+
         """查询令牌用量。POST /token/stats"""
         result = self._init_return_data()
         token = (token or "").strip()
