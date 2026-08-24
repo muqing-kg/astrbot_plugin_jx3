@@ -107,44 +107,50 @@ function sessionCard(row) {
         ${pill(row.server || "未绑定区服", Boolean(row.server))}
         ${pill("Token " + (row.token_status || "未配置"), Boolean(row.has_token || row.use_global_token))}
         ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
-        ${pill(row.use_global_token ? "使用全局Token" : "未用全局Token", Boolean(row.use_global_token))}
         ${pill(row.bot_enabled === false ? "机器人已关闭" : "机器人开启", row.bot_enabled !== false)}
       </div>
     </div>
-    <div class="grid">
-      <label class="field">
-        <span>区服</span>
-        <input data-k="server" placeholder="例如梦江南" value="${escapeHtml(row.server || "")}" />
-      </label>
-      <label class="toggle">
-        <input data-k="use_global" type="checkbox" ${row.use_global_token ? "checked" : ""} />
-        使用全局 Token
-      </label>
+    <div class="switches">
       <label class="toggle">
         <input data-k="bot_enabled" type="checkbox" ${row.bot_enabled === false ? "" : "checked"} />
         启用该会话机器人
       </label>
-      <label class="field">
-        <span>会话 Token</span>
-        <input data-k="token" type="password" placeholder="填写后保存，不回显原文" />
-      </label>
-      <label class="field">
-        <span>推栏标识</span>
-        <input data-k="ticket" type="password" placeholder="填写后保存，不回显原文" />
+      <label class="toggle">
+        <input data-k="use_global" type="checkbox" ${row.use_global_token ? "checked" : ""} />
+        使用全局 JX3API Token
       </label>
     </div>
-    <div class="actions" style="margin-top:12px">
-      <button data-act="bind" type="button">保存区服</button>
-      <button data-act="token" type="button">保存 Token</button>
-      <button data-act="clear-token" class="ghost" type="button">清除 Token</button>
-      <button data-act="ticket" type="button">保存推栏</button>
-      <button data-act="clear-ticket" class="ghost" type="button">清除推栏</button>
-    </div>
-    <div class="push-row" style="margin-top:12px">
-      <button data-act="push" data-kind="开服" data-on="${row.push_kaifu ? 0 : 1}" class="${row.push_kaifu ? "" : "ghost"}" type="button">${row.push_kaifu ? "关闭开服" : "打开开服"}</button>
-      <button data-act="push" data-kind="新闻" data-on="${row.push_xinwen ? 0 : 1}" class="${row.push_xinwen ? "" : "ghost"}" type="button">${row.push_xinwen ? "关闭新闻" : "打开新闻"}</button>
-      <button data-act="push" data-kind="刷马" data-on="${row.push_shuma ? 0 : 1}" class="${row.push_shuma ? "" : "ghost"}" type="button">${row.push_shuma ? "关闭刷马" : "打开刷马"}</button>
-      <button data-act="push" data-kind="赤兔" data-on="${row.push_chitu ? 0 : 1}" class="${row.push_chitu ? "" : "ghost"}" type="button">${row.push_chitu ? "关闭赤兔" : "打开赤兔"}</button>
+    <div class="rows">
+      <div class="row">
+        <label class="field">
+          <span>区服</span>
+          <input data-k="server" placeholder="例如梦江南" value="${escapeHtml(row.server || "")}" />
+        </label>
+        <div class="row-actions">
+          <button data-act="bind" type="button">保存区服</button>
+          <button data-act="clear-server" class="ghost" type="button">清除区服</button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>JX3API Token</span>
+          <input data-k="token" type="password" placeholder="填写后保存，不回显原文" />
+        </label>
+        <div class="row-actions">
+          <button data-act="token" type="button">保存 Token</button>
+          <button data-act="clear-token" class="ghost" type="button">清除 Token</button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>推栏标识</span>
+          <input data-k="ticket" type="password" placeholder="填写后保存，不回显原文" />
+        </label>
+        <div class="row-actions">
+          <button data-act="ticket" type="button">保存推栏</button>
+          <button data-act="clear-ticket" class="ghost" type="button">清除推栏</button>
+        </div>
+      </div>
     </div>
   `;
 
@@ -174,12 +180,12 @@ function sessionCard(row) {
     } else if (act === "ticket") {
       if (!row.umo || !ticket) return setStatus("请填写推栏标识", true);
       await run(() => apiPost("page/sessions/ticket", { umo: row.umo, ticket }));
+    } else if (act === "clear-server") {
+      await run(() => apiPost("page/sessions/clear-server", { umo: row.umo }));
     } else if (act === "clear-token") {
       await run(() => apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "token" }));
     } else if (act === "clear-ticket") {
       await run(() => apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "ticket" }));
-    } else if (act === "push") {
-      await run(() => apiPost("page/sessions/push", { umo: row.umo, kind: btn.dataset.kind, enabled: btn.dataset.on === "1" }));
     }
   });
 
@@ -188,7 +194,7 @@ function sessionCard(row) {
     try {
       if (!row.umo) throw new Error("当前会话缺少标识");
       await apiPost("page/sessions/use-global", { umo: row.umo, enabled });
-      setStatus(enabled ? "已启用全局 Token" : "已关闭全局 Token");
+      setStatus(enabled ? "已启用全局 JX3API Token" : "已关闭全局 JX3API Token");
       await load();
     } catch (err) {
       ev.target.checked = !enabled;
