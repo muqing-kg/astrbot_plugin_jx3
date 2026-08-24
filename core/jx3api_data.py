@@ -115,6 +115,9 @@ class JX3APIService:
             return_data["msg"] = "处理接口返回信息时出错"
             return return_data
 
+        if return_data.get("msg") and return_data.get("msg") != "功能函数未执行":
+            return return_data
+
         # template 为空时不加载模板
         if template:
             try:
@@ -158,13 +161,19 @@ class JX3APIService:
             "rows": rows,
         }
 
+    def _set_table(self, return_data: Dict[str, Any], title: str, columns: list[str], rows: list[list[str]], subtitle: str = "", empty_msg: str = "暂无数据") -> None:
+        if not rows:
+            return_data["msg"] = empty_msg
+            return
+        return_data["data"] = self._table_data(title, columns, rows, subtitle)
+
     def _arena_mode_code(self, mode: str) -> int:
         text = str(mode or "").strip().lower()
         if text in {"", "1", "33", "3v3", "3"}:
             return 1
-        if text in {"0", "22", "2v2"}:
+        if text in {"0", "2", "22", "2v2"}:
             return 0
-        if text in {"2", "55", "5v5", "5"}:
+        if text in {"55", "5v5", "5"}:
             return 2
         return 1
 
@@ -1873,7 +1882,7 @@ class JX3APIService:
                 ])
             title = f"跨服名剑 {mode_name}"
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
-            return_data["data"] = self._table_data(title, ["排名", "角色", "门派", "区服", "分数", "胜率"], rows, subtitle)
+            self._set_table(return_data, title, ["排名", "角色", "门派", "区服", "分数", "胜率"], rows, subtitle, "暂无排行数据")
 
         params = {"mode": mode_code, "token": self.token}
         if server:
@@ -1898,7 +1907,7 @@ class JX3APIService:
                 ])
             title = f"武林争霸 {camp_name}"
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
-            return_data["data"] = self._table_data(title, ["排名", "帮会", "帮主", "区服", "积分"], rows, subtitle)
+            self._set_table(return_data, title, ["排名", "帮会", "帮主", "区服", "积分"], rows, subtitle, "暂无排行数据")
 
         params = {"camp": camp_code, "token": self.token}
         if server:
@@ -1919,7 +1928,7 @@ class JX3APIService:
                     self._pick(item, "score", "totalScore", "value", "bounty"),
                 ])
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
-            return_data["data"] = self._table_data("捕快荣誉", ["排名", "角色", "门派", "区服", "积分"], rows, subtitle)
+            self._set_table(return_data, "捕快荣誉", ["排名", "角色", "门派", "区服", "积分"], rows, subtitle, "暂无排行数据")
 
         params = {"token": self.token}
         if server:
@@ -1940,7 +1949,7 @@ class JX3APIService:
                     self._pick(item, "score", "totalScore", "value", "bounty"),
                 ])
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
-            return_data["data"] = self._table_data("江湖浪客", ["排名", "角色", "门派", "区服", "积分"], rows, subtitle)
+            self._set_table(return_data, "江湖浪客", ["排名", "角色", "门派", "区服", "积分"], rows, subtitle, "暂无排行数据")
 
         params = {"token": self.token}
         if server:
@@ -1965,7 +1974,7 @@ class JX3APIService:
                 ])
             title = f"决斗挑战 {mode_name}"
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
-            return_data["data"] = self._table_data(title, ["排名", "角色", "门派", "区服", "积分"], rows, subtitle)
+            self._set_table(return_data, title, ["排名", "角色", "门派", "区服", "积分"], rows, subtitle, "暂无排行数据")
 
         params = {"mode": mode_code, "token": self.token}
         if server:
@@ -1992,7 +2001,7 @@ class JX3APIService:
             role = self._pick(payload, "roleName", "name", default=name)
             title = f"{role} 资历分布"
             subtitle = f"{server} · 更新时间：{self._now_text()}"
-            return_data["data"] = self._table_data(title, ["分类", "已完成", "总计", "进度"], rows, subtitle)
+            self._set_table(return_data, title, ["分类", "已完成", "总计", "进度"], rows, subtitle, "暂无资历分布数据")
 
         params = {"server": server, "name": name, "class": class_id, "token": self.token, "ticket": self.ticket}
         if subclass:
@@ -2032,7 +2041,7 @@ class JX3APIService:
                     self._pick(item, "date"),
                 ])
             subtitle = f"关键词：{name} · 更新时间：{self._now_text()}"
-            return_data["data"] = self._table_data("外观搜索", ["名称", "别名", "分类", "参考价", "时间"], rows, subtitle)
+            self._set_table(return_data, "外观搜索", ["名称", "别名", "分类", "参考价", "时间"], rows, subtitle, "暂无外观搜索结果")
 
         return await self._request_api("/trade/item/search", {"name": name, "token": self.token}, processor, "data_list.html")
 
@@ -2052,7 +2061,7 @@ class JX3APIService:
                 ])
             title = f"{self._pick(payload, 'server', default=server)} 沙盘据点"
             subtitle = f"更新时间：{format_time(payload.get('update')) or self._now_text()}"
-            return_data["data"] = self._table_data(title, ["据点", "帮会", "阵营", "帮主", "防守"], rows, subtitle)
+            self._set_table(return_data, title, ["据点", "帮会", "阵营", "帮主", "防守"], rows, subtitle, "暂无沙盘数据")
 
         return await self._request_api("/sand/records", {"server": server, "token": self.token}, processor, "data_list.html")
 
@@ -2122,9 +2131,7 @@ class JX3APIService:
                             self._pick(item, "name", "title", default="条目"),
                             self._pick(item, "desc", "text", "value"),
                         ])
-            if not rows:
-                rows = [["名称", name], ["说明", "暂无攻略内容"]]
-            return_data["data"] = self._table_data(f"{name} 奇遇攻略", ["项目", "内容"], rows)
+            self._set_table(return_data, f"{name} 奇遇攻略", ["项目", "内容"], rows, empty_msg="暂无攻略内容")
 
         return await self._request_api("/event/strategy", {"name": name, "token": self.token}, processor, "data_list.html")
 
@@ -2167,7 +2174,7 @@ class JX3APIService:
                     self._pick(item, "time", "duration", "actual"),
                 ])
             title = f"急速计算 CD {cooldown}"
-            return_data["data"] = self._table_data(title, ["急速", "帧数", "实际时长"], rows)
+            self._set_table(return_data, title, ["急速", "帧数", "实际时长"], rows, empty_msg="暂无急速数据")
 
         return await self._request_api("/skill/calculate", {"cooldown": cooldown, "token": self.token}, processor, "data_list.html")
 
@@ -2186,7 +2193,7 @@ class JX3APIService:
                     self._pick(item, "shortPass", "dps180short"),
                 ])
             title = f"{season} 第{floor}层秒伤"
-            return_data["data"] = self._table_data(title, ["首领", "血量", "完美秒伤", "通关秒伤", "短时完美", "短时通关"], rows)
+            self._set_table(return_data, title, ["首领", "血量", "完美秒伤", "通关秒伤", "短时完美", "短时通关"], rows, empty_msg="暂无秒伤数据")
 
         return await self._request_api("/trial/bosses", {"season": season, "floor": floor, "token": self.token}, processor, "data_list.html")
 
@@ -2206,7 +2213,7 @@ class JX3APIService:
                     self._pick(item, "start", "begin", "date"),
                     boss_text,
                 ])
-            return_data["data"] = self._table_data("试炼赛季", ["赛季", "时间", "首领顺序"], rows)
+            self._set_table(return_data, "试炼赛季", ["赛季", "时间", "首领顺序"], rows, empty_msg="暂无赛季数据")
 
         return await self._request_api("/trial/seasons", {"token": self.token}, processor, "data_list.html")
 
