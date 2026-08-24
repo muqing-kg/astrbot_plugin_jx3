@@ -440,10 +440,6 @@ class MessageBuilder:
         """ 资历分布 服务器 角色 [分类] """
         return await self.T2I_image_msg(event, lambda: self.jx3api.zilifenbu(server, name, class_id, subclass))
 
-    async def  waiguanjiage(self, event: AstrMessageEvent, Name: str, server: str = ""):
-        """ 外观价格 外观名 [服务器] """
-        return await self.T2I_image_msg(event, lambda: self.jx3api.wujia(Name, server))
-
     async def  waiguansousuo(self, event: AstrMessageEvent, name: str):
         """ 外观搜索 关键词 """
         return await self.T2I_image_msg(event, lambda: self.jx3api.waiguansousuo(name))
@@ -451,10 +447,6 @@ class MessageBuilder:
     async def  mingpianyushe(self, event: AstrMessageEvent, server: str, name: str):
         """ 名片预设 服务器 角色 """
         return await self.plain_chain(event, lambda: self.jx3api.mingpianyushe(server, name))
-
-    async def  mingpianjilu(self, event: AstrMessageEvent, server: str, name: str):
-        """ 名片记录 服务器 角色 """
-        return await self.plain_chain(event, lambda: self.jx3api.mingpianjilu(server, name))
 
     async def  jisuji(self, event: AstrMessageEvent, cooldown: float = 1.5):
         """ 急速 [技能CD] """
@@ -640,22 +632,6 @@ class MessageBuilder:
         """ 舔狗语录"""
         return await self.plain_msg(event, self.jx3api.tiangou)
 
-    async def  fkxq4(self, event: AstrMessageEvent):
-        """ 疯狂星期四"""
-        return await self.plain_msg(event, lambda: self.jx3api.fengleiyulu("疯狂星期四"))
-
-    async def  caihongpi(self, event: AstrMessageEvent):
-        """ 彩虹屁"""
-        return await self.plain_msg(event, lambda: self.jx3api.fengleiyulu("彩虹屁"))
-
-    async def  dujitang(self, event: AstrMessageEvent):
-        """ 毒鸡汤"""
-        return await self.plain_msg(event, lambda: self.jx3api.fengleiyulu("毒鸡汤"))
-
-    async def  pengyouquan(self, event: AstrMessageEvent):
-        """ 朋友圈"""
-        return await self.plain_msg(event, lambda: self.jx3api.fengleiyulu("朋友圈"))
-
     async def  heshengme(self, event: AstrMessageEvent,):
         """ 喝什么"""
         return await self.plain_msg(event, self.jx3api.heshengme)
@@ -695,10 +671,6 @@ class MessageBuilder:
     async def  jigai(self, event: AstrMessageEvent,):
         """ 技改"""
         return await self.plain_msg(event, self.jx3api.jigai)
-
-    async def  jiemi(self, event: AstrMessageEvent):
-        """ 解密"""
-        return await self.plain_msg(event, self.jx3api.jiemi)
 
     async def  fubeng(self, event: AstrMessageEvent, server:str, name:str):
         """ 副本"""

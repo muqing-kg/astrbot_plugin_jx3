@@ -1582,19 +1582,6 @@ class JX3APIService:
         ) 
 
 
-    async def fengleiyulu(self, name:str) -> Dict[str, Any]:
-        """分类语录"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            return_data["data"] = data.get('content')
-
-        return await self._request_api(
-            path="/saohua/context",
-            params= { "name": name, "token": self.token},
-            processor=processor,
-            template=""
-        ) 
-
-
     async def heshengme(self) -> Dict[str, Any]:
         """喝什么"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
@@ -1735,27 +1722,6 @@ class JX3APIService:
         return await self._request_api(
             path="/skill/rework",
             params= {},
-            processor=processor,
-            template=""
-        ) 
-
-
-    async def jiemi(self) -> Dict[str, Any]:
-        """解密"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            return_data["data"] = "\n".join([
-                "解密",
-                f"当前时间：{data.get('nowTime', '')}",
-                f"当前节点：{data.get('nowNode', '')}",
-                f"当前结果：{data.get('nowResult', '')}",
-                f"下轮节点：{data.get('nextNode', '')}",
-                f"下轮结果：{data.get('nextResult', '')}",
-                f"剩余时间：{data.get('intervalTime', '')}",
-            ])
-
-        return await self._request_api(
-            path="/mech/decrypt",
-            params= {"token": self.token},
             processor=processor,
             template=""
         ) 
@@ -2022,25 +1988,6 @@ class JX3APIService:
             params["subclass"] = subclass
         return await self._request_api("/tuilan/achievement", params, processor, "data_list.html")
 
-    async def waiguanjiage(self, Name: str, server: str = "") -> Dict[str, Any]:
-        """外观价格"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            payload = data if isinstance(data, dict) else {}
-            groups = payload.get("list")
-            if isinstance(groups, list) and groups and isinstance(groups[0], list):
-                named = []
-                labels = ["公示期", "在售期", server or "查询区服", "电信区", "双线区", "无界区"]
-                for index, group in enumerate(groups):
-                    named.append({"name": labels[index] if index < len(labels) else f"分组{index+1}", "list": group})
-                payload = dict(payload)
-                payload["list"] = named
-            return_data["data"] = payload
-
-        params = {"name": Name, "token": self.token}
-        if server:
-            params["server"] = server
-        return await self._request_api("/trade/item/records", params, processor, "wujia.html")
-
     async def waiguansousuo(self, name: str) -> Dict[str, Any]:
         """外观搜索"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
@@ -2102,23 +2049,6 @@ class JX3APIService:
             processor,
             "",
         )
-
-    async def mingpianjilu(self, server: str, name: str) -> Dict[str, Any]:
-        """名片记录"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            payload = data if isinstance(data, dict) else {}
-            url = payload.get("showAvatar")
-            if not url:
-                return_data["msg"] = "未获取到名片图片"
-                return
-            role = self._pick(payload, "roleName", default=name)
-            server_name = self._pick(payload, "serverName", default=server)
-            return_data["data"] = [
-                Comp.Plain(f"{server_name}-{role}"),
-                Comp.Image.fromURL(url),
-            ]
-
-        return await self._request_api("/card/record", {"server": server, "name": name, "token": self.token}, processor, "")
 
     async def qiyugonglue(self, name: str) -> Dict[str, Any]:
         """奇遇攻略"""
