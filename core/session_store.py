@@ -134,6 +134,23 @@ class SessionStore:
         await self.sql.update("session_config", data, "umo=?", (umo,))
         return await self.get(umo)
 
+    async def clear_server(self, umo: str) -> dict[str, Any]:
+        await self.ensure(umo)
+        await self.sql.update(
+            "session_config",
+            {
+                "server": "",
+                "push_kaifu": 0,
+                "push_xinwen": 0,
+                "push_shuma": 0,
+                "push_chitu": 0,
+                "updated_at": _now(),
+            },
+            "umo=?",
+            (umo,),
+        )
+        return await self.get(umo)
+
     async def set_push(self, umo: str, kind: str, enabled: bool) -> tuple[bool, str]:
         if kind not in PUSH_FIELD:
             return False, "不支持的推送类型"

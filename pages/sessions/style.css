@@ -82,28 +82,44 @@ button.danger { background: #8b3b3b; }
   color: var(--muted);
 }
 .pill.on { background: #d9efe3; color: var(--ok); }
-.grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
+.switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  margin-bottom: 16px;
 }
-.field { display: grid; gap: 6px; }
+.rows { display: grid; gap: 12px; }
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 12px;
+  align-items: end;
+}
+.field { display: grid; gap: 6px; min-width: 0; }
 .field span { font-size: 12px; color: var(--muted); }
 .field input {
   width: 100%;
+  min-height: 40px;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
 }
-.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.row-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.row-actions button {
+  min-height: 40px;
+  width: 100%;
+}
 .toggle {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
 }
-.push-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .empty {
   padding: 28px;
   text-align: center;
@@ -113,5 +129,5 @@ button.danger { background: #8b3b3b; }
   border-radius: var(--radius);
 }
 @media (max-width: 720px) {
-  .grid, .card-head { grid-template-columns: 1fr; display: grid; }
+  .card-head, .row { grid-template-columns: 1fr; display: grid; }
 }

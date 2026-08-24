@@ -25,6 +25,7 @@ class SessionPageAPI:
         routes = [
             ("/page/sessions", self.list_sessions, ["GET"], "列出会话绑定"),
             ("/page/sessions/bind", self.bind_session, ["POST"], "绑定会话区服"),
+            ("/page/sessions/clear-server", self.clear_server, ["POST"], "清除会话区服"),
             ("/page/sessions/push", self.set_push, ["POST"], "设置会话推送"),
             ("/page/sessions/token", self.set_token, ["POST"], "设置会话 Token"),
             ("/page/sessions/ticket", self.set_ticket, ["POST"], "设置会话推栏"),
@@ -60,6 +61,15 @@ class SessionPageAPI:
         if not umo or not server:
             return self.error_response("缺少 umo 或区服", status_code=400)
         await self.plugin.sessions.bind_server(umo, server)
+        return self.json_response({"ok": True})
+
+    async def clear_server(self):
+        data = await self._payload()
+        umo = str(data.get("umo") or "").strip()
+        if not umo:
+            return self.error_response("缺少 umo", status_code=400)
+        await self.plugin.sessions.clear_server(umo)
+        await self.plugin.jx3at.refresh_jobs()
         return self.json_response({"ok": True})
 
     async def set_push(self):
