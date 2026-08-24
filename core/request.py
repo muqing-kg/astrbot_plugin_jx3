@@ -129,7 +129,7 @@ class APIClient:
             if code not in [200, "0", 0, 1]:
                 msg = data.get('msg') or data.get('message', '未知错误')
                 logger.error(f"API业务报错: code={code}, msg={msg}")
-                return None
+                return {"_error": str(msg), "_code": code}
         
         return data
 
@@ -148,6 +148,8 @@ class APIClient:
         if data is None:
             return None
         if isinstance(data, bytes):
+            return data
+        if isinstance(data, dict) and data.get("_error"):
             return data
         if key and isinstance(data, dict):
             return data.get(key, {})
