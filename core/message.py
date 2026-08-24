@@ -416,6 +416,58 @@ class MessageBuilder:
         """ 试炼排行 服务器 心法 """
         return await self.T2I_image_msg(event, lambda: self.jx3api.shilianpaixing(name, server))
 
+    async def  kuafumingjian(self, event: AstrMessageEvent, server: str = "", mode: str = "33"):
+        """ 跨服名剑 [服务器] [模式] """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.kuafumingjian(server, mode))
+
+    async def  wulinzhengba(self, event: AstrMessageEvent, server: str = "", camp: str = "浩气"):
+        """ 武林争霸 [服务器] [阵营] """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.wulinzhengba(server, camp))
+
+    async def  bukuai(self, event: AstrMessageEvent, server: str = ""):
+        """ 捕快 [服务器] """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.bukuai(server))
+
+    async def  langke(self, event: AstrMessageEvent, server: str = ""):
+        """ 浪客 [服务器] """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.langke(server))
+
+    async def  juedou(self, event: AstrMessageEvent, server: str = "", mode: str = "公开"):
+        """ 决斗 [服务器] [公开/私密] """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.juedou(server, mode))
+
+    async def  zilifenbu(self, event: AstrMessageEvent, server: str, name: str, class_id: str = "1", subclass: str = ""):
+        """ 资历分布 服务器 角色 [分类] """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.zilifenbu(server, name, class_id, subclass))
+
+    async def  waiguanjiage(self, event: AstrMessageEvent, Name: str, server: str = ""):
+        """ 外观价格 外观名 [服务器] """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.waiguanjiage(Name, server))
+
+    async def  waiguansousuo(self, event: AstrMessageEvent, name: str):
+        """ 外观搜索 关键词 """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.waiguansousuo(name))
+
+    async def  mingpianyushe(self, event: AstrMessageEvent, server: str, name: str):
+        """ 名片预设 服务器 角色 """
+        return await self.plain_chain(event, lambda: self.jx3api.mingpianyushe(server, name))
+
+    async def  mingpianjilu(self, event: AstrMessageEvent, server: str, name: str):
+        """ 名片记录 服务器 角色 """
+        return await self.plain_chain(event, lambda: self.jx3api.mingpianjilu(server, name))
+
+    async def  jisuji(self, event: AstrMessageEvent, cooldown: float = 1.5):
+        """ 急速 [技能CD] """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.jisuji(cooldown))
+
+    async def  shilianmiaoshang(self, event: AstrMessageEvent, season: str, floor: int):
+        """ 试炼秒伤 赛季 层数 """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.shilianmiaoshang(season, floor))
+
+    async def  shiliansaiji(self, event: AstrMessageEvent):
+        """ 试炼赛季 """
+        return await self.T2I_image_msg(event, self.jx3api.shiliansaiji)
+
     async def  zhengyingpaimai(self, event: AstrMessageEvent,server: str , name: str = "", limit: int = 50 ):
         """ 阵营拍卖 物品名称 服务器"""
         return await self.T2I_image_msg(event, lambda: self.jx3api.zhengyingpaimai(server, name, limit))
@@ -430,7 +482,7 @@ class MessageBuilder:
 
     async def  wujia(self, event: AstrMessageEvent,Name: str , server: str = ""):
         """ 物价 外观名称 服务器"""    
-        return await self.T2I_image_msg(event, lambda: self.jx3api.wujia(Name, server)) 
+        return await self.T2I_image_msg(event, lambda: self.jx3api.waiguanjiage(Name, server))
 
     async def  chengbeng(self, event: AstrMessageEvent, server: str ,Name: str ,source : int = 0):
         """ 成本 服务器 物品名称 """    
@@ -446,7 +498,7 @@ class MessageBuilder:
 
     async def  shapan(self, event: AstrMessageEvent,server: str = ""):
         """ 沙盘 服务器"""
-        return await self.image_msg(event, lambda: self.aijx3.shapan(server))  
+        return await self.T2I_image_msg(event, lambda: self.jx3api.shapan(server))
 
     async def  zhueevent(self, event: AstrMessageEvent, server: str):
         """ 诛恶事件 服务器"""
@@ -486,7 +538,7 @@ class MessageBuilder:
 
     async def  qiyugonglue(self, event: AstrMessageEvent,name: str):
         """ 攻略 奇遇"""
-        return await self.T2I_image_msg(event, lambda: self.jx3box.qiyugonglue(name))
+        return await self.T2I_image_msg(event, lambda: self.jx3api.qiyugonglue(name))
 
     async def  jingnai(self, event: AstrMessageEvent, server: str, name: str):
         """ 精耐 服务器 角色 """
@@ -510,7 +562,7 @@ class MessageBuilder:
 
     async def  peizhuang(self, event: AstrMessageEvent,name: str, tags: str = ""):
         """ 配装 心法 类型"""
-        return await self.plain_msg(event, lambda: self.jx3box.peizhuang(name,tags))
+        return await self.plain_msg(event, lambda: self.jx3api.peizhuang(name,tags))
 
     async def  zilipaixing(self, event: AstrMessageEvent, server: str = "", school: str = ""):
         """ 资历排行 服务器 门派 """

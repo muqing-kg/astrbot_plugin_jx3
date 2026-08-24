@@ -47,7 +47,7 @@ from .core.page_api import SessionPageAPI
 @register("astrbot_plugin_jx3",
           "muqing-kg",
           "聚合剑网三游戏数据，提供查询、图片渲染、本地避雷和后台推送。",
-          "3.3.3",
+          "3.3.4",
           "https://github.com/muqing-kg/astrbot_plugin_jx3"
 )
 class Jx3ApiPlugin(Star):
@@ -192,6 +192,19 @@ class Jx3ApiPlugin(Star):
             "本周恶人五十强": self.jx3cmd.benzhouerenwushiqiang,
             "本周浩气五十强": self.jx3cmd.benzhouhaoqiwushiqiang,
             "试炼排行": self.jx3cmd.shilianpaixing,
+            "跨服名剑": self.jx3cmd.kuafumingjian,
+            "武林争霸": self.jx3cmd.wulinzhengba,
+            "捕快": self.jx3cmd.bukuai,
+            "浪客": self.jx3cmd.langke,
+            "决斗": self.jx3cmd.juedou,
+            "资历分布": self.jx3cmd.zilifenbu,
+            "外观价格": self.jx3cmd.waiguanjiage,
+            "外观搜索": self.jx3cmd.waiguansousuo,
+            "名片预设": self.jx3cmd.mingpianyushe,
+            "名片记录": self.jx3cmd.mingpianjilu,
+            "急速": self.jx3cmd.jisuji,
+            "试炼秒伤": self.jx3cmd.shilianmiaoshang,
+            "试炼赛季": self.jx3cmd.shiliansaiji,
             "阵营拍卖": self.jx3cmd.zhengyingpaimai,
             "的卢": self.jx3cmd.dilujilu,
             "金价": self.jx3cmd.jinjia,

@@ -1,0 +1,31 @@
+{# template-title: {{ title }} #}
+{# template-components: data-table #}
+
+
+<div class="container data-page">
+    <h1>{{ title }}</h1>
+    <div class="data-page__meta">{{ subtitle }}</div>
+
+    {% if note %}
+    <div class="data-note">{{ note }}</div>
+    {% endif %}
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                {% for col in columns %}
+                <th>{{ col }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+        {% for row in rows %}
+            <tr>
+                {% for cell in row %}
+                <td class="data-cell--wrap">{{ cell }}</td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>

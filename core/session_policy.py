@@ -23,6 +23,9 @@ NEED_TICKET = frozenset({
     "资历排行",
     "技能",
     "奇穴",
+    "资历分布",
+    "名片预设",
+    "配装",
 })
 
 NEED_TOKEN = frozenset({
@@ -41,6 +44,9 @@ NEED_TOKEN = frozenset({
     "聊天", "骗子", "拜师", "收徒", "招募", "团长", "团牌",
     "疯狂星期四", "彩虹屁", "毒鸡汤", "朋友圈",
     "贴吧物价", "818", "解密", "副本", "掉落",
+    "跨服名剑", "武林争霸", "捕快", "浪客", "决斗",
+    "资历分布", "外观价格", "外观搜索", "名片预设", "名片记录",
+    "急速", "试炼秒伤", "试炼赛季", "沙盘", "攻略", "配装",
 })
 
 # 命令最少需要的非服务器参数个数。少填了就把绑定服插到最前。
@@ -59,10 +65,12 @@ SERVER_ARITY = {
     "精耐": 1, "成就": 2, "角色": 1, "资历排行": 0, "聊天": 1, "统战": 0,
     "花价": 0, "拜师": 0, "收徒": 0, "招募": 0, "团长": 0, "团牌": 0,
     "开服": 0, "副本": 1, "资历": 1, "交易行": 1,
+    "跨服名剑": 0, "武林争霸": 0, "捕快": 0, "浪客": 0, "决斗": 0,
+    "资历分布": 1, "名片预设": 1, "名片记录": 1,
 }
 
 SERVER_SECOND_COMMANDS = frozenset({
-    "物价", "统计", "骗子", "贴吧物价", "掉落",
+    "物价", "统计", "骗子", "贴吧物价", "掉落", "外观价格",
 })
 
 
@@ -98,9 +106,13 @@ def _is_optional_tail(cmd: str, value: str) -> bool:
     text = (value or "").strip()
     if not text:
         return False
-    if cmd == "战绩" and text.lower() in MODE_TOKENS:
+    if cmd in {"战绩", "跨服名剑"} and text.lower() in MODE_TOKENS:
         return True
-    if cmd in {"金价", "阵营拍卖", "近期", "汇总", "聊天"} and text.isdigit():
+    if cmd == "武林争霸" and text in {"浩气", "恶人", "浩气盟", "恶人谷", "1", "2"}:
+        return True
+    if cmd == "决斗" and text in {"公开", "私密", "1", "2"}:
+        return True
+    if cmd in {"金价", "阵营拍卖", "近期", "汇总", "聊天", "资历分布"} and text.isdigit():
         return True
     if cmd == "阵营拍卖" and not text.isdigit():
         return True
