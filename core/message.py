@@ -442,7 +442,7 @@ class MessageBuilder:
 
     async def  waiguanjiage(self, event: AstrMessageEvent, Name: str, server: str = ""):
         """ 外观价格 外观名 [服务器] """
-        return await self.T2I_image_msg(event, lambda: self.jx3api.waiguanjiage(Name, server))
+        return await self.T2I_image_msg(event, lambda: self.jx3api.wujia(Name, server))
 
     async def  waiguansousuo(self, event: AstrMessageEvent, name: str):
         """ 外观搜索 关键词 """
@@ -482,7 +482,7 @@ class MessageBuilder:
 
     async def  wujia(self, event: AstrMessageEvent,Name: str , server: str = ""):
         """ 物价 外观名称 服务器"""    
-        return await self.T2I_image_msg(event, lambda: self.jx3api.waiguanjiage(Name, server))
+        return await self.T2I_image_msg(event, lambda: self.jx3api.wujia(Name, server))
 
     async def  chengbeng(self, event: AstrMessageEvent, server: str ,Name: str ,source : int = 0):
         """ 成本 服务器 物品名称 """    
@@ -498,7 +498,7 @@ class MessageBuilder:
 
     async def  shapan(self, event: AstrMessageEvent,server: str = ""):
         """ 沙盘 服务器"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.shapan(server))
+        return await self.image_msg(event, lambda: self.aijx3.shapan(server))
 
     async def  zhueevent(self, event: AstrMessageEvent, server: str):
         """ 诛恶事件 服务器"""
@@ -538,7 +538,7 @@ class MessageBuilder:
 
     async def  qiyugonglue(self, event: AstrMessageEvent,name: str):
         """ 攻略 奇遇"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.qiyugonglue(name))
+        return await self.T2I_image_msg(event, lambda: self.jx3box.qiyugonglue(name))
 
     async def  jingnai(self, event: AstrMessageEvent, server: str, name: str):
         """ 精耐 服务器 角色 """
@@ -562,7 +562,7 @@ class MessageBuilder:
 
     async def  peizhuang(self, event: AstrMessageEvent,name: str, tags: str = ""):
         """ 配装 心法 类型"""
-        return await self.plain_msg(event, lambda: self.jx3api.peizhuang(name,tags))
+        return await self.plain_msg(event, lambda: self.jx3box.peizhuang(name,tags))
 
     async def  zilipaixing(self, event: AstrMessageEvent, server: str = "", school: str = ""):
         """ 资历排行 服务器 门派 """

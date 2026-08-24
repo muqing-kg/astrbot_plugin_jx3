@@ -104,6 +104,9 @@ class JX3APIService:
         return_data = self._init_return_data()
 
         data = await self._base_request(path, params)
+        if isinstance(data, dict) and data.get("_error"):
+            return_data["msg"] = self._token_error_message(data.get("_error"))
+            return return_data
         if data is None:
             return_data["msg"] = "获取接口信息失败"
             return return_data
@@ -151,6 +154,17 @@ class JX3APIService:
 
     def _now_text(self) -> str:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    def _token_error_message(self, raw: Any) -> str:
+        text = str(raw or "").strip()
+        lowered = text.lower()
+        if any(key in lowered for key in ("expire", "expired")) or "过期" in text:
+            return "JX3API Token 已过期，请更换或续费后再试。可发送 /查询令牌 查看状态。"
+        if any(key in lowered for key in ("quota", "limit", "remaining", "insufficient", "count")) or any(key in text for key in ("次数", "余额", "额度", "用尽", "不足")):
+            return "JX3API Token 次数已用尽，请更换或续费后再试。可发送 /查询令牌 查看剩余次数。"
+        if "token" in lowered or "令牌" in text:
+            return f"JX3API Token 不可用：{text}。可发送 /查询令牌 查看状态。"
+        return text or "获取接口信息失败"
 
     def _table_data(self, title: str, columns: list[str], rows: list[list[str]], subtitle: str = "", note: str = "") -> dict:
         return {
