@@ -47,7 +47,7 @@ from .core.page_api import SessionPageAPI
 @register("astrbot_plugin_jx3",
           "muqing-kg",
           "聚合剑网三游戏数据，提供查询、图片渲染、本地避雷和后台推送。",
-          "3.3.0",
+          "3.3.2",
           "https://github.com/muqing-kg/astrbot_plugin_jx3"
 )
 class Jx3ApiPlugin(Star):
@@ -433,6 +433,11 @@ class Jx3ApiPlugin(Star):
         if not parts:
             return
 
+        umo = self._event_umo(event)
+        row = await self.sessions.ensure(umo, self._event_display_name(event))
+        if not self.sessions.is_bot_enabled(row) and parts[0] != "认领":
+            return
+
         admin_ret = await self._handle_admin_command(event, parts)
         if admin_ret is not None:
             event.stop_event()
@@ -444,8 +449,6 @@ class Jx3ApiPlugin(Star):
         if not handler:
             return
 
-        umo = self._event_umo(event)
-        row = await self.sessions.ensure(umo, self._event_display_name(event))
         bound = (row.get("server") or "").strip()
         injected = inject_server_args(cmd, args, bound)
         if injected == UNBOUND_SERVER:

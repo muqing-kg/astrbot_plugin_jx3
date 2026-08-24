@@ -75,7 +75,8 @@
     padding: 7px 13px 10px;
 }
 
-.span-2 .section-body {
+.span-2 .section-body,
+.span-3 .section-body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -154,9 +155,10 @@
 }
 
 .ranking-list {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     gap: 5px;
+    align-items: center;
 }
 
 .ranking-list .command {

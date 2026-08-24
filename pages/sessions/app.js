@@ -86,7 +86,7 @@ function render(payload) {
   const sessions = payload.sessions || [];
   cardsEl.innerHTML = "";
   if (!sessions.length) {
-    cardsEl.innerHTML = '<div class="empty">暂无会话。群里先发一条指令或完成绑定后会出现在这里。</div>';
+    cardsEl.innerHTML = '<div class="empty">暂无已绑定区服的群/私聊。先在对应会话发送 /绑定 区服名。</div>';
     return;
   }
   for (const row of sessions) {
@@ -108,6 +108,7 @@ function sessionCard(row) {
         ${pill("Token " + (row.token_status || "未配置"), Boolean(row.has_token || row.use_global_token))}
         ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
         ${pill(row.use_global_token ? "使用全局Token" : "未用全局Token", Boolean(row.use_global_token))}
+        ${pill(row.bot_enabled === false ? "机器人已关闭" : "机器人开启", row.bot_enabled !== false)}
       </div>
     </div>
     <div class="grid">
@@ -118,6 +119,10 @@ function sessionCard(row) {
       <label class="toggle">
         <input data-k="use_global" type="checkbox" ${row.use_global_token ? "checked" : ""} />
         使用全局 Token
+      </label>
+      <label class="toggle">
+        <input data-k="bot_enabled" type="checkbox" ${row.bot_enabled === false ? "" : "checked"} />
+        启用该会话机器人
       </label>
       <label class="field">
         <span>会话 Token</span>
@@ -184,6 +189,18 @@ function sessionCard(row) {
       if (!row.umo) throw new Error("当前会话缺少标识");
       await apiPost("page/sessions/use-global", { umo: row.umo, enabled });
       setStatus(enabled ? "已启用全局 Token" : "已关闭全局 Token");
+      await load();
+    } catch (err) {
+      ev.target.checked = !enabled;
+      setStatus(err.message || "保存失败", true);
+    }
+  });
+  card.querySelector('[data-k="bot_enabled"]').addEventListener("change", async (ev) => {
+    const enabled = ev.target.checked;
+    try {
+      if (!row.umo) throw new Error("当前会话缺少标识");
+      await apiPost("page/sessions/bot", { umo: row.umo, enabled });
+      setStatus(enabled ? "已开启该会话机器人" : "已关闭该会话机器人");
       await load();
     } catch (err) {
       ev.target.checked = !enabled;

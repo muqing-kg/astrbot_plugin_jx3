@@ -45,10 +45,17 @@ class SessionStore:
                 push_xinwen INTEGER DEFAULT 0,
                 push_shuma INTEGER DEFAULT 0,
                 push_chitu INTEGER DEFAULT 0,
+                bot_enabled INTEGER DEFAULT 1,
                 updated_at TEXT DEFAULT ''
             )
             """
         )
+        try:
+            await self.sql.execute(
+                "ALTER TABLE session_config ADD COLUMN bot_enabled INTEGER DEFAULT 1"
+            )
+        except Exception:
+            pass
         await self.sql.execute(
             """
             CREATE TABLE IF NOT EXISTS plugin_admin (
@@ -101,6 +108,7 @@ class SessionStore:
                 "push_xinwen": 0,
                 "push_shuma": 0,
                 "push_chitu": 0,
+                "bot_enabled": 1,
                 "updated_at": _now(),
             },
         )
@@ -113,6 +121,10 @@ class SessionStore:
 
     async def list_all(self) -> list[dict[str, Any]]:
         return await self.sql.select_all("session_config")
+
+    async def list_bound(self) -> list[dict[str, Any]]:
+        rows = await self.list_all()
+        return [row for row in rows if (row.get("server") or "").strip()]
 
     async def bind_server(self, umo: str, server: str, display_name: str = "") -> dict[str, Any]:
         await self.ensure(umo, display_name)
@@ -153,6 +165,22 @@ class SessionStore:
             "umo=?",
             (umo,),
         )
+
+    async def set_bot_enabled(self, umo: str, enabled: bool) -> None:
+        await self.ensure(umo)
+        await self.sql.update(
+            "session_config",
+            {"bot_enabled": 1 if enabled else 0, "updated_at": _now()},
+            "umo=?",
+            (umo,),
+        )
+
+    def is_bot_enabled(self, row: dict[str, Any] | None) -> bool:
+        if not row:
+            return True
+        if "bot_enabled" not in row or row.get("bot_enabled") is None:
+            return True
+        return bool(row.get("bot_enabled"))
 
     async def set_use_global_token(self, umo: str, enabled: bool) -> None:
         await self.ensure(umo)
@@ -195,6 +223,7 @@ class SessionStore:
         if not field:
             return []
         rows = await self.sql.select_all("session_config", f"{field}=?", (1,))
+        rows = [row for row in rows if self.is_bot_enabled(row)]
         if kind == "新闻":
             return rows
         server = (server or "").strip()
@@ -231,16 +260,21 @@ class SessionStore:
             {"kind": kind, "server": server, "status": str(status)},
         )
 
-    def public_row(self, row: dict[str, Any]) -> dict[str, Any]:
+    def public_row(self, row: dict[str, Any], has_global_ticket: bool = False) -> dict[str, Any]:
+        has_own_ticket = bool((row.get("ticket") or "").strip())
+        ticket_status = mask_secret(row.get("ticket") or "")
+        if not has_own_ticket and has_global_ticket:
+            ticket_status = "使用全局"
         return {
             "umo": row.get("umo", ""),
             "display_name": row.get("display_name", ""),
             "server": row.get("server", ""),
             "token_status": mask_secret(row.get("token") or ""),
-            "ticket_status": mask_secret(row.get("ticket") or ""),
+            "ticket_status": ticket_status,
             "has_token": bool((row.get("token") or "").strip()),
-            "has_ticket": bool((row.get("ticket") or "").strip()),
+            "has_ticket": has_own_ticket or has_global_ticket,
             "use_global_token": bool(row.get("use_global_token")),
+            "bot_enabled": self.is_bot_enabled(row),
             "push_kaifu": bool(row.get("push_kaifu")),
             "push_xinwen": bool(row.get("push_xinwen")),
             "push_shuma": bool(row.get("push_shuma")),
