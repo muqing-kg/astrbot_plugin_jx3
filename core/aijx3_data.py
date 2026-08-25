@@ -86,14 +86,14 @@ class AIJX3Service:
 
         data = await self._base_request(path, params)
         if data is None:
-            return_data["msg"] = "获取接口信息失败"
+            return_data["msg"] = "接口请求失败"
             return return_data
 
         try:
             await processor(data, return_data)
         except Exception as e:
             logger.exception(f"数据处理时出错: {e}")
-            return_data["msg"] = "处理接口返回信息时出错"
+            return_data["msg"] = "接口数据处理失败"
             return return_data
 
         # template 为空时不加载模板

@@ -108,14 +108,14 @@ class JX3APIService:
             return_data["msg"] = self._token_error_message(data.get("_error"))
             return return_data
         if data is None:
-            return_data["msg"] = "获取接口信息失败"
+            return_data["msg"] = f"接口请求失败：{path}"
             return return_data
 
         try:
             await processor(data, return_data)
         except Exception as e:
             logger.exception(f"数据处理时出错: {e}")
-            return_data["msg"] = "处理接口返回信息时出错"
+            return_data["msg"] = f"接口数据处理失败：{path}"
             return return_data
 
         if return_data.get("msg") and return_data.get("msg") != "功能函数未执行":
@@ -164,7 +164,7 @@ class JX3APIService:
             return "JX3API Token 次数已用尽，请更换或续费后再试。可发送 /查询令牌 查看剩余次数。"
         if "token" in lowered or "令牌" in text:
             return f"JX3API Token 不可用：{text}。可发送 /查询令牌 查看状态。"
-        return text or "获取接口信息失败"
+        return text or "接口请求失败"
 
     def _table_data(self, title: str, columns: list[str], rows: list[list[str]], subtitle: str = "", note: str = "") -> dict:
         return {
@@ -206,6 +206,7 @@ class JX3APIService:
     # --- 业务功能函数 ---
     async def helps(self) -> Dict[str, Any]:
         """帮助"""
+        from .command_catalog import help_rows
         return_data = self._init_return_data()
         
         # 加载模板
@@ -215,9 +216,24 @@ class JX3APIService:
             logger.error(f"加载模板失败: {e}")
             return_data["msg"] = "系统错误：模板文件不存在"
             return return_data
-            
+        catalog = getattr(self, "command_catalog", None)
+        return_data["data"] = {"rows": help_rows(catalog)}
         return_data["code"] = 200
    
+        return return_data
+
+    async def notice_manage(self, display_name: str, server: str, enabled) -> Dict[str, Any]:
+        """通知管理"""
+        from .event_catalog import build_notice_view
+        return_data = self._init_return_data()
+        try:
+            return_data["temp"] = await load_template("notice.html")
+        except FileNotFoundError as e:
+            logger.error(f"加载模板失败: {e}")
+            return_data["msg"] = "系统错误：模板文件不存在"
+            return return_data
+        return_data["data"] = build_notice_view(display_name, server, enabled)
+        return_data["code"] = 200
         return return_data
 
 
@@ -448,15 +464,28 @@ class JX3APIService:
         """马场"""
         # 数据处理
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            data0 = data.get("data") 
-            return_data["data"] = (
-                f"【区服】：{data.get('server')}\n"
-                f"【阴山大草原】\n{', '.join(data0.get('阴山大草原') or [])}\n"
-                f"【鲲鹏岛】\n{', '.join(data0.get('鲲鹏岛') or [])}\n"
-                f"【黑戈壁】\n{', '.join(data0.get('黑戈壁') or [])}\n"
-                f"【龙泉府 / 进图（21:10）】\n{', '.join(data0.get('龙泉府 / 进图（21:10）') or [])}\n"
-                f"\n{data.get('note')}\n"
-            )
+            maps = data.get("data") or {}
+            server_name = data.get("server") or server
+            lines = [f"{server_name}·马场告示"]
+            preferred = ["阴山大草原", "黑戈壁", "鲲鹏岛", "龙泉府 / 进图（21:10）"]
+            names = [name for name in preferred if name in maps] or list(maps.keys())
+            for name in names:
+                lines.append("--------------------------------")
+                lines.append(str(name))
+                values = maps.get(name) or []
+                if isinstance(values, str):
+                    values = [values]
+                if values:
+                    lines.extend(str(item) for item in values if str(item).strip())
+                else:
+                    lines.append("时间尚久，无法预知。")
+            note = str(data.get("note") or "").strip()
+            if note:
+                lines.append("--------------------------------")
+                lines.append(note)
+            lines.append("")
+            lines.append("数据仅供参考，请以游戏内为准。")
+            return_data["data"] = "\n".join(lines)
             
         return await self._request_api(
             path="/ranch/records",
@@ -782,6 +811,21 @@ class JX3APIService:
         ) 
 
 
+
+    def _card_update_text(self, ts) -> str:
+        try:
+            value = int(ts)
+        except (TypeError, ValueError):
+            return ""
+        if value > 10_000_000_000:
+            value //= 1000
+        try:
+            from zoneinfo import ZoneInfo
+            dt = datetime.fromtimestamp(value, tz=ZoneInfo("Asia/Shanghai"))
+        except (OSError, OverflowError, ValueError):
+            return ""
+        return dt.strftime("%m/%d %H:%M")
+
     async def jueshemingpian(self, server: str, name: str) -> Dict[str, Any]:
         """名片缓存"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
@@ -790,10 +834,16 @@ class JX3APIService:
                 return_data["msg"] = "未获取到名片图片"
                 return return_data
 
-            server_name = data.get("serverName", server)
-            role_name = data.get("roleName", name)
+            zone_name = data.get("zoneName") or ""
+            server_name = data.get("serverName") or server
+            role_name = data.get("roleName") or name
             show_like = data.get("showLike", 0)
-            msg = f"{server_name}-{role_name}\n点赞：{show_like}"
+            title = " · ".join(part for part in (zone_name, server_name, role_name) if part)
+            updated = self._card_update_text(data.get("cacheTime"))
+            like_line = f"获赞 {show_like} 次"
+            if updated:
+                like_line = f"{like_line} · 名片更新于 {updated}"
+            msg = f"{title}\n{like_line}"
 
             return_data["data"] = [
                 Comp.Plain(msg),
@@ -1078,12 +1128,12 @@ class JX3APIService:
                 if not isinstance(item, dict):
                     continue
 
-                server = item.get("server") or "未知服务器"
-                name = item.get("name") or "未知角色名"
+                item_server = item.get("server") or "未知服务器"
+                item_name = item.get("name") or "未知角色名"
                 time_text = format_time(item.get("time", 0))
 
                 role_history_lines.append(
-                    f"{time_text}　{server}·{name}"
+                    f"{time_text}　{item_server}·{item_name}"
                 )
 
             if role_history_lines:
@@ -1098,12 +1148,12 @@ class JX3APIService:
                 if not isinstance(item, dict):
                     continue
 
-                server = item.get("server") or "未知服务器"
+                item_server = item.get("server") or "未知服务器"
                 tong_name = item.get("name") or "无帮会"
                 time_text = format_time(item.get("time", 0))
 
                 tong_history_lines.append(
-                    f"{time_text}　{server}·{tong_name}"
+                    f"{time_text}　{item_server}·{tong_name}"
                 )
 
             if tong_history_lines:
@@ -1111,22 +1161,30 @@ class JX3APIService:
             else:
                 tong_history_text = "暂无帮会历史记录"
 
+            history_names = []
+            for item in role_names:
+                if isinstance(item, dict) and item.get("name"):
+                    if item.get("name") not in history_names:
+                        history_names.append(item.get("name"))
+            if not history_names and data.get("roleName"):
+                history_names = [data.get("roleName")]
+            history_tongs = []
+            for item in tong_names:
+                if isinstance(item, dict) and item.get("name") and item.get("name") not in history_tongs:
+                    history_tongs.append(item.get("name"))
+            if not history_tongs and data.get("tongName"):
+                history_tongs = [data.get("tongName")]
+            role = data.get("roleName") or name
             return_data["data"] = (
-                f"服务器：{data.get('zoneName') or '未知'}·"
-                f"{data.get('serverName') or '未知'}\n"
-                f"名称：{data.get('roleName') or '未知'}\n"
-                f"角色ID：{data.get('roleId') or '未知'}\n"
-                f"推栏ID：{data.get('globalId') or '未知'}\n"
-                f"职业：{data.get('forceName') or '未知'}·"
-                f"{data.get('bodyName') or '未知'}\n"
-                f"帮会：{data.get('tongName') or '无帮会'}\n"
-                f"阵营：{data.get('campName') or '未知'}\n"
-                f"\n"
-                f"【角色历史】\n"
-                f"{role_history_text}\n"
-                f"\n"
-                f"【帮会历史】\n"
-                f"{tong_history_text}"
+                f"{role}·详细信息：\n"
+                f"所属服务器：{data.get('zoneName') or '未知'}·{data.get('serverName') or server}\n"
+                f"角色体型：{data.get('forceName') or '未知'}·{data.get('bodyName') or '未知'}\n"
+                f"角色阵营：{data.get('campName') or '未知'}\n"
+                f"角色帮会：{data.get('tongName') or '无帮会'}\n"
+                f"角色标识：{data.get('roleId') or '未知'}\n"
+                f"全服标识：{data.get('globalId') or data.get('globalRoleId') or '未知'}\n"
+                f"历史名称：{'、'.join(history_names) or '无'}\n"
+                f"历史帮会：{'、'.join(history_tongs) or '无'}"
             )
 
         return await self._request_api(
@@ -1135,6 +1193,36 @@ class JX3APIService:
             processor=processor,
             template=""
         ) 
+
+
+    async def zaixian(self, server: str, name: str) -> Dict[str, Any]:
+        """角色在线"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            payload = data if isinstance(data, dict) else {}
+            online = payload.get("onlineStatus")
+            if online is None:
+                online = payload.get("online")
+            state = "游戏在线" if online in {True, 1, "1", "true", "在线"} else "游戏离线"
+            title = " · ".join(part for part in (
+                payload.get("zoneName") or "",
+                payload.get("serverName") or server,
+                payload.get("roleName") or name,
+            ) if part)
+            return_data["data"] = (
+                f"{title}\n"
+                f"门派体型：{payload.get('forceName') or '未知'} · {payload.get('bodyName') or '未知'}\n"
+                f"所属阵营：{payload.get('campName') or '未知'}\n"
+                f"所在帮会：{payload.get('tongName') or '无帮会'}\n"
+                f"角色标识：{payload.get('roleId') or '未知'}\n"
+                f"登录状态：{state}"
+            )
+
+        return await self._request_api(
+            path="/role/detail",
+            params={"server": server, "name": name, "history": 0, "token": self.token},
+            processor=processor,
+            template="",
+        )
 
 
     async def zhenyan(self, name: str) -> Dict[str, Any]:
@@ -1384,39 +1472,6 @@ class JX3APIService:
             params= {"name": name},
             processor=processor,
             template="xiaoyao.html"
-        ) 
-
-
-    async def pianzhi(self, server:str, uid: str) -> Dict[str, Any]:
-        """骗子查询"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            records = data["records"]
-
-            if not records:
-                result_msg = "未找到该用户行骗记录，很棒！继续保持！"
-            else:
-                result_msg = ""
-
-                for record in records:
-                    result_msg += f"区服：{record['server']}  标签：{record['tieba']}\n\n"
-
-                    for item in record["data"]:
-                        result_msg += f"标题：{item['title']}\n"
-                        result_msg += f"地址：{item['url']}\n"
-                        result_msg += f"ID：{item['tid']}\n"
-                        result_msg += f"内容：{item['text']}\n"
-                        result_msg += (
-                            f"时间：{datetime.fromtimestamp(item['time']).strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                        )
-
-                    result_msg += "\n\n"
-            return_data["data"] = result_msg
-
-        return await self._request_api(
-            path="/fraud/detail",
-            params= {"server": server, "uid": uid, "token": self.token},
-            processor=processor,
-            template=""
         ) 
 
 
@@ -1687,15 +1742,32 @@ class JX3APIService:
             list_data = data[0]
             status = list_data.get("status")
             
-            if status == 1:
-                status_str = f"{server}服务器已开服，快冲，快冲！"
-                status_bool = True
+            opened = str(status) in {"1", "True", "true", "已开服"} or status == 1
+            status_bool = bool(opened)
+            zone = list_data.get("zone") or ""
+            if zone.endswith("大区"):
+                zone_label = zone
+            elif zone.endswith("区"):
+                zone_label = zone[:-1] + "大区"
+            elif zone:
+                zone_label = f"{zone}大区"
             else:
-                status_str = f"{server}服务器当前维护中，等会再来吧！"
-                status_bool = False
-
+                zone_label = "未知大区"
+            state = "已开服" if opened else "维护中"
+            version = list_data.get("version") or list_data.get("now_version") or "未知"
+            maintain = format_time(list_data.get("maintainTime") or list_data.get("maintain") or list_data.get("time"))
+            opened_at = format_time(list_data.get("openTime") or list_data.get("lastOpen") or "")
+            if maintain:
+                maintain = datetime.strptime(maintain, "%Y-%m-%d %H:%M:%S").strftime("%m月%d日 %H:%M:%S") if len(maintain) >= 19 else maintain
+            if opened_at:
+                opened_at = datetime.strptime(opened_at, "%Y-%m-%d %H:%M:%S").strftime("%m月%d日 %H:%M:%S") if len(opened_at) >= 19 else opened_at
             return_data["status"] = status_bool
-            return_data["data"] = status_str
+            return_data["data"] = (
+                f"{zone_label}：{list_data.get('server') or server} 「 {state} 」\n"
+                f"最新版本：{version}\n"
+                f"维护时间：{maintain or '未知'}\n"
+                f"上次开服：{opened_at or '未知'}"
+            )
 
         return await self._request_api(
             path="/server/status/check",

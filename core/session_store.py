@@ -3,12 +3,11 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from .event_catalog import GLOBAL_KINDS, PUSH_FIELD, PUSH_TYPES
 from .session_policy import (
     CREDENTIAL_MISSING,
     NEED_TICKET,
     NEED_TOKEN,
-    PUSH_FIELD,
-    PUSH_TYPES,
     UNBOUND_SERVER,
     mask_secret,
     resolve_query_server,
@@ -45,17 +44,51 @@ class SessionStore:
                 push_xinwen INTEGER DEFAULT 0,
                 push_shuma INTEGER DEFAULT 0,
                 push_chitu INTEGER DEFAULT 0,
+                push_gengxin INTEGER DEFAULT 0,
+                push_bagua INTEGER DEFAULT 0,
+                push_guanai INTEGER DEFAULT 0,
+                push_yuncong INTEGER DEFAULT 0,
+                push_qiyu INTEGER DEFAULT 0,
+                push_fuyao INTEGER DEFAULT 0,
+                push_dilu INTEGER DEFAULT 0,
+                push_diaoluo INTEGER DEFAULT 0,
+                push_paimai INTEGER DEFAULT 0,
+                push_zhue INTEGER DEFAULT 0,
+                push_zhuihun INTEGER DEFAULT 0,
+                push_jisi INTEGER DEFAULT 0,
+                push_xuanzhan INTEGER DEFAULT 0,
+                push_judian INTEGER DEFAULT 0,
+                push_weibo INTEGER DEFAULT 0,
                 bot_enabled INTEGER DEFAULT 1,
                 updated_at TEXT DEFAULT ''
             )
             """
         )
-        try:
-            await self.sql.execute(
-                "ALTER TABLE session_config ADD COLUMN bot_enabled INTEGER DEFAULT 1"
-            )
-        except Exception:
-            pass
+        extra_columns = [
+            "bot_enabled INTEGER DEFAULT 1",
+            "push_gengxin INTEGER DEFAULT 0",
+            "push_bagua INTEGER DEFAULT 0",
+            "push_guanai INTEGER DEFAULT 0",
+            "push_yuncong INTEGER DEFAULT 0",
+            "push_qiyu INTEGER DEFAULT 0",
+            "push_fuyao INTEGER DEFAULT 0",
+            "push_dilu INTEGER DEFAULT 0",
+            "push_diaoluo INTEGER DEFAULT 0",
+            "push_paimai INTEGER DEFAULT 0",
+            "push_zhue INTEGER DEFAULT 0",
+            "push_zhuihun INTEGER DEFAULT 0",
+            "push_jisi INTEGER DEFAULT 0",
+            "push_xuanzhan INTEGER DEFAULT 0",
+            "push_judian INTEGER DEFAULT 0",
+            "push_weibo INTEGER DEFAULT 0",
+        ]
+        for column in extra_columns:
+            try:
+                await self.sql.execute(
+                    f"ALTER TABLE session_config ADD COLUMN {column}"
+                )
+            except Exception:
+                pass
         await self.sql.execute(
             """
             CREATE TABLE IF NOT EXISTS plugin_admin (
@@ -128,6 +161,11 @@ class SessionStore:
 
     async def bind_server(self, umo: str, server: str, display_name: str = "") -> dict[str, Any]:
         await self.ensure(umo, display_name)
+        resolver = getattr(self, "resolve_server", None)
+        if callable(resolver):
+            official = resolver(server)
+            if official:
+                server = official
         data = {"server": server.strip(), "updated_at": _now()}
         if display_name:
             data["display_name"] = display_name
@@ -140,10 +178,7 @@ class SessionStore:
             "session_config",
             {
                 "server": "",
-                "push_kaifu": 0,
-                "push_xinwen": 0,
-                "push_shuma": 0,
-                "push_chitu": 0,
+                **{field: 0 for field in PUSH_FIELD.values()},
                 "updated_at": _now(),
             },
             "umo=?",
@@ -155,7 +190,7 @@ class SessionStore:
         if kind not in PUSH_FIELD:
             return False, "不支持的推送类型"
         row = await self.ensure(umo)
-        if enabled and not (row.get("server") or "").strip():
+        if enabled and kind not in GLOBAL_KINDS and not (row.get("server") or "").strip():
             return False, "请先绑定区服后再打开推送。"
         await self.sql.update(
             "session_config",
@@ -241,10 +276,24 @@ class SessionStore:
             return []
         rows = await self.sql.select_all("session_config", f"{field}=?", (1,))
         rows = [row for row in rows if self.is_bot_enabled(row)]
-        if kind == "新闻":
+        if kind in GLOBAL_KINDS:
             return rows
         server = (server or "").strip()
-        return [row for row in rows if (row.get("server") or "").strip() == server]
+        resolver = getattr(self, "resolve_server", None)
+        if callable(resolver):
+            official = resolver(server)
+            if official:
+                server = official
+        matched = []
+        for row in rows:
+            bound = (row.get("server") or "").strip()
+            if callable(resolver):
+                official_bound = resolver(bound)
+                if official_bound:
+                    bound = official_bound
+            if bound == server:
+                matched.append(row)
+        return matched
 
     async def servers_with_push(self, kind: str) -> list[str]:
         field = PUSH_FIELD.get(kind)
@@ -252,8 +301,13 @@ class SessionStore:
             return []
         rows = await self.sql.select_all("session_config", f"{field}=?", (1,))
         servers = []
+        resolver = getattr(self, "resolve_server", None)
         for row in rows:
             server = (row.get("server") or "").strip()
+            if callable(resolver):
+                official = resolver(server)
+                if official:
+                    server = official
             if server and server not in servers:
                 servers.append(server)
         return servers
@@ -296,6 +350,7 @@ class SessionStore:
             "push_xinwen": bool(row.get("push_xinwen")),
             "push_shuma": bool(row.get("push_shuma")),
             "push_chitu": bool(row.get("push_chitu")),
+            "pushes": {kind: bool(row.get(field)) for kind, field in PUSH_FIELD.items()},
         }
 
     async def get_admin(self) -> dict[str, Any] | None:
@@ -318,6 +373,11 @@ class SessionStore:
         row = await self.get_admin()
         current = ((row or {}).get("user_id") or "").strip()
         return bool(current) and current == str(user_id or "").strip()
+
+    def enabled_kinds(self, row: dict[str, Any] | None) -> set[str]:
+        if not row:
+            return set()
+        return {kind for kind, field in PUSH_FIELD.items() if row.get(field)}
 
     async def enabled_push_kinds(self) -> list[str]:
         kinds = []

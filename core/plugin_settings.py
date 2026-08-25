@@ -1,0 +1,83 @@
+from __future__ import annotations
+
+import json
+from typing import Any
+
+from .sqlite import AsyncSQLiteDB
+
+
+class PluginSettings:
+    def __init__(self, sqlite: AsyncSQLiteDB):
+        self.sql = sqlite
+
+    async def init(self) -> None:
+        await self.sql.execute(
+            """
+            CREATE TABLE IF NOT EXISTS plugin_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT DEFAULT ''
+            )
+            """
+        )
+
+    async def _get(self, key: str) -> str:
+        row = await self.sql.select_one("plugin_settings", "key=?", (key,))
+        return "" if not row else str(row.get("value") or "")
+
+    async def _set(self, key: str, value: str) -> None:
+        row = await self.sql.select_one("plugin_settings", "key=?", (key,))
+        if row:
+            await self.sql.update("plugin_settings", {"value": value}, "key=?", (key,))
+            return
+        await self.sql.insert("plugin_settings", {"key": key, "value": value})
+
+    async def command_overrides(self) -> dict[str, str]:
+        raw = await self._get("command_overrides")
+        if not raw:
+            return {}
+        try:
+            data = json.loads(raw)
+        except Exception:
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        return {str(k): str(v) for k, v in data.items() if str(k) and str(v)}
+
+    async def server_aliases(self) -> dict[str, str]:
+        raw = await self._get("server_aliases")
+        if not raw:
+            return {}
+        try:
+            data = json.loads(raw)
+        except Exception:
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        out = {}
+        for key, value in data.items():
+            if isinstance(value, list):
+                out[str(key)] = "，".join(str(item) for item in value if str(item).strip())
+            else:
+                out[str(key)] = str(value)
+        return out
+
+    async def set_command_overrides(self, overrides: dict[str, str]) -> None:
+        await self._set("command_overrides", json.dumps(overrides, ensure_ascii=False))
+
+    async def set_server_aliases(self, aliases: dict[str, str]) -> None:
+        await self._set("server_aliases", json.dumps(aliases, ensure_ascii=False))
+
+    async def command_descs(self) -> dict[str, str]:
+        raw = await self._get("command_descs")
+        if not raw:
+            return {}
+        try:
+            data = json.loads(raw)
+        except Exception:
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        return {str(k): str(v) for k, v in data.items() if str(k) and str(v)}
+
+    async def set_command_descs(self, descs: dict[str, str]) -> None:
+        await self._set("command_descs", json.dumps(descs, ensure_ascii=False))

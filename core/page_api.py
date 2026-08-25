@@ -32,6 +32,12 @@ class SessionPageAPI:
             ("/page/sessions/use-global", self.set_use_global, ["POST"], "设置是否使用全局 Token"),
             ("/page/sessions/clear-secret", self.clear_secret, ["POST"], "清除会话密钥"),
             ("/page/sessions/bot", self.set_bot, ["POST"], "设置会话是否启用机器人"),
+            ("/page/commands", self.list_commands, ["GET"], "列出全局命令"),
+            ("/page/commands/save", self.save_command, ["POST"], "保存全局命令"),
+            ("/page/commands/reset", self.reset_commands, ["POST"], "恢复默认命令"),
+            ("/page/servers", self.list_servers, ["GET"], "列出区服别名"),
+            ("/page/servers/save", self.save_server, ["POST"], "保存区服别名"),
+            ("/page/servers/reset", self.reset_servers, ["POST"], "恢复默认区服别名"),
         ]
         for route, handler, methods, description in routes:
             self.plugin.context.register_web_api(
@@ -60,8 +66,12 @@ class SessionPageAPI:
         server = str(data.get("server") or "").strip()
         if not umo or not server:
             return self.error_response("缺少 umo 或区服", status_code=400)
-        await self.plugin.sessions.bind_server(umo, server)
-        return self.json_response({"ok": True})
+        from .server_catalog import canonical_server
+        official = canonical_server(self.plugin.server_catalog, server)
+        if not official:
+            return self.error_response("未识别的区服。请使用正式区服名或已配置的别名。", status_code=400)
+        await self.plugin.sessions.bind_server(umo, official)
+        return self.json_response({"ok": True, "server": official})
 
     async def clear_server(self):
         data = await self._payload()
@@ -127,3 +137,76 @@ class SessionPageAPI:
             return self.error_response("缺少 umo", status_code=400)
         await self.plugin.sessions.set_bot_enabled(umo, enabled)
         return self.json_response({"ok": True})
+
+    async def list_commands(self):
+        from .command_catalog import public_command_rows
+        return self.json_response({
+            "commands": public_command_rows(self.plugin.command_catalog),
+            "notice": "命令修改全局生效。改名后只认新命令，不再认旧命令。",
+        })
+
+    async def save_command(self):
+        from .command_catalog import apply_command_overrides, set_command_name
+        data = await self._payload()
+        command_id = str(data.get("id") or "").strip()
+        name = str(data.get("command") or "").strip()
+        desc = str(data.get("desc") or "").strip()
+        catalog, error = set_command_name(self.plugin.command_catalog, command_id, name)
+        if error:
+            return self.error_response(error, status_code=400)
+        if desc:
+            catalog[command_id]["desc"] = desc
+        overrides = await self.plugin.settings.command_overrides()
+        if name == command_id:
+            overrides.pop(command_id, None)
+        else:
+            overrides[command_id] = name
+        await self.plugin.settings.set_command_overrides(overrides)
+        descs = await self.plugin.settings.command_descs()
+        if desc:
+            descs[command_id] = desc
+        else:
+            descs.pop(command_id, None)
+        await self.plugin.settings.set_command_descs(descs)
+        self.plugin.command_catalog = apply_command_overrides(overrides)
+        for key, value in descs.items():
+            if key in self.plugin.command_catalog and value:
+                self.plugin.command_catalog[key]["desc"] = value
+        self.plugin.jx3api.command_catalog = self.plugin.command_catalog
+        return self.json_response({"ok": True})
+
+    async def reset_commands(self):
+        from .command_catalog import apply_command_overrides
+        await self.plugin.settings.set_command_overrides({})
+        await self.plugin.settings.set_command_descs({})
+        self.plugin.command_catalog = apply_command_overrides({})
+        self.plugin.jx3api.command_catalog = self.plugin.command_catalog
+        return self.json_response({"ok": True})
+
+    async def list_servers(self):
+        from .server_catalog import public_server_rows
+        return self.json_response({
+            "servers": public_server_rows(self.plugin.server_catalog),
+            "notice": "别名全局生效。查询和绑定可用别名，返回内容始终用正式区服名。",
+        })
+
+    async def save_server(self):
+        from .server_catalog import apply_alias_overrides, set_server_aliases
+        data = await self._payload()
+        server = str(data.get("server") or "").strip()
+        aliases = str(data.get("aliases") or "").strip()
+        catalog, error = set_server_aliases(self.plugin.server_catalog, server, aliases)
+        if error:
+            return self.error_response(error, status_code=400)
+        stored = await self.plugin.settings.server_aliases()
+        stored[server] = aliases
+        await self.plugin.settings.set_server_aliases(stored)
+        self.plugin.server_catalog = apply_alias_overrides(stored)
+        return self.json_response({"ok": True})
+
+    async def reset_servers(self):
+        from .server_catalog import apply_alias_overrides
+        await self.plugin.settings.set_server_aliases({})
+        self.plugin.server_catalog = apply_alias_overrides({})
+        return self.json_response({"ok": True})
+
