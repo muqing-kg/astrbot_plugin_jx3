@@ -1,7 +1,9 @@
-{# template-title: 区服状态面板 #}
+{# template-title: 区服状态 #}
 {# template-components: data-layout collection-card #}
 
 
+<div class="container">
+    <h1>区服状态</h1>
     <!-- 无界区 -->
     <div class="collection-section">
         <div class="collection-heading">无界区（{{ server_wj|length if server_wj else 0 }}）</div>
@@ -43,3 +45,4 @@
         <div class="collection-empty">暂无数据</div>
         {% endif %}
     </div>
+</div>

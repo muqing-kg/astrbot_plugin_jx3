@@ -1,98 +1,122 @@
-{# template-title: 剑网三 战绩面板 #}
+{# template-title: 角色战绩 #}
 
-<div class="panel">
 
-    <!-- 角色信息 -->
-    <div class="header">
-        <div>
-            <div class="role-name">{{ roleName }}</div>
-            <div class="sub-info">
-                {{ serverName }} ｜ {{ forceName }} ｜ {{ campName }} ｜ {{ tongName }}
-            </div>
-        </div>
-        <div class="sub-info">
-            角色ID：{{ roleId }}
-        </div>
-    </div>
+<div class="container">
+    <h1>角色战绩 • {{ serverName }} • {{ roleName }}</h1>
 
-    <!-- 头像 + 当前 3v3 表现 -->
-    <div class="stats-wrap">
-
-        <!-- 右侧数据 -->
-        <div class="stats">
-            <div class="stat-box">
-                <div class="stat-title">名剑积分</div>
-                <div class="stat-value mmr">{{ performance['3v3'].mmr }}</div>
-            </div>
-
-            <div class="stat-box">
-                <div class="stat-title">名剑段位</div>
-                <div class="stat-value">{{ performance['3v3'].grade }}</div>
-            </div>
-
-            <div class="stat-box">
-                <div class="stat-title">胜率</div>
-                <div class="stat-value winrate">{{ performance['3v3'].winRate }}%</div>
-            </div>
-
-            <div class="stat-box">
-                <div class="stat-title">总场数</div>
-                <div class="stat-value">{{ performance['3v3'].totalCount }}</div>
-            </div>
-
-            <div class="stat-box">
-                <div class="stat-title">MVP次数</div>
-                <div class="stat-value">{{ performance['3v3'].mvpCount }}</div>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- 对战记录表 -->
-    <table>
+    {% if performance.get('2v2') %}
+    <table class="data-table table-striped">
         <thead>
-        <tr>
-            <th class="time-col">开始时间</th>
-            <th class="duration-col">对战时长</th>
-            <th class="kungfu-col">心法</th>
-            <th class="result-col">胜负</th>
-            <th class="score-col">积分变化</th>
-            <th class="score-col">最终积分</th>
-            <th class="grade-col">平均段位</th>
-            <th class="mvp-col">MVP</th>
-        </tr>
+            <tr>
+                <th>2v2</th>
+                <th>总场次</th>
+                <th>最佳</th>
+                <th>胜场</th>
+                <th>胜率</th>
+                <th>评分</th>
+                <th>周排名</th>
+            </tr>
         </thead>
+        <tbody>
+            <tr>
+                <td>{{ performance['2v2'].grade }}段</td>
+                <td>{{ performance['2v2'].totalCount }}</td>
+                <td>{{ performance['2v2'].mvpCount }}</td>
+                <td>{{ performance['2v2'].winCount }}</td>
+                <td>{{ performance['2v2'].winRate }}%</td>
+                <td>{{ performance['2v2'].mmr }}</td>
+                <td>{{ performance['2v2'].ranking }}</td>
+            </tr>
+        </tbody>
+    </table>
+    {% endif %}
 
+    {% if performance.get('3v3') %}
+    <table class="data-table table-striped">
+        <thead>
+            <tr>
+                <th>3v3</th>
+                <th>总场次</th>
+                <th>最佳</th>
+                <th>胜场</th>
+                <th>胜率</th>
+                <th>评分</th>
+                <th>周排名</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ performance['3v3'].grade }}段</td>
+                <td>{{ performance['3v3'].totalCount }}</td>
+                <td>{{ performance['3v3'].mvpCount }}</td>
+                <td>{{ performance['3v3'].winCount }}</td>
+                <td>{{ performance['3v3'].winRate }}%</td>
+                <td>{{ performance['3v3'].mmr }}</td>
+                <td>{{ performance['3v3'].ranking }}</td>
+            </tr>
+        </tbody>
+    </table>
+    {% endif %}
+
+    {% if performance.get('5v5') %}
+    <table class="data-table table-striped">
+        <thead>
+            <tr>
+                <th>5v5</th>
+                <th>总场次</th>
+                <th>最佳</th>
+                <th>胜场</th>
+                <th>胜率</th>
+                <th>评分</th>
+                <th>周排名</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>{{ performance['5v5'].grade }}段</td>
+                <td>{{ performance['5v5'].totalCount }}</td>
+                <td>{{ performance['5v5'].mvpCount }}</td>
+                <td>{{ performance['5v5'].winCount }}</td>
+                <td>{{ performance['5v5'].winRate }}%</td>
+                <td>{{ performance['5v5'].mmr }}</td>
+                <td>{{ performance['5v5'].ranking }}</td>
+            </tr>
+        </tbody>
+    </table>
+    {% endif %}
+
+    <table class="data-table table-striped">
+        <thead>
+            <tr>
+                <th>心法</th>
+                <th>比赛模式</th>
+                <th>评分变化</th>
+                <th>比赛时长</th>
+                <th>结束时间</th>
+                <th>比赛结果</th>
+            </tr>
+        </thead>
         <tbody>
         {% for m in history %}
             <tr>
-                <td class="time-col start-time" data-ts="{{ m.startTime }}">{{ m.startTime }}</td>
-                <td class="duration-col">{{ m.endTime - m.startTime }}</td>
-                <td class="kungfu-col">{{ m.kungfu }}</td>
-                <td class="result-col {{ 'win' if m.won else 'lose' }}">{{ '胜' if m.won else '负' }}</td>
-                <td class="score-col {{ 'mmr-up' if m.mmr > 0 else 'mmr-down' }}">
-                    {{ m.mmr }}
-                </td>
-                <td class="score-col">{{ m.totalMmr }}</td>
-                <td class="grade-col">{{ m.avgGrade }}</td>
-                <td class="mvp-col {{ 'mvp' if m.mvp else '' }}">
-                    {{ '是' if m.mvp else '-' }}
-                </td>
+                <td>{{ m.kungfu }}</td>
+                <td>{{ m.avgGrade }}段 {{ m.pvpType }}</td>
+                <td class="{{ 'mmr-up' if m.mmr > 0 else 'mmr-down' }}">{{ m.totalMmr }} {{ m.mmr }}</td>
+                <td>{{ m.endTime - m.startTime }}</td>
+                <td class="start-time" data-ts="{{ m.startTime }}">{{ m.startTime }}</td>
+                <td class="{{ 'win' if m.won else 'lose' }}">{{ '胜利' if m.won else '失败' }}</td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
-
 </div>
 <script>
 document.querySelectorAll(".start-time").forEach(function (cell) {
     const ts = Number(cell.dataset.ts);
-
     if (!Number.isFinite(ts) || ts <= 0) {
         cell.textContent = "-";
         return;
     }
-
     cell.textContent = new Date(ts * 1000).toLocaleString("zh-CN", {
         timeZone: "Asia/Shanghai",
         hour12: false

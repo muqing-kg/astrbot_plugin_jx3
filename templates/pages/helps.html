@@ -1,88 +1,598 @@
-{# template-title: 剑网三插件功能介绍 #}
-<div class="page help-page">
-    <header class="top-info help-header">
-        <div>
-            <div class="top-name">剑网三综合查询插件</div>
-            <div class="top-summary">青绿免费 · 朱红需 Token · 紫色需 Token+推栏</div>
-        </div>
-        <div class="top-desc">
-            默认使用 AstrBot 前缀 / ，例如 /绑定 梦江南<br>
-            未写区服时使用当前会话绑定区服；付费指令需先配置 Token
-        </div>
-    </header>
-
-    <main class="section-grid">
-        <section class="section span-3">
-            <div class="section-title">通用</div>
-            <div class="section-body">
-                <div class="feature"><div class="feature-name">会话设置</div><div class="commands"><span class="cmd-item"><span class="command">认领 剑网3机器人</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">绑定 区服名</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">查询令牌</span><span class="badge badge-free">免费</span></span></div></div>
-                <div class="feature"><div class="feature-name">主动推送</div><div class="commands"><span class="cmd-item"><span class="command">打开 新闻</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">关闭 新闻</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">打开 开服</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">打开 刷马</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">打开 赤兔</span><span class="badge badge-free">免费</span></span></div></div>
-                <div class="feature"><div class="feature-name">付费配置</div><div class="commands"><span class="cmd-item"><span class="command">私聊 Token UMO 密钥</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">私聊 推栏 UMO 标识</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">群内用系统 /sid 查 UMO</span><span class="badge badge-free">免费</span></span></div></div>
-                <div class="feature"><div class="feature-name">日常活动</div><div class="commands"><span class="cmd-item"><span class="command">日常 [延后天数]</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">日常预测</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">楚天社</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">云从社</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">披风会</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">穹野卫</span><span class="badge badge-free">免费</span></span></div></div>
-                <div class="feature"><div class="feature-name">角色资料</div><div class="commands"><span class="cmd-item"><span class="command">角色 服务器 名称</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">名片 服务器 角色</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">名片预设 服务器 角色</span><span class="badge badge-ticket">需Token+推栏</span></span><span class="cmd-item"><span class="command">全名片 服务器 角色</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">随机秀 服务器 [门派] [体型]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">聊天 服务器 角色 [条数] [页数]</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">物价交易</div><div class="commands"><span class="cmd-item"><span class="command">金价 服务器</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">物价 外观名称 [服务器]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">外观搜索 关键词</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">交易行 服务器 物品</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">看号 万宝楼编号</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">贴吧物价 名称 [服务器] [数量]</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">心法配装</div><div class="commands"><span class="cmd-item"><span class="command">配装 心法 [类型]</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">宏 心法</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">技能 心法</span><span class="badge badge-ticket">需Token+推栏</span></span><span class="cmd-item"><span class="command">奇穴 心法</span><span class="badge badge-ticket">需Token+推栏</span></span><span class="cmd-item"><span class="command">急速 [技能CD]</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">官方资讯</div><div class="commands"><span class="cmd-item"><span class="command">开服 服务器</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">区服</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">新闻 [数量]</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">维护 [数量]</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">技改</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">科举 题目 [条数]</span><span class="badge badge-free">免费</span></span></div></div>
-                <div class="feature"><div class="feature-name">家园装饰</div><div class="commands"><span class="cmd-item"><span class="command">花价 服务器 [名称] [地图]</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">装饰 名称</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">器物 地图名称</span><span class="badge badge-free">免费</span></span></div></div>
-                <div class="feature"><div class="feature-name">师徒招募</div><div class="commands"><span class="cmd-item"><span class="command">拜师 服务器 [关键词]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">收徒 服务器 [关键词]</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">烟花记录</div><div class="commands"><span class="cmd-item"><span class="command">烟花 [服务器] 角色</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">贴吧八卦</div><div class="commands"><span class="cmd-item"><span class="command">818 [服务器] [数量]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">骗子 名称 [服务器]</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature full-row"><div class="feature-name">避雷功能</div><div class="commands"><span class="cmd-item"><span class="command">避雷添加 名称 备注</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">避雷查看</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">避雷查询 名称</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">避雷修改 ID 名称 备注</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">避雷删除 ID</span><span class="badge badge-free">免费</span></span></div></div>
-                <div class="feature full-row"><div class="feature-name">骚话语录</div><div class="commands"><span class="cmd-item"><span class="command">答案之书</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">舔狗语录</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">喝什么</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">吃什么</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">骚话</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">渣男语录</span><span class="badge badge-free">免费</span></span></div></div>
-            </div>
-        </section>
-
-        <section class="section span-3">
-            <div class="section-title">休闲(PVX)</div>
-            <div class="section-body">
-                <div class="feature"><div class="feature-name">成就资历</div><div class="commands"><span class="cmd-item"><span class="command">成就 服务器 角色 成就</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">资历 服务器 角色</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">资历排行 [服务器] [门派]</span><span class="badge badge-ticket">需Token+推栏</span></span><span class="cmd-item"><span class="command">资历分布 服务器 角色 [分类]</span><span class="badge badge-ticket">需Token+推栏</span></span></div></div>
-                <div class="feature"><div class="feature-name">马场查询</div><div class="commands"><span class="cmd-item"><span class="command">刷马 [服务器]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">马场 [服务器]</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">奇遇记录</div><div class="commands"><span class="cmd-item"><span class="command">奇遇 服务器 角色</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">查询 服务器 角色</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">未出 服务器 角色</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">汇总 服务器 [天数]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">近期 服务器 [数量]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">统计 奇遇 [服务器] [数量]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">攻略 奇遇</span><span class="badge badge-free">免费</span></span></div></div>
-                <div class="feature ranking-feature"><div class="feature-name">风云榜单</div><div class="ranking-list">
-                    <span class="cmd-item"><span class="command">名士五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">老江湖五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">兵甲藏家五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">名师五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">阵营英雄五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">薪火相传五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">庐园广记一百强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">浩气神兵宝甲五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">恶人神兵宝甲五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">浩气爱心帮会五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">恶人爱心帮会五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">赛季恶人五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">赛季浩气五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">上周恶人五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">上周浩气五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">本周恶人五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                    <span class="cmd-item"><span class="command">本周浩气五十强 服务器</span><span class="badge badge-token">需Token</span></span>
-                </div></div>
-            </div>
-        </section>
-
-        <section class="section span-2">
-            <div class="section-title">秘境(PVE)</div>
-            <div class="section-body">
-                <div class="feature"><div class="feature-name">团队招募</div><div class="commands"><span class="cmd-item"><span class="command">招募 服务器 [副本]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">团长 服务器 [名称]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">团牌 服务器 [内容]</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">副本进度</div><div class="commands"><span class="cmd-item"><span class="command">副本 服务器 角色</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">掉落 物品 [服务器] [数量]</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">百战试炼</div><div class="commands"><span class="cmd-item"><span class="command">百战</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">精耐 服务器 角色</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">试炼排行 服务器 心法</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">试炼秒伤 赛季 层数</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">试炼赛季</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">成本小药</div><div class="commands"><span class="cmd-item"><span class="command">成本 服务器 物品名称</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">小药</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">阵眼 心法</span><span class="badge badge-ticket">需Token+推栏</span></span></div></div>
-                <div class="feature"><div class="feature-name">赤兔记录</div><div class="commands"><span class="cmd-item"><span class="command">赤兔</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">本周赤兔</span><span class="badge badge-token">需Token</span></span></div></div>
-            </div>
-        </section>
-
-        <section class="section">
-            <div class="section-title">阵营(PVP)</div>
-            <div class="section-body">
-                <div class="feature"><div class="feature-name">统战沙盘</div><div class="commands"><span class="cmd-item"><span class="command">统战 [服务器]</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">沙盘 服务器</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">关隘</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">拍卖记录</div><div class="commands"><span class="cmd-item"><span class="command">阵营拍卖 服务器 [物品] [数量]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">的卢 服务器</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">名剑战绩</div><div class="commands"><span class="cmd-item"><span class="command">战绩 [服务器] 角色 [模式]</span><span class="badge badge-ticket">需Token+推栏</span></span><span class="cmd-item"><span class="command">名剑排行 [模式] [数量]</span><span class="badge badge-ticket">需Token+推栏</span></span><span class="cmd-item"><span class="command">名剑统计 [模式]</span><span class="badge badge-ticket">需Token+推栏</span></span><span class="cmd-item"><span class="command">跨服名剑 [服务器] [模式]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">武林争霸 [服务器] [阵营]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">捕快 [服务器]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">浪客 [服务器]</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">决斗 [服务器] [公开/私密]</span><span class="badge badge-token">需Token</span></span></div></div>
-                <div class="feature"><div class="feature-name">帮战诛恶</div><div class="commands"><span class="cmd-item"><span class="command">帮战 服务器</span><span class="badge badge-free">免费</span></span><span class="cmd-item"><span class="command">诛恶 服务器</span><span class="badge badge-token">需Token</span></span><span class="cmd-item"><span class="command">阵营奉献 [阵营]</span><span class="badge badge-token">需Token</span></span></div></div>
-            </div>
-        </section>
-    </main>
-
-    <footer class="footer help-footer">
-        指令与参数之间使用空格分隔，带有 <strong>[ ]</strong> 的参数可以省略。青绿为免费，朱红需 Token，紫色需 Token+推栏。
-    </footer>
+{# template-title: 帮助 #}
+<div class="container help-page">
+    <div class="help-title">
+        <img src="{{ icons.img.get('jx3', '') }}" alt="">
+        <strong>帮助</strong>
+    </div>
+    <table class="help-table">
+        <thead>
+            <tr>
+                <th>功能</th>
+                <th>命令</th>
+                <th>示例</th>
+            </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td class="help-feature">会话设置</td>
+            <td class="help-command">认领 [名称]</td>
+            <td class="help-example">认领 剑网3机器人</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">绑定 [区服]</td>
+            <td class="help-example">绑定 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">查询令牌</td>
+            <td class="help-example">查询令牌</td>
+        </tr>
+        <tr>
+            <td class="help-feature">主动推送</td>
+            <td class="help-command">打开 [类型]</td>
+            <td class="help-example">打开 新闻</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">关闭 [类型]</td>
+            <td class="help-example">关闭 新闻</td>
+        </tr>
+        <tr>
+            <td class="help-feature">付费配置</td>
+            <td class="help-command">私聊 Token [UMO] [密钥]</td>
+            <td class="help-example">私聊 Token UMO 密钥</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">私聊 推栏 [UMO] [标识]</td>
+            <td class="help-example">私聊 推栏 UMO 标识</td>
+        </tr>
+        <tr>
+            <td class="help-feature">日常活动</td>
+            <td class="help-command">日常 | 日常 [天数]</td>
+            <td class="help-example">日常 | 日常 1</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">日常预测</td>
+            <td class="help-example">日常预测</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">楚天社</td>
+            <td class="help-example">楚天社</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">云从社</td>
+            <td class="help-example">云从社</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">披风会</td>
+            <td class="help-example">披风会</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">穹野卫</td>
+            <td class="help-example">穹野卫</td>
+        </tr>
+        <tr>
+            <td class="help-feature">角色资料</td>
+            <td class="help-command">角色 [服务器] [角色]</td>
+            <td class="help-example">角色 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">名片 [服务器] [角色]</td>
+            <td class="help-example">名片 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">名片预设 [服务器] [角色]</td>
+            <td class="help-example">名片预设 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">全名片 [服务器] [角色]</td>
+            <td class="help-example">全名片 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">随机秀 [服务器] [门派] [体型]</td>
+            <td class="help-example">随机秀 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">聊天 [服务器] [角色] [条数] [页数]</td>
+            <td class="help-example">聊天 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature">物价交易</td>
+            <td class="help-command">金价 | 金价 [服务器]</td>
+            <td class="help-example">金价 | 金价 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">物价 [外观] [服务器]</td>
+            <td class="help-example">物价 狐金 | 物价 狐金 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">外观搜索 [关键词]</td>
+            <td class="help-example">外观搜索 狐金</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">交易行 [服务器] [物品]</td>
+            <td class="help-example">交易行 飞龙在天 六级</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">看号 [编号]</td>
+            <td class="help-example">看号 123456</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">贴吧物价 [名称] [服务器] [数量]</td>
+            <td class="help-example">贴吧物价 狐金 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature">心法配装</td>
+            <td class="help-command">配装 [心法] [类型]</td>
+            <td class="help-example">配装 剑纯</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">宏 [心法]</td>
+            <td class="help-example">宏 鲸鱼</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">技能 [心法]</td>
+            <td class="help-example">技能 毒经</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">奇穴 [心法]</td>
+            <td class="help-example">奇穴 毒经</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">急速 [技能CD]</td>
+            <td class="help-example">急速 1.5</td>
+        </tr>
+        <tr>
+            <td class="help-feature">官方资讯</td>
+            <td class="help-command">开服 | 开服 [服务器]</td>
+            <td class="help-example">开服 | 开服 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">区服</td>
+            <td class="help-example">区服</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">新闻 [数量]</td>
+            <td class="help-example">新闻</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">维护 [数量]</td>
+            <td class="help-example">维护</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">技改</td>
+            <td class="help-example">技改</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">科举 [题目] [条数]</td>
+            <td class="help-example">科举 李白</td>
+        </tr>
+        <tr>
+            <td class="help-feature">家园装饰</td>
+            <td class="help-command">花价 [服务器] [名称] [地图]</td>
+            <td class="help-example">花价 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">装饰 [名称]</td>
+            <td class="help-example">装饰 桌</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">器物 [地图]</td>
+            <td class="help-example">器物 浩气盟</td>
+        </tr>
+        <tr>
+            <td class="help-feature">师徒招募</td>
+            <td class="help-command">拜师 [服务器] [关键词]</td>
+            <td class="help-example">拜师 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">收徒 [服务器] [关键词]</td>
+            <td class="help-example">收徒 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature">烟花记录</td>
+            <td class="help-command">烟花 [服务器] [角色]</td>
+            <td class="help-example">烟花 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature">贴吧八卦</td>
+            <td class="help-command">818 [服务器] [数量]</td>
+            <td class="help-example">818 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">骗子 [名称] [服务器]</td>
+            <td class="help-example">骗子 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature">避雷功能</td>
+            <td class="help-command">避雷添加 [名称] [备注]</td>
+            <td class="help-example">避雷添加 小螺卜头 备注</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">避雷查看</td>
+            <td class="help-example">避雷查看</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">避雷查询 [名称]</td>
+            <td class="help-example">避雷查询 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">避雷修改 [ID] [名称] [备注]</td>
+            <td class="help-example">避雷修改 1 小螺卜头 备注</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">避雷删除 [ID]</td>
+            <td class="help-example">避雷删除 1</td>
+        </tr>
+        <tr>
+            <td class="help-feature">骚话语录</td>
+            <td class="help-command">答案之书</td>
+            <td class="help-example">答案之书</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">舔狗语录</td>
+            <td class="help-example">舔狗语录</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">喝什么</td>
+            <td class="help-example">喝什么</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">吃什么</td>
+            <td class="help-example">吃什么</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">骚话</td>
+            <td class="help-example">骚话</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">渣男语录</td>
+            <td class="help-example">渣男语录</td>
+        </tr>
+        <tr>
+            <td class="help-feature">成就资历</td>
+            <td class="help-command">成就 [服务器] [角色] [成就]</td>
+            <td class="help-example">成就 飞龙在天 小螺卜头 名剑</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">资历 [服务器] [角色]</td>
+            <td class="help-example">资历 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">资历排行 [服务器] [门派]</td>
+            <td class="help-example">资历排行 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">资历分布 [服务器] [角色] [分类]</td>
+            <td class="help-example">资历分布 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature">马场查询</td>
+            <td class="help-command">刷马 | 刷马 [服务器]</td>
+            <td class="help-example">刷马 | 刷马 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">马场 | 马场 [服务器]</td>
+            <td class="help-example">马场 | 马场 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature">奇遇记录</td>
+            <td class="help-command">奇遇 [服务器] [角色]</td>
+            <td class="help-example">奇遇 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">查询 [服务器] [角色]</td>
+            <td class="help-example">查询 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">未出 [服务器] [角色]</td>
+            <td class="help-example">未出 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">汇总 [服务器] [天数]</td>
+            <td class="help-example">汇总 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">近期 [服务器] [数量]</td>
+            <td class="help-example">近期 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">统计 [奇遇] [服务器] [数量]</td>
+            <td class="help-example">统计 追魂骨 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">攻略 [奇遇]</td>
+            <td class="help-example">攻略 生死判</td>
+        </tr>
+        <tr>
+            <td class="help-feature">风云榜单</td>
+            <td class="help-command">名士五十强 [服务器]</td>
+            <td class="help-example">名士五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">老江湖五十强 [服务器]</td>
+            <td class="help-example">老江湖五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">兵甲藏家五十强 [服务器]</td>
+            <td class="help-example">兵甲藏家五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">名师五十强 [服务器]</td>
+            <td class="help-example">名师五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">阵营英雄五十强 [服务器]</td>
+            <td class="help-example">阵营英雄五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">薪火相传五十强 [服务器]</td>
+            <td class="help-example">薪火相传五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">庐园广记一百强 [服务器]</td>
+            <td class="help-example">庐园广记一百强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">浩气神兵宝甲五十强 [服务器]</td>
+            <td class="help-example">浩气神兵宝甲五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">恶人神兵宝甲五十强 [服务器]</td>
+            <td class="help-example">恶人神兵宝甲五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">浩气爱心帮会五十强 [服务器]</td>
+            <td class="help-example">浩气爱心帮会五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">恶人爱心帮会五十强 [服务器]</td>
+            <td class="help-example">恶人爱心帮会五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">赛季恶人五十强 [服务器]</td>
+            <td class="help-example">赛季恶人五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">赛季浩气五十强 [服务器]</td>
+            <td class="help-example">赛季浩气五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">上周恶人五十强 [服务器]</td>
+            <td class="help-example">上周恶人五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">上周浩气五十强 [服务器]</td>
+            <td class="help-example">上周浩气五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">本周恶人五十强 [服务器]</td>
+            <td class="help-example">本周恶人五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">本周浩气五十强 [服务器]</td>
+            <td class="help-example">本周浩气五十强 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature">团队招募</td>
+            <td class="help-command">招募 [服务器] [副本]</td>
+            <td class="help-example">招募 飞龙在天 浪客行</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">团长 [服务器] [名称]</td>
+            <td class="help-example">团长 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">团牌 [服务器] [内容]</td>
+            <td class="help-example">团牌 飞龙在天 开团</td>
+        </tr>
+        <tr>
+            <td class="help-feature">副本进度</td>
+            <td class="help-command">副本 [服务器] [角色]</td>
+            <td class="help-example">副本 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">掉落 [物品] [服务器] [数量]</td>
+            <td class="help-example">掉落 太一玄晶 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature">百战试炼</td>
+            <td class="help-command">百战</td>
+            <td class="help-example">百战</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">精耐 [服务器] [角色]</td>
+            <td class="help-example">精耐 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">试炼排行 [服务器] [心法]</td>
+            <td class="help-example">试炼排行 飞龙在天 剑纯</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">试炼秒伤 [赛季] [层数]</td>
+            <td class="help-example">试炼秒伤 1 10</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">试炼赛季</td>
+            <td class="help-example">试炼赛季</td>
+        </tr>
+        <tr>
+            <td class="help-feature">成本小药</td>
+            <td class="help-command">成本 [服务器] [物品]</td>
+            <td class="help-example">成本 飞龙在天 狐金</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">小药</td>
+            <td class="help-example">小药</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">阵眼 [心法]</td>
+            <td class="help-example">阵眼 毒经</td>
+        </tr>
+        <tr>
+            <td class="help-feature">赤兔记录</td>
+            <td class="help-command">赤兔</td>
+            <td class="help-example">赤兔</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">本周赤兔</td>
+            <td class="help-example">本周赤兔</td>
+        </tr>
+        <tr>
+            <td class="help-feature">统战沙盘</td>
+            <td class="help-command">统战 [服务器]</td>
+            <td class="help-example">统战 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">沙盘 | 沙盘 [服务器]</td>
+            <td class="help-example">沙盘 | 沙盘 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">关隘</td>
+            <td class="help-example">关隘</td>
+        </tr>
+        <tr>
+            <td class="help-feature">拍卖记录</td>
+            <td class="help-command">阵营拍卖 [服务器] [物品] [数量]</td>
+            <td class="help-example">阵营拍卖 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">的卢 [服务器]</td>
+            <td class="help-example">的卢 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature">名剑战绩</td>
+            <td class="help-command">战绩 [服务器] [角色] [模式]</td>
+            <td class="help-example">战绩 飞龙在天 小螺卜头</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">名剑排行 [模式] [数量]</td>
+            <td class="help-example">名剑排行 33</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">名剑统计 [模式]</td>
+            <td class="help-example">名剑统计 33</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">跨服名剑 [服务器] [模式]</td>
+            <td class="help-example">跨服名剑 飞龙在天 33</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">武林争霸 [服务器] [阵营]</td>
+            <td class="help-example">武林争霸 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">捕快 [服务器]</td>
+            <td class="help-example">捕快 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">浪客 [服务器]</td>
+            <td class="help-example">浪客 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">决斗 [服务器] [公开/私密]</td>
+            <td class="help-example">决斗 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature">帮战诛恶</td>
+            <td class="help-command">帮战 [服务器]</td>
+            <td class="help-example">帮战 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">诛恶 [服务器]</td>
+            <td class="help-example">诛恶 飞龙在天</td>
+        </tr>
+        <tr>
+            <td class="help-feature"></td>
+            <td class="help-command">阵营奉献 [阵营]</td>
+            <td class="help-example">阵营奉献 浩气盟</td>
+        </tr>
+        </tbody>
+    </table>
 </div>

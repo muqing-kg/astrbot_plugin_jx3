@@ -3,20 +3,18 @@
 
 
 <div class="container data-page">
-    <h1>烟花记录</h1>
-
-    <table class="data-table data-table--spaced">
+    <h1>角色烟花</h1>
+    <table class="data-table table-striped">
         <thead>
             <tr>
                 <th>服务器</th>
-                <th>烟花名称</th>
-                <th>使用地点</th>
-                <th>释放角色</th>
-                <th>接收角色</th>
-                <th>释放时间</th>
+                <th>烟花</th>
+                <th>地图</th>
+                <th>赠送人</th>
+                <th>接收人</th>
+                <th>时间</th>
             </tr>
         </thead>
-
         <tbody>
         {% for m in list %}
             <tr>
@@ -30,5 +28,4 @@
         {% endfor %}
         </tbody>
     </table>
-
 </div>

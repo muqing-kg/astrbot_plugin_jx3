@@ -1,11 +1,10 @@
 {# template-title: 未做奇遇 #}
 {# template-components: data-layout collection-card #}
 
-    <div class="data-header">
-        <div class="data-header__title">未做奇遇</div>
-        <div class="data-header__meta">{{ server }} · {{ name }}</div>
-    </div>
 
+<div class="container">
+    <h1>角色未触发奇遇</h1>
+    <div class="data-header__meta">{{ server }} · {{ name }}</div>
     <div class="collection-section">
         <div class="collection-heading">普通奇遇（{{ ptqy|length if ptqy else 0 }}）</div>
         {% if ptqy %}
@@ -17,7 +16,6 @@
                 {% else %}
                 <div class="collection-card__name">{{ item.event }}</div>
                 {% endif %}
-                <div class="collection-card__meta">{{ item.time }}</div>
             </div>
             {% endfor %}
         </div>
@@ -25,7 +23,6 @@
         <div class="collection-empty">暂无未做普通奇遇</div>
         {% endif %}
     </div>
-
     <div class="collection-section">
         <div class="collection-heading">绝世奇遇（{{ jsqy|length if jsqy else 0 }}）</div>
         {% if jsqy %}
@@ -37,7 +34,6 @@
                 {% else %}
                 <div class="collection-card__name">{{ item.event }}</div>
                 {% endif %}
-                <div class="collection-card__meta">{{ item.time }}</div>
             </div>
             {% endfor %}
         </div>
@@ -45,3 +41,4 @@
         <div class="collection-empty">暂无未做绝世奇遇</div>
         {% endif %}
     </div>
+</div>

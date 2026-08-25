@@ -2,7 +2,8 @@
 {# template-components: data-layout collection-card #}
 
 
-    <!-- 普通奇遇 -->
+<div class="container">
+    <h1>角色奇遇</h1>
     <div class="collection-section">
         <div class="collection-heading">普通奇遇（{{ ptqy|length if ptqy else 0 }}）</div>
         {% if ptqy %}
@@ -22,8 +23,6 @@
         <div class="collection-empty">暂无普通奇遇</div>
         {% endif %}
     </div>
-
-    <!-- 绝世奇遇 -->
     <div class="collection-section">
         <div class="collection-heading">绝世奇遇（{{ jsqy|length if jsqy else 0 }}）</div>
         {% if jsqy %}
@@ -43,8 +42,6 @@
         <div class="collection-empty">暂无绝世奇遇</div>
         {% endif %}
     </div>
-
-    <!-- 宠物奇遇 -->
     <div class="collection-section">
         <div class="collection-heading">宠物奇遇（{{ cwqy|length if cwqy else 0 }}）</div>
         {% if cwqy %}
@@ -64,3 +61,4 @@
         <div class="collection-empty">暂无宠物奇遇</div>
         {% endif %}
     </div>
+</div>
