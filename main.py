@@ -76,6 +76,8 @@ class Jx3ApiPlugin(Star):
 
     async def initialize(self):
         try:
+            await self.local_sql_db.connect()
+            await self.plugin_sql_db.connect()
             await self.init_achievement_cache_data()
             await self.sessions.init()
             await self.settings.init()
@@ -86,7 +88,6 @@ class Jx3ApiPlugin(Star):
                     self.command_catalog[command_id]["desc"] = desc
             self.server_catalog = apply_alias_overrides(await self.settings.server_aliases())
             self.jx3api.command_catalog = self.command_catalog
-            await self.plugin_sql_db.connect()
             await self.jx3at.init_tasks()
             try:
                 SessionPageAPI(self).register()
