@@ -7,7 +7,7 @@
 
 /* 卡片 */
 .card {
-    background: #ffffff;
+    background: transparent;
     border-radius: 12px;
     padding: 16px 18px;
     box-shadow: 0 4px 14px rgba(0,0,0,0.06);

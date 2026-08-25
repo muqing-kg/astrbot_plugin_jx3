@@ -1,30 +1,34 @@
-{# template-title: 日常预测 #}
+{# template-title: 日常推演 #}
 
 
 <div class="container">
-    <h1>日常预测</h1>
-
-    <div class="calendar">
-        <!-- 星期头 -->
-        {% for w in ["周一","周二","周三","周四","周五","周六","周日"] %}
-        <div class="week">{{ w }}</div>
-        {% endfor %}
-
-        <!-- 日程卡片 -->
-        {% for m in items %}
-        <div class="
-            card
-            {% if m.compare == '过去' %}past{% endif %}
-            {% if m.compare == '今天' %}today{% endif %}
-            {% if m.compare == '将来' %}future{% endif %}
-        ">
-            {% if m.en %}
-                <div class="date">{{ m.date }}</div>
-                <div class="line">日常：{{ m.war }}</div>
-                <div class="line">战场：{{ m.battle }}</div>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
+    <h1>日常推演</h1>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>星期一</th>
+                <th>星期二</th>
+                <th>星期三</th>
+                <th>星期四</th>
+                <th>星期五</th>
+                <th>星期六</th>
+                <th>星期日</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in range(0, items|length, 7) %}
+            <tr>
+                {% for m in items[row:row+7] %}
+                <td class="{% if m.compare == '今天' %}today{% elif m.compare == '过去' %}past{% endif %}">
+                    {% if m.en %}
+                    <div class="date">{{ m.date }}</div>
+                    <div class="line">{{ m.war }}</div>
+                    <div class="line">{{ m.battle }}</div>
+                    {% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
-

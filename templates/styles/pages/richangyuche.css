@@ -34,7 +34,7 @@
 }
 
 .card.future {
-    background: rgba(255, 255, 255, 0.88);
+    background: transparent;
     color: var(--jx3-text);
     border: 1px solid var(--jx3-border-faint);
 }

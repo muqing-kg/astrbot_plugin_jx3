@@ -4,13 +4,13 @@
 
 <div class="container data-page">
     <h1>{{ title }}</h1>
+    {% if subtitle %}
     <div class="data-page__meta">{{ subtitle }}</div>
-
+    {% endif %}
     {% if note %}
     <div class="data-note">{{ note }}</div>
     {% endif %}
-
-    <table class="data-table">
+    <table class="data-table table-striped">
         <thead>
             <tr>
                 {% for col in columns %}

@@ -1,33 +1,22 @@
 {# template-title: 奇遇汇总 #}
-{# template-components: data-table #}
+{# template-components: data-layout collection-card #}
 
 
-<div class="container data-page">
-    <h1>{{ server }} 奇遇汇总</h1>
+<div class="container">
+    <h1>奇遇汇总 • {{ server }}</h1>
     <div class="data-page__meta">最近 {{ num }} 天 · 更新时间：{{ update_time }}</div>
-
-    <table class="data-table data-table--nowrap">
-        <thead>
-            <tr>
-                <th>区服</th>
-                <th>奇遇名称</th>
-                <th>触发次数</th>
-                <th>最近角色</th>
-                <th>最近时间</th>
-            </tr>
-        </thead>
-
-        <tbody>
+    <div class="card-grid" style="--grid-columns: 3">
         {% for m in items %}
-            <tr>
-                <td>{{ m.server }}</td>
-                <td class="data-cell--strong">{{ m.event }}</td>
-                <td class="data-cell--score">{{ m.count }}</td>
-                <td class="data-cell--name">{{ m.latest_name }}</td>
-                <td class="data-cell--muted data-cell--numeric">{{ m.latest_time }}</td>
-            </tr>
+        <div class="collection-card">
+            {% if icons.serendipity.get(m.event) %}
+            <img class="collection-card__image" src="{{ icons.serendipity[m.event] }}" alt="{{ m.event }}">
+            {% else %}
+            <div class="collection-card__name">{{ m.event }}</div>
+            {% endif %}
+            <div class="collection-card__name">{{ m.latest_name }}</div>
+            <div class="collection-card__meta">{{ m.latest_time }}</div>
+            <div class="collection-card__meta">{{ m.count }} 次</div>
+        </div>
         {% endfor %}
-        </tbody>
-    </table>
-
+    </div>
 </div>

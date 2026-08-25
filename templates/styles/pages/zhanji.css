@@ -1,7 +1,7 @@
 .panel {
     width: 1100px;
     margin: auto;
-    background: #ffffff;
+    background: transparent;
     border-radius: 12px;
     padding: 22px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
@@ -101,7 +101,7 @@ th {
 }
 
 tbody tr:nth-child(odd) {
-    background: #ffffff;
+    background: transparent;
 }
 
 .win {

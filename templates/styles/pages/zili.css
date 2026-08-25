@@ -1,5 +1,5 @@
 .header {
-        background: #ffffff;
+        background: transparent;
         border-radius: 14px;
         padding: 22px 26px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.08);
@@ -37,7 +37,7 @@
     }
 
     .summary {
-        background: #ffffff;
+        background: transparent;
         border-radius: 14px;
         padding: 22px 26px;
         box-shadow: 0 4px 16px rgba(0,0,0,0.08);
@@ -95,7 +95,7 @@
     }
 
     .item {
-        background: #ffffff;
+        background: transparent;
         border-radius: 12px;
         padding: 15px 16px;
         box-shadow: 0 3px 12px rgba(0,0,0,0.06);

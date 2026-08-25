@@ -1,11 +1,10 @@
-{# template-title: 区服各平台金价 #}
+{# template-title: 金价 #}
 {# template-components: data-table #}
 
 
 <div class="container data-page">
-    <h1>区服各平台金价</h1>
-
-    <table class="data-table data-table--spaced">
+    <h1>金价</h1>
+    <table class="data-table table-striped">
         <thead>
             <tr>
                 <th>服务器</th>
@@ -18,7 +17,6 @@
                 <th>时间</th>
             </tr>
         </thead>
-
         <tbody>
         {% for m in items %}
             <tr>
@@ -27,12 +25,11 @@
                 <td>{{ m.wanbaolou }}</td>
                 <td>{{ m.dd373 }}</td>
                 <td>{{ m.uu898 }}</td>
-                <td>{{ m.5173 }}</td>
-                <td>{{ m.7881 }}</td>
+                <td>{{ m['5173'] }}</td>
+                <td>{{ m['7881'] }}</td>
                 <td>{{ m.date }}</td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
-
 </div>

@@ -29,7 +29,7 @@
     .main-card {
         overflow: hidden;
         margin-bottom: 30px;
-        background: #fff;
+        background: transparent;
         border-radius: 20px;
         box-shadow: 0 8px 28px rgba(0, 0, 0, 0.09);
     }
@@ -196,7 +196,7 @@
 
     .summary-panel {
         padding: 28px 30px 30px;
-        background: #fff;
+        background: transparent;
         text-align: left;
     }
 
@@ -370,7 +370,7 @@
 
     .material-card {
         overflow: hidden;
-        background: #fff;
+        background: transparent;
         border: 1px solid #e5e5eb;
         border-radius: 17px;
         box-shadow: 0 5px 18px rgba(0, 0, 0, 0.07);
@@ -597,7 +597,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #fff;
+        background: transparent;
         border: 2px dashed #ccc;
         border-radius: 16px;
         color: #888;

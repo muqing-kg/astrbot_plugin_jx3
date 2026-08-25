@@ -93,7 +93,7 @@
      */
     .boss-item.finished {
         color: #334655;
-        background: #e7eef3;
+        background: rgba(246, 241, 232, 0.55);
         border: 1px solid #9eb3c4;
     }
 
@@ -168,7 +168,7 @@
         padding: 50px 20px;
         color: var(--jx3-text-muted);
         text-align: center;
-        background: rgba(255, 255, 255, 0.88);
+        background: transparent;
         border: 1px solid var(--jx3-border-faint);
         border-radius: 12px;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);

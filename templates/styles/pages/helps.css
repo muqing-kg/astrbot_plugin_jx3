@@ -1,183 +1,64 @@
-.help-page {
-    position: relative;
-    padding: 28px;
-    overflow: hidden;
-    border: 1px solid var(--jx3-border-soft);
-    border-radius: 20px;
-    background:
-        linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(244, 248, 251, 0.35) 24%),
-        rgba(255, 255, 255, 0.72);
-    box-shadow: inset 0 0 32px rgba(47, 79, 104, 0.04);
+.jx3-template--helps {
+    --jx3-page-width: 720px;
 }
 
-.help-header {
+.help-page {
+    width: 720px;
+    padding: 10px;
+    background: transparent;
+}
+
+.help-title {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 28px;
-    margin-bottom: 24px;
-}
-
-.top-name {
+    justify-content: center;
+    gap: 10px;
+    margin: 10px 0 16px;
     color: var(--jx3-text);
-    font-size: 24px;
+    font-size: 28px;
     font-weight: 800;
-    letter-spacing: 0.08em;
 }
 
-.top-summary {
-    margin-top: 8px;
-    font-size: 14px;
-    color: var(--jx3-text-secondary);
+.help-title img {
+    width: 50px;
+    height: 50px;
 }
 
-.top-desc {
-    font-size: 14px;
-    line-height: 1.8;
-    text-align: right;
-    color: var(--jx3-text-muted);
-}
-
-.section-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 22px;
-    align-items: start;
-}
-
-.section {
-    min-width: 0;
-    overflow: hidden;
-}
-
-.section.span-2 {
-    grid-column: span 2;
-}
-
-.section.span-3 {
-    grid-column: 1 / -1;
-}
-
-.section-title {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--jx3-border-faint);
-    background: linear-gradient(90deg, rgba(31, 111, 139, 0.12), rgba(232, 238, 242, 0.4));
-    font-size: 19px;
-    font-weight: 800;
-    letter-spacing: 0.05em;
-    color: var(--jx3-text);
-}
-
-.section-body {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 14px 22px;
-    padding: 16px 18px 18px;
-}
-
-.span-2 .section-body,
-.span-3 .section-body {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.feature {
-    display: grid;
-    grid-template-columns: 96px minmax(0, 1fr);
-    gap: 14px;
-    align-items: start;
-    min-width: 0;
-    padding: 12px 0;
-    border-bottom: 1px dashed rgba(47, 79, 104, 0.12);
-}
-
-.feature-name {
-    padding-top: 6px;
-    font-size: 14px;
-    line-height: 1.6;
-    font-weight: 700;
-    color: var(--jx3-text);
-}
-
-.commands,
-.ranking-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px 14px;
-    min-width: 0;
-    align-items: stretch;
-}
-
-.cmd-item {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    max-width: 100%;
-}
-
-.command {
-    display: inline-block;
-    padding: 7px 10px;
-    border: 1px solid var(--jx3-border-faint);
-    border-radius: 6px;
-    font-size: 13px;
-    line-height: 1.55;
-    word-break: break-all;
-    color: var(--jx3-text);
-    background: rgba(31, 111, 139, 0.06);
-}
-
-.badge {
-    display: inline-block;
-    padding: 0 6px;
-    border-radius: 999px;
-    font-size: 10px;
-    line-height: 1.6;
-    font-weight: 700;
-    white-space: nowrap;
-    opacity: 0.92;
-}
-
-.badge-free {
-    color: #3f6b4e;
-    background: rgba(220, 252, 231, 0.7);
-    border: 1px solid rgba(134, 239, 172, 0.45);
-}
-
-.badge-token {
-    color: #8a3a4a;
-    background: rgba(255, 228, 230, 0.7);
-    border: 1px solid rgba(253, 164, 175, 0.45);
-}
-
-.badge-ticket {
-    color: #5b4b86;
-    background: rgba(237, 233, 254, 0.7);
-    border: 1px solid rgba(196, 181, 253, 0.45);
-}
-
-.ranking-feature {
-    grid-template-columns: 96px minmax(0, 1fr);
-}
-
-.ranking-list .cmd-item {
-    width: auto;
-}
-
-.full-row {
-    grid-column: 1 / -1;
-}
-
-.help-footer {
-    margin-top: 22px;
-    padding: 16px 16px 2px;
-    border-top: 1px solid var(--jx3-border-faint);
-    font-size: 13px;
-    line-height: 1.8;
+.help-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: transparent;
     text-align: center;
-    color: var(--jx3-text-muted);
 }
 
-.help-footer strong {
+.help-table thead th {
+    padding: 12px 10px;
+    color: #fff;
+    background: #343a40;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.help-table td {
+    padding: 12px 10px;
     color: var(--jx3-text);
+    font-size: 15px;
+    vertical-align: middle;
+}
+
+.help-table tbody tr:nth-child(even) {
+    background: rgba(0, 0, 0, 0.035);
+}
+
+.help-table tbody tr:nth-child(odd) {
+    background: transparent;
+}
+
+.help-feature {
+    font-weight: 700;
+}
+
+.help-command,
+.help-example {
+    font-weight: 500;
 }

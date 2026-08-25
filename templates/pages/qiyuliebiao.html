@@ -1,30 +1,16 @@
 {# template-title: 区服奇遇 #}
-{# template-components: data-table #}
+{# template-components: data-layout collection-card #}
 
 
-<div class="container data-page">
-    <h1>区服奇遇</h1>
-
-    <table class="data-table data-table--spaced">
-        <thead>
-            <tr>
-                <th>奇遇名称</th>
-                <th>服务器</th>
-                <th>触发角色</th>
-                <th>触发时间</th>
-            </tr>
-        </thead>
-
-        <tbody>
+<div class="container">
+    <h1>奇遇统计</h1>
+    <div class="card-grid" style="--grid-columns: 3">
         {% for m in items %}
-            <tr>
-                <td>{{ m.event }}</td>
-                <td>{{ m.server }}</td>
-                <td>{{ m.name }}</td>
-                <td>{{ m.time }}</td>
-            </tr>
+        <div class="collection-card">
+            <div class="collection-card__name">{{ m.name }}</div>
+            <div class="collection-card__meta">{{ m.time }}</div>
+            <div class="collection-card__meta">{{ m.event }} · {{ m.server }}</div>
+        </div>
         {% endfor %}
-        </tbody>
-    </table>
-
+    </div>
 </div>
