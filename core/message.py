@@ -444,10 +444,6 @@ class MessageBuilder:
         """ 外观搜索 关键词 """
         return await self.T2I_image_msg(event, lambda: self.jx3api.waiguansousuo(name))
 
-    async def  mingpianyushe(self, event: AstrMessageEvent, server: str, name: str):
-        """ 名片预设 服务器 角色 """
-        return await self.plain_chain(event, lambda: self.jx3api.mingpianyushe(server, name))
-
     async def  jisuji(self, event: AstrMessageEvent, cooldown: float = 1.5):
         """ 急速 [技能CD] """
         return await self.T2I_image_msg(event, lambda: self.jx3api.jisuji(cooldown))

@@ -199,7 +199,6 @@ class Jx3ApiPlugin(Star):
             "决斗": self.jx3cmd.juedou,
             "资历分布": self.jx3cmd.zilifenbu,
             "外观搜索": self.jx3cmd.waiguansousuo,
-            "名片预设": self.jx3cmd.mingpianyushe,
             "急速": self.jx3cmd.jisuji,
             "试炼秒伤": self.jx3cmd.shilianmiaoshang,
             "试炼赛季": self.jx3cmd.shiliansaiji,

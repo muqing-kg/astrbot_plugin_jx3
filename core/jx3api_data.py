@@ -793,13 +793,11 @@ class JX3APIService:
             server_name = data.get("serverName", server)
             role_name = data.get("roleName", name)
             show_like = data.get("showLike", 0)
-            msg0 = f"{server_name}-{role_name}"
-            msg1 = f"点赞：{show_like}"
+            msg = f"{server_name}-{role_name}\n点赞：{show_like}"
 
             return_data["data"] = [
-                Comp.Plain(msg0),
+                Comp.Plain(msg),
                 Comp.Image.fromURL(url),
-                Comp.Plain(msg1)
             ]
             
         return await self._request_api(
@@ -838,25 +836,25 @@ class JX3APIService:
     async def shuoyoumingpian(self, server: str, name: str) -> Dict[str, Any]:
         """名片历史"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            chain = []
+            statuses = []
+            images = []
             for m in data:
                 status = "当前展示" if m.get("showActive") else "未展示"
-                msg = f"第{m.get('showIndex')}张 {status}"
+                statuses.append(f"第{m.get('showIndex')}张 {status}")
                 url = m.get("showAvatar")
 
                 if not url:
                     logger.warning(f"第{m.get('showIndex')}张名片缺少图片URL，已跳过")
                     continue
 
-                chain.extend([
-                    Comp.Plain(msg),
-                    Comp.Image.fromURL(url),
-                ])
+                images.append(Comp.Image.fromURL(url))
 
-            if not chain:
+            if not images:
                 return_data["msg"] = "未获取到有效的名片数据"
                 return return_data
 
+            chain = [Comp.Plain("丨".join(statuses))]
+            chain.extend(images)
             return_data["data"] = chain
 
         return await self._request_api(
@@ -2025,30 +2023,6 @@ class JX3APIService:
             self._set_table(return_data, title, ["据点", "帮会", "阵营", "帮主", "防守"], rows, subtitle, "暂无沙盘数据")
 
         return await self._request_api("/sand/records", {"server": server, "token": self.token}, processor, "data_list.html")
-
-    async def mingpianyushe(self, server: str, name: str) -> Dict[str, Any]:
-        """名片预设"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            payload = data if isinstance(data, dict) else {}
-            url = payload.get("showAvatar") or payload.get("url") or payload.get("preset")
-            if not url:
-                return_data["msg"] = "未获取到名片预设图"
-                return
-            role = self._pick(payload, "roleName", default=name)
-            server_name = self._pick(payload, "serverName", default=server)
-            like = self._pick(payload, "showLike", "like", default="0")
-            return_data["data"] = [
-                Comp.Plain(f"{server_name}-{role}"),
-                Comp.Image.fromURL(url),
-                Comp.Plain(f"点赞：{like}"),
-            ]
-
-        return await self._request_api(
-            "/card/preset",
-            {"server": server, "name": name, "token": self.token, "ticket": self.ticket},
-            processor,
-            "",
-        )
 
     async def qiyugonglue(self, name: str) -> Dict[str, Any]:
         """奇遇攻略"""
