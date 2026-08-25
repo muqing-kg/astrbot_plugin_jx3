@@ -14,7 +14,7 @@
     justify-content: center;
     gap: 10px;
     margin: 10px 0 16px;
-    color: var(--jx3-text);
+    color: #c45c7a;
     font-size: 28px;
     font-weight: 800;
 }
@@ -34,20 +34,20 @@
 .help-table thead th {
     padding: 12px 10px;
     color: #fff;
-    background: #343a40;
+    background: #d9899f;
     font-size: 16px;
     font-weight: 700;
 }
 
 .help-table td {
     padding: 12px 10px;
-    color: var(--jx3-text);
+    color: #4a4458;
     font-size: 15px;
     vertical-align: middle;
 }
 
 .help-table tbody tr:nth-child(even) {
-    background: rgba(0, 0, 0, 0.035);
+    background: rgba(216, 137, 159, 0.08);
 }
 
 .help-table tbody tr:nth-child(odd) {
@@ -55,10 +55,12 @@
 }
 
 .help-feature {
+    color: #c45c7a;
     font-weight: 700;
 }
 
 .help-command,
 .help-example {
+    color: #4a4458;
     font-weight: 500;
 }

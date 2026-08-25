@@ -12,7 +12,6 @@ from .core.jx3api_data import JX3APIService
 from .core.aijx3_data import AIJX3Service
 from .core.jx3box_data import JX3BOXService
 from .core.async_task import AsyncTask
-from .core.bilei_data import BiLeidata
 from .core.message import MessageBuilder
 from .core.fun_basic import load_as_base64
 from .core.session_store import CREDENTIAL_MISSING, SessionStore
@@ -21,6 +20,7 @@ from .core.session_policy import (
     NEED_TICKET,
     NEED_TOKEN,
     UNBOUND_SERVER,
+    UNKNOWN_SERVER,
     CLAIM_PHRASE,
     hint_bind_denied,
     hint_bind_ok,
@@ -38,16 +38,24 @@ from .core.session_policy import (
     hint_unbound,
     inject_server_args,
     parse_admin_command,
+    remap_admin_parts,
+    current_command_name,
+    format_command_error,
+    hint_unknown_server,
+    hint_command_usage,
     strip_command_prefix,
 )
 from .core.credentials import reset_request_credentials, set_request_credentials
 from .core.page_api import SessionPageAPI
+from .core.command_catalog import apply_command_overrides, resolve_command
+from .core.server_catalog import apply_alias_overrides, canonical_server
+from .core.plugin_settings import PluginSettings
 
 
 @register("astrbot_plugin_jx3",
           "muqing-kg",
-          "聚合剑网三游戏数据，提供查询、图片渲染、本地避雷和后台推送。",
-          "3.3.4",
+          "聚合剑网三游戏数据，提供查询、图片渲染和后台推送。",
+          "3.3.6",
           "https://github.com/muqing-kg/astrbot_plugin_jx3"
 )
 class Jx3ApiPlugin(Star):
@@ -68,9 +76,16 @@ class Jx3ApiPlugin(Star):
 
     async def initialize(self):
         try:
-            await self.init_bilei_data()
             await self.init_achievement_cache_data()
             await self.sessions.init()
+            await self.settings.init()
+            self.command_catalog = apply_command_overrides(await self.settings.command_overrides())
+            descs = await self.settings.command_descs()
+            for command_id, desc in descs.items():
+                if command_id in self.command_catalog and desc:
+                    self.command_catalog[command_id]["desc"] = desc
+            self.server_catalog = apply_alias_overrides(await self.settings.server_aliases())
+            self.jx3api.command_catalog = self.command_catalog
             await self.plugin_sql_db.connect()
             await self.jx3at.init_tasks()
             try:
@@ -121,7 +136,6 @@ class Jx3ApiPlugin(Star):
         self.local_sql_db = AsyncSQLiteDB(str(self.local_data_path))
         self.plugin_sql_db = AsyncSQLiteDB(str(self.plugin_data_path))
         self.sessions = SessionStore(self.local_sql_db)
-        self.bilei = BiLeidata(self.local_sql_db)
         self.jx3api = JX3APIService(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.aijx3 = AIJX3Service(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.jx3box = JX3BOXService(self.conf, self.plugin_sql_db, self.local_sql_db)
@@ -132,19 +146,11 @@ class Jx3ApiPlugin(Star):
             self.jx3box,
             self.sessions,
         )
-        self.jx3cmd = MessageBuilder("", self.jx3api, self.aijx3, self.jx3box, self.bilei, self.jx3at, self.icons)
-
-    async def init_bilei_data(self):
-        await self.local_sql_db.connect()
-        await self.local_sql_db.execute("""
-        CREATE TABLE IF NOT EXISTS bilei(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            text TEXT,
-            time TEXT,
-            user TEXT
-        )
-        """)
+        self.jx3cmd = MessageBuilder("", self.jx3api, self.aijx3, self.jx3box, self.jx3at, self.icons)
+        self.settings = PluginSettings(self.local_sql_db)
+        self.command_catalog = apply_command_overrides({})
+        self.server_catalog = apply_alias_overrides({})
+        self.sessions.resolve_server = lambda name: canonical_server(self.server_catalog, name)
 
     async def init_achievement_cache_data(self):
         await self.local_sql_db.execute("""
@@ -158,62 +164,63 @@ class Jx3ApiPlugin(Star):
     def ini_command_map(self):
         self.command_map = {
             "功能": self.jx3cmd.helps,
+            "通知管理": self.jx3cmd.notice_manage,
             "日常": self.jx3cmd.richang,
             "日常预测": self.jx3cmd.richangyuche,
             "穹野卫": self.jx3cmd.qiongyewei,
             "披风会": self.jx3cmd.pifenghui,
             "云从社": self.jx3cmd.yunchongshe,
             "楚天社": self.jx3cmd.chutianshe,
-            "关隘": self.jx3cmd.guanaishouling,
+            "关隘首领": self.jx3cmd.guanaishouling,
             "赤兔": self.jx3cmd.benrichitu,
             "本周赤兔": self.jx3cmd.benzhouchitu,
-            "阵营奉献": self.jx3cmd.zhenyingevent,
+            "阵营事件": self.jx3cmd.zhenyingevent,
             "烟花": self.jx3cmd.yanhuachaxun,
             "刷马": self.jx3cmd.shuma,
             "马场": self.jx3cmd.machang,
             "战绩": self.jx3cmd.zhanji,
             "名剑排行": self.jx3cmd.mingjianpaihang,
             "名剑统计": self.jx3cmd.mingjiantongji,
-            "名士五十强": self.jx3cmd.mingshiwushiqiang,
-            "老江湖五十强": self.jx3cmd.laojianghuwushiqiang,
-            "兵甲藏家五十强": self.jx3cmd.bingjiacangjiawushiqiang,
-            "名师五十强": self.jx3cmd.mingshiwushiqiang_mentor,
-            "阵营英雄五十强": self.jx3cmd.zhengyingyingxiongwushiqiang,
-            "薪火相传五十强": self.jx3cmd.xinhuoxiangchuanwushiqiang,
-            "庐园广记一百强": self.jx3cmd.luyuanguangjiyibaiqiang,
-            "浩气神兵宝甲五十强": self.jx3cmd.haoqishenbingbaojiawushiqiang,
-            "恶人神兵宝甲五十强": self.jx3cmd.erenshenbingbaojiawushiqiang,
-            "浩气爱心帮会五十强": self.jx3cmd.haoqiaixinbanghuiwushiqiang,
-            "恶人爱心帮会五十强": self.jx3cmd.erenaixinbanghuiwushiqiang,
-            "赛季恶人五十强": self.jx3cmd.saijierenwushiqiang,
-            "赛季浩气五十强": self.jx3cmd.saijihaoqiwushiqiang,
-            "上周恶人五十强": self.jx3cmd.shangzhouerenwushiqiang,
-            "上周浩气五十强": self.jx3cmd.shangzhouhaoqiwushiqiang,
-            "本周恶人五十强": self.jx3cmd.benzhouerenwushiqiang,
-            "本周浩气五十强": self.jx3cmd.benzhouhaoqiwushiqiang,
-            "试炼排行": self.jx3cmd.shilianpaixing,
-            "跨服名剑": self.jx3cmd.kuafumingjian,
+            "名士排行": self.jx3cmd.mingshiwushiqiang,
+            "江湖排行": self.jx3cmd.laojianghuwushiqiang,
+            "兵甲排行": self.jx3cmd.bingjiacangjiawushiqiang,
+            "名师排行": self.jx3cmd.mingshiwushiqiang_mentor,
+            "阵营排行": self.jx3cmd.zhengyingyingxiongwushiqiang,
+            "薪火排行": self.jx3cmd.xinhuoxiangchuanwushiqiang,
+            "家园排行": self.jx3cmd.luyuanguangjiyibaiqiang,
+            "浩气神兵排行": self.jx3cmd.haoqishenbingbaojiawushiqiang,
+            "恶人神兵排行": self.jx3cmd.erenshenbingbaojiawushiqiang,
+            "浩气爱心排行": self.jx3cmd.haoqiaixinbanghuiwushiqiang,
+            "恶人爱心排行": self.jx3cmd.erenaixinbanghuiwushiqiang,
+            "赛季恶人战功榜": self.jx3cmd.saijierenwushiqiang,
+            "赛季浩气战功榜": self.jx3cmd.saijihaoqiwushiqiang,
+            "上周恶人战功榜": self.jx3cmd.shangzhouerenwushiqiang,
+            "上周浩气战功榜": self.jx3cmd.shangzhouhaoqiwushiqiang,
+            "本周恶人战功榜": self.jx3cmd.benzhouerenwushiqiang,
+            "本周浩气战功榜": self.jx3cmd.benzhouhaoqiwushiqiang,
+            "试炼之地": self.jx3cmd.shilianpaixing,
+            "跨服名剑榜": self.jx3cmd.kuafumingjian,
             "武林争霸": self.jx3cmd.wulinzhengba,
-            "捕快": self.jx3cmd.bukuai,
-            "浪客": self.jx3cmd.langke,
-            "决斗": self.jx3cmd.juedou,
+            "捕快荣誉榜": self.jx3cmd.bukuai,
+            "江湖浪客榜": self.jx3cmd.langke,
+            "决斗挑战榜": self.jx3cmd.juedou,
             "资历分布": self.jx3cmd.zilifenbu,
             "外观搜索": self.jx3cmd.waiguansousuo,
-            "急速": self.jx3cmd.jisuji,
+            "加速": self.jx3cmd.jisuji,
             "试炼秒伤": self.jx3cmd.shilianmiaoshang,
             "试炼赛季": self.jx3cmd.shiliansaiji,
-            "阵营拍卖": self.jx3cmd.zhengyingpaimai,
+            "拍卖": self.jx3cmd.zhengyingpaimai,
             "的卢": self.jx3cmd.dilujilu,
             "金价": self.jx3cmd.jinjia,
             "物价": self.jx3cmd.wujia,
-            "成本": self.jx3cmd.chengbeng,
-            "看号": self.jx3cmd.kanhao,
+            "配方": self.jx3cmd.chengbeng,
+            "万宝楼": self.jx3cmd.kanhao,
             "帮战": self.jx3cmd.bangzhanjilu,
             "沙盘": self.jx3cmd.shapan,
             "诛恶": self.jx3cmd.zhueevent,
             "名片": self.jx3cmd.jueshemingpian,
-            "全名片": self.jx3cmd.shuoyoumingpian,
-            "随机秀": self.jx3cmd.shuijimingpian,
+            "全部名片": self.jx3cmd.shuoyoumingpian,
+            "随机名片": self.jx3cmd.shuijimingpian,
             "奇遇": self.jx3cmd.juesheqiyu,
             "查询": self.jx3cmd.juesheqiyu,
             "未出": self.jx3cmd.weizuoqiyu,
@@ -233,10 +240,9 @@ class Jx3ApiPlugin(Star):
             "聊天": self.jx3cmd.liaotian,
             "统战": self.jx3cmd.tongzhanyy,
             "小药": self.jx3cmd.xiaoyao,
-            "骗子": self.jx3cmd.pianzhi,
             "花价": self.jx3cmd.huajia,
             "装饰": self.jx3cmd.zhuangshi,
-            "器物": self.jx3cmd.qiwu,
+            "器物谱": self.jx3cmd.qiwu,
             "拜师": self.jx3cmd.baishi,
             "收徒": self.jx3cmd.shoutu,
             "维护": self.jx3cmd.weihu,
@@ -253,7 +259,7 @@ class Jx3ApiPlugin(Star):
             "贴吧物价": self.jx3cmd.tiebawujia,
             "818": self.jx3cmd.bagua,
             "科举": self.jx3cmd.keju,
-            "区服": self.jx3cmd.zhuangtai,
+            "全服状态": self.jx3cmd.zhuangtai,
             "开服": self.jx3cmd.kaifu,
             "技改": self.jx3cmd.jigai,
             "副本": self.jx3cmd.fubeng,
@@ -261,11 +267,6 @@ class Jx3ApiPlugin(Star):
             "宏": self.jx3cmd.hong,
             "资历": self.jx3cmd.zili,
             "交易行": self.jx3cmd.jiaoyihang,
-            "避雷添加": self.jx3cmd.bilei_add,
-            "避雷查看": self.jx3cmd.bilei_all,
-            "避雷查询": self.jx3cmd.bilei_select,
-            "避雷修改": self.jx3cmd.bilei_update,
-            "避雷删除": self.jx3cmd.bilei_delete,
         }
 
     def parse_message(self, text: str) -> list[str] | None:
@@ -322,21 +323,27 @@ class Jx3ApiPlugin(Star):
         return str(self.conf.get("jx3api_ticket", "") or "").strip()
 
     async def _handle_admin_command(self, event: AstrMessageEvent, parts: list[str]):
-        parsed = parse_admin_command(parts, is_private=self._is_private(event))
+        parsed = parse_admin_command(remap_admin_parts(parts, self.command_catalog), is_private=self._is_private(event))
         if parsed.error == GROUP_SECRET_FORBIDDEN:
             return event.plain_result(hint_group_secret())
         if parsed.error == "missing_server":
-            return event.plain_result("用法：/绑定 区服名\n例如：/绑定 梦江南")
+            bind = current_command_name(self.command_catalog, "绑定")
+            return event.plain_result(f"用法：/{bind} 区服名\n例如：/{bind} 梦江南")
         if parsed.error == "missing_push_type":
-            return event.plain_result("用法：/打开 新闻 或 /关闭 新闻\n可选：开服、新闻、刷马、赤兔")
+            open_cmd = current_command_name(self.command_catalog, "打开")
+            close_cmd = current_command_name(self.command_catalog, "关闭")
+            notice = current_command_name(self.command_catalog, "通知管理")
+            return event.plain_result(f"用法：/{open_cmd} 新闻 或 /{close_cmd} 新闻\n发送 /{notice} 查看全部事件类型")
         if parsed.error == "missing_secret_args":
-            return event.plain_result("用法：/Token <UMO> <Token> 或 /推栏 <UMO> <推栏标识>")
+            token_cmd = current_command_name(self.command_catalog, "Token")
+            ticket_cmd = current_command_name(self.command_catalog, "推栏")
+            return event.plain_result(f"用法：/{token_cmd} <UMO> <Token> 或 /{ticket_cmd} <UMO> <推栏标识>")
         if parsed.error:
             return None
 
         if parsed.action == "claim":
             if parsed.value != CLAIM_PHRASE:
-                return event.plain_result(hint_claim_phrase())
+                return event.plain_result(hint_claim_phrase(self.command_catalog))
             if not (self._is_astrbot_admin(event) or not ((await self.sessions.get_admin()) or {}).get("user_id")):
                 # 已有认领人时，仅 AstrBot 管理员或本人可重复认领
                 if not await self._is_plugin_admin(event):
@@ -349,7 +356,7 @@ class Jx3ApiPlugin(Star):
 
         if parsed.action == "token_stats":
             if not await self._is_plugin_admin(event):
-                return event.plain_result(hint_need_claim())
+                return event.plain_result(hint_need_claim(self.command_catalog))
             umo = self._event_umo(event)
             row = await self.sessions.get(umo)
             session_token = ((row or {}).get("token") or "").strip()
@@ -365,30 +372,33 @@ class Jx3ApiPlugin(Star):
                 body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
                 blocks.append("【全局 Token】\n" + body)
             if not blocks:
-                return event.plain_result(hint_need_token())
+                return event.plain_result(hint_need_token(self.command_catalog))
             return event.plain_result("\n\n".join(blocks))
 
         if parsed.action == "bind":
             if not await self._is_plugin_admin(event):
-                return event.plain_result(hint_need_claim())
+                return event.plain_result(hint_need_claim(self.command_catalog))
             umo = self._event_umo(event)
-            await self.sessions.bind_server(umo, parsed.value, self._event_display_name(event))
-            return event.plain_result(hint_bind_ok(parsed.value))
+            official = canonical_server(self.server_catalog, parsed.value)
+            if not official:
+                return event.plain_result("未识别的区服。请使用正式区服名或已配置的别名。")
+            await self.sessions.bind_server(umo, official, self._event_display_name(event))
+            return event.plain_result(hint_bind_ok(official))
 
         if parsed.action in {"open_push", "close_push"}:
             if not await self._is_plugin_admin(event):
-                return event.plain_result(hint_need_claim())
+                return event.plain_result(hint_need_claim(self.command_catalog))
             umo = self._event_umo(event)
             await self.sessions.ensure(umo, self._event_display_name(event))
             ok, msg = await self.sessions.set_push(umo, parsed.value, parsed.action == "open_push")
             if not ok:
-                return event.plain_result(hint_push_need_bind())
+                return event.plain_result(hint_push_need_bind(self.command_catalog))
             await self.jx3at.refresh_jobs()
-            return event.plain_result(hint_push_ok(parsed.value, parsed.action == "open_push"))
+            return event.plain_result(hint_push_ok(parsed.value, parsed.action == "open_push", self.command_catalog))
 
         if parsed.action in {"set_token", "set_ticket"}:
             if not await self._is_plugin_admin(event):
-                return event.plain_result(hint_need_claim())
+                return event.plain_result(hint_need_claim(self.command_catalog))
             target = parsed.target.strip()
             row = await self.sessions.get(target)
             if not row:
@@ -440,7 +450,8 @@ class Jx3ApiPlugin(Star):
 
         umo = self._event_umo(event)
         row = await self.sessions.ensure(umo, self._event_display_name(event))
-        if not self.sessions.is_bot_enabled(row) and parts[0] != "认领":
+        claim_cmd = ((self.command_catalog.get("认领") or {}).get("command") or "认领")
+        if not self.sessions.is_bot_enabled(row) and parts[0] != claim_cmd:
             return
 
         admin_ret = await self._handle_admin_command(event, parts)
@@ -449,16 +460,38 @@ class Jx3ApiPlugin(Star):
             yield admin_ret
             return
 
-        cmd, *args = parts
+        trigger, *args = parts
+        cmd = resolve_command(self.command_catalog, trigger)
+        if not cmd:
+            return
+        if cmd == "通知管理":
+            event.stop_event()
+            yield await self.jx3cmd.notice_manage(
+                event,
+                display_name=self._event_display_name(event),
+                server=(row.get("server") or "").strip() or "未绑定",
+                enabled=self.sessions.enabled_kinds(row),
+            )
+            return
+
         handler = self.command_map.get(cmd)
         if not handler:
             return
 
         bound = (row.get("server") or "").strip()
-        injected = inject_server_args(cmd, args, bound)
+        injected = inject_server_args(
+            cmd,
+            args,
+            bound,
+            resolver=lambda name: canonical_server(self.server_catalog, name),
+        )
         if injected == UNBOUND_SERVER:
             event.stop_event()
-            yield event.plain_result(hint_unbound())
+            yield event.plain_result(hint_unbound(self.command_catalog))
+            return
+        if injected == UNKNOWN_SERVER:
+            event.stop_event()
+            yield event.plain_result(hint_unknown_server())
             return
         args = injected
 
@@ -466,7 +499,7 @@ class Jx3ApiPlugin(Star):
             token = self.sessions.resolve_token(row, self._global_token())
             if token == CREDENTIAL_MISSING:
                 event.stop_event()
-                yield event.plain_result(hint_need_token())
+                yield event.plain_result(hint_need_token(self.command_catalog))
                 return
         else:
             token = self.sessions.resolve_token(row, self._global_token())
@@ -477,7 +510,7 @@ class Jx3ApiPlugin(Star):
             ticket = self.sessions.resolve_ticket(row, self._global_ticket())
             if ticket == CREDENTIAL_MISSING:
                 event.stop_event()
-                yield event.plain_result(hint_need_ticket())
+                yield event.plain_result(hint_need_ticket(self.command_catalog))
                 return
         else:
             ticket = self.sessions.resolve_ticket(row, self._global_ticket())
@@ -492,6 +525,6 @@ class Jx3ApiPlugin(Star):
                 yield ret
         except Exception as e:
             logger.exception(f"指令执行失败: {cmd}, error={e}")
-            yield event.plain_result("参数错误或执行失败")
+            yield event.plain_result(format_command_error(cmd, e, self.command_catalog))
         finally:
             reset_request_credentials(creds)

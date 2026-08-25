@@ -10,7 +10,6 @@ from .jx3api_data import JX3APIService
 from .aijx3_data import AIJX3Service
 from .jx3box_data import JX3BOXService
 from .async_task import AsyncTask
-from .bilei_data import BiLeidata
 
 
 class MessageBuilder:
@@ -43,7 +42,6 @@ class MessageBuilder:
                  jx3api: JX3APIService, 
                  aijx3: AIJX3Service,
                  jx3box: JX3BOXService,  
-                 bilei: BiLeidata, 
                  jx3at: AsyncTask, 
                  icons: dict[str, dict[str, str]]
             ):
@@ -51,7 +49,6 @@ class MessageBuilder:
         self.jx3api = jx3api
         self.aijx3 = aijx3
         self.jx3box = jx3box
-        self.bilei = bilei
         self.jx3at = jx3at
         self.icons = icons
 
@@ -82,7 +79,7 @@ class MessageBuilder:
                 await event.send(event.plain_result(data["msg"])) 
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result("猪脑过载，请稍后再试")) 
+            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试")) 
 
 
     async def T2I_image_msg(self, event: AstrMessageEvent, action):
@@ -105,7 +102,7 @@ class MessageBuilder:
 
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result("猪脑过载，请稍后再试")) 
+            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试")) 
 
 
     async def image_msg(self, event: AstrMessageEvent, action):
@@ -119,7 +116,7 @@ class MessageBuilder:
 
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result("猪脑过载，请稍后再试")) 
+            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试")) 
 
 
     async def plain_chain(self, event: AstrMessageEvent, action):
@@ -132,7 +129,7 @@ class MessageBuilder:
                 await event.send(event.plain_result(data["msg"])) 
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result("猪脑过载，请稍后再试")) 
+            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试")) 
 
 
     async def handler_plain_image_msg(self, event: AstrMessageEvent, action1, action2):
@@ -193,7 +190,7 @@ class MessageBuilder:
                     except Exception as e:
                         logger.error(f"功能函数执行错误: {e}")
                         await new_event.send(
-                            MessageChain().message("猪脑过载，请稍后再试")
+                            MessageChain().message(str(e) or "渲染失败，请稍后重试")
                         )
 
                     controller.stop()
@@ -212,7 +209,7 @@ class MessageBuilder:
                 
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result("猪脑过载，请稍后再试"))
+            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试"))
 
 
     async def handler_zili_msg(self, event: AstrMessageEvent, name: str, server: str):
@@ -257,7 +254,7 @@ class MessageBuilder:
                     await new_event.send(new_event.image_result(url))
                 except Exception as e:
                     logger.error(f"资历查询执行错误: {e}")
-                    await new_event.send(MessageChain().message("猪脑过载，请稍后再试"))
+                    await new_event.send(MessageChain().message(str(e) or "渲染失败，请稍后重试"))
 
                 controller.stop()
 
@@ -270,12 +267,19 @@ class MessageBuilder:
 
         except Exception as e:
             logger.error(f"资历会话执行错误: {e}")
-            await event.send(event.plain_result("猪脑过载，请稍后再试"))
+            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试"))
 
 
     async def  helps(self, event: AstrMessageEvent):
         """ 功能"""
         return await self.T2I_image_msg(event, self.jx3api.helps)
+
+    async def  notice_manage(self, event: AstrMessageEvent, display_name: str = "", server: str = "", enabled=None):
+        """ 通知管理 """
+        return await self.T2I_image_msg(
+            event,
+            lambda: self.jx3api.notice_manage(display_name, server, enabled or set()),
+        )
 
 
     async def  richang(self, event: AstrMessageEvent, num: int = 0):
@@ -576,9 +580,6 @@ class MessageBuilder:
         """ 小药 心法"""
         return await self.T2I_image_msg(event, lambda: self.jx3api.xiaoyao(name))
 
-    async def  pianzhi(self, event: AstrMessageEvent, uid: str, server:str = ""):
-        """ 骗子 uid 服务器"""
-        return await self.plain_msg(event, lambda: self.jx3api.pianzhi(server,uid))
 
     async def  huajia(self, event: AstrMessageEvent,  server: str, name: str= "" , map: str= ""):
         """ 花价 服务器 名称 地图"""
@@ -688,24 +689,3 @@ class MessageBuilder:
     async def  jiaoyihang(self, event: AstrMessageEvent,server: str, Name: str):
         """ 交易行 物品名称 服务器"""     
         return await self.T2I_image_msg(event, lambda: self.jx3box.jiaoyihang(Name,server))
-
-
-    async def bilei_add(self, event: AstrMessageEvent,name: str, text: str):
-        """避雷添加 名称 备注"""
-        return await self.plain_msg(event, lambda: self.bilei.add(name,text,event.get_sender_name()))
-    
-    async def bilei_all(self, event: AstrMessageEvent):
-        """避雷查看"""
-        return await self.T2I_image_msg(event, self.bilei.all)
-    
-    async def bilei_select(self, event: AstrMessageEvent, name:str):
-        """避雷查询"""
-        return await self.T2I_image_msg(event, lambda: self.bilei.select(name))
-
-    async def bilei_update(self, event: AstrMessageEvent, id:int, name: str, text: str):
-        """避雷修改 ID 名称 备注"""
-        return await self.plain_msg(event, lambda: self.bilei.update(id,name,text,event.get_sender_name()))
-
-    async def bilei_delete(self, event: AstrMessageEvent, id:int):
-        """避雷删除 ID"""
-        return await self.plain_msg(event, lambda: self.bilei.delete(id))

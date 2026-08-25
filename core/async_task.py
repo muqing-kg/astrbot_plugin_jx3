@@ -9,9 +9,11 @@ from astrbot.api.star import Context
 from astrbot.api import logger
 from astrbot.api import AstrBotConfig
 
+from .event_catalog import event_dedupe_key, format_event_text, parse_ws_message, resolve_push_kind
 from .jx3api_data import JX3APIService
 from .jx3box_data import JX3BOXService
 from .session_store import SessionStore
+from .ws_client import DEFAULT_WS_URL, JX3WSClient
 
 
 class AsyncTask:
@@ -32,12 +34,21 @@ class AsyncTask:
         self.sessions = sessions
         self.scheduler = AsyncIOScheduler()
         self.jobs = {
-            "开服": {"interval": 60, "name": "开服监控"},
-            "新闻": {"interval": 280, "name": "新闻资讯"},
-            "刷马": {"interval": 60, "name": "刷马消息"},
             "赤兔": {"interval": 60, "name": "赤兔消息"},
         }
+        self.ws = JX3WSClient(
+            url=str(self.conf.get("jx3api_ws_url", "") or DEFAULT_WS_URL),
+            token=self._ws_token(),
+            on_message=self.handle_ws_message,
+        )
         logger.info("初始化推送功能成功")
+
+    def _ws_token(self) -> str:
+        return str(
+            self.conf.get("jx3api_ws_token", "")
+            or self.conf.get("jx3api_token", "")
+            or ""
+        ).strip()
 
     async def init_tasks(self):
         if not self.scheduler.running:
@@ -55,6 +66,8 @@ class AsyncTask:
             elif kind not in enabled and running:
                 self.scheduler.remove_job(job_id)
                 logger.info(f"{meta['name']}后台任务已停止")
+        event_kinds = enabled - set(self.jobs)
+        await self.ws.configure(self._ws_token(), bool(event_kinds))
 
     def _add_scheduler(self, kind: str, name: str, interval: int):
         job_id = f"push_{kind}"
@@ -76,9 +89,6 @@ class AsyncTask:
                 if self.scheduler.get_job(job_id):
                     self.scheduler.remove_job(job_id)
                 return
-            if kind == "新闻":
-                await self._push_news()
-                return
             servers = await self.sessions.servers_with_push(kind)
             for server in servers:
                 await self._push_server(kind, server)
@@ -87,25 +97,34 @@ class AsyncTask:
         except Exception:
             logger.exception(f"{name} 后台任务执行异常")
 
-    async def _push_news(self):
-        data = await self.jx3api.xinwen(1)
-        if not isinstance(data, dict):
+    async def handle_ws_message(self, raw):
+        parsed = parse_ws_message(raw)
+        action = parsed.get("action") or 0
+        payload = parsed.get("payload") or {}
+        kind = resolve_push_kind(action)
+        if not kind:
             return
-        status = str(data.get("status"))
-        old = await self.sessions.get_push_state("新闻", "*")
+        text = format_event_text(action, payload)
+        if not text:
+            return
+        server = str(payload.get("server") or "").strip()
+        resolver = getattr(self.sessions, "resolve_server", None)
+        if callable(resolver):
+            official = resolver(server)
+            if official:
+                server = official
+        status = event_dedupe_key(action, payload)
+        old = await self.sessions.get_push_state(kind, server or "*")
         if old == status:
             return
-        targets = await self.sessions.push_targets("新闻")
-        await self._send(targets, data.get("data") or "")
-        await self.sessions.set_push_state("新闻", "*", status)
+        targets = await self.sessions.push_targets(kind, server)
+        if not targets:
+            return
+        await self._send(targets, text)
+        await self.sessions.set_push_state(kind, server or "*", status)
 
     async def _push_server(self, kind: str, server: str):
-        if kind == "开服":
-            data = await self.jx3api.kaifu(server)
-        elif kind == "刷马":
-            data = await self.jx3box.machangxiaoxi(server, "horse", "foreshow")
-        else:
-            data = await self.jx3box.machangxiaoxi(server, "chitu-horse", "share_msg")
+        data = await self.jx3box.machangxiaoxi(server, "chitu-horse", "share_msg")
         if not isinstance(data, dict):
             return
         status = str(data.get("status"))
@@ -135,6 +154,7 @@ class AsyncTask:
 
     async def destroy(self):
         try:
+            await self.ws.stop()
             self.stop_all_tasks()
             if self.scheduler.running:
                 self.scheduler.shutdown(wait=False)

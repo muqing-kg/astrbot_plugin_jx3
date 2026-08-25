@@ -2,18 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .event_catalog import GLOBAL_KINDS, PUSH_FIELD, PUSH_TYPES
+
 UNBOUND_SERVER = "UNBOUND_SERVER"
 CREDENTIAL_MISSING = "CREDENTIAL_MISSING"
 GROUP_SECRET_FORBIDDEN = "group_secret_forbidden"
 CLAIM_PHRASE = "剑网3机器人"
-
-PUSH_TYPES = ("开服", "新闻", "刷马", "赤兔")
-PUSH_FIELD = {
-    "开服": "push_kaifu",
-    "新闻": "push_xinwen",
-    "刷马": "push_shuma",
-    "赤兔": "push_chitu",
-}
 
 NEED_TICKET = frozenset({
     "战绩",
@@ -27,47 +21,46 @@ NEED_TICKET = frozenset({
 })
 
 NEED_TOKEN = frozenset({
-    "关隘", "赤兔", "本周赤兔", "阵营奉献", "烟花", "刷马", "马场",
+    "关隘首领", "赤兔", "本周赤兔", "阵营事件", "烟花", "刷马", "马场",
     "战绩", "名剑排行", "名剑统计",
-    "名士五十强", "老江湖五十强", "兵甲藏家五十强", "名师五十强",
-    "阵营英雄五十强", "薪火相传五十强", "庐园广记一百强",
-    "浩气神兵宝甲五十强", "恶人神兵宝甲五十强",
-    "浩气爱心帮会五十强", "恶人爱心帮会五十强",
-    "赛季恶人五十强", "赛季浩气五十强",
-    "上周恶人五十强", "上周浩气五十强",
-    "本周恶人五十强", "本周浩气五十强",
-    "试炼排行", "阵营拍卖", "的卢", "金价", "物价", "成本", "看号", "诛恶",
-    "名片", "全名片", "随机秀", "奇遇", "查询", "未出", "汇总", "近期", "统计",
+    "名士排行", "江湖排行", "兵甲排行", "名师排行",
+    "阵营排行", "薪火排行", "家园排行",
+    "浩气神兵排行", "恶人神兵排行",
+    "浩气爱心排行", "恶人爱心排行",
+    "赛季恶人战功榜", "赛季浩气战功榜",
+    "上周恶人战功榜", "上周浩气战功榜",
+    "本周恶人战功榜", "本周浩气战功榜",
+    "试炼之地", "拍卖", "的卢", "金价", "物价", "配方", "万宝楼", "诛恶",
+    "名片", "全部名片", "随机名片", "奇遇", "查询", "未出", "汇总", "近期", "统计",
     "精耐", "百战", "成就", "角色", "阵眼", "资历排行", "技能", "奇穴", "资历",
-    "聊天", "骗子", "拜师", "收徒", "招募", "团长", "团牌",
     "贴吧物价", "818", "副本", "掉落",
-    "跨服名剑", "武林争霸", "捕快", "浪客", "决斗",
+    "跨服名剑榜", "武林争霸", "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
     "资历分布", "外观搜索",
-    "急速", "试炼秒伤", "试炼赛季",
+    "加速", "试炼秒伤", "试炼赛季",
 })
 
 # 命令最少需要的非服务器参数个数。少填了就把绑定服插到最前。
 SERVER_ARITY = {
     "烟花": 1, "刷马": 0, "马场": 0, "战绩": 1,
-    "名士五十强": 0, "老江湖五十强": 0, "兵甲藏家五十强": 0, "名师五十强": 0,
-    "阵营英雄五十强": 0, "薪火相传五十强": 0, "庐园广记一百强": 0,
-    "浩气神兵宝甲五十强": 0, "恶人神兵宝甲五十强": 0,
-    "浩气爱心帮会五十强": 0, "恶人爱心帮会五十强": 0,
-    "赛季恶人五十强": 0, "赛季浩气五十强": 0,
-    "上周恶人五十强": 0, "上周浩气五十强": 0,
-    "本周恶人五十强": 0, "本周浩气五十强": 0,
-    "试炼排行": 1, "阵营拍卖": 0, "的卢": 0, "金价": 0, "成本": 1,
-    "帮战": 0, "沙盘": 0, "诛恶": 0, "名片": 1, "全名片": 1, "随机秀": 0,
+    "名士排行": 0, "江湖排行": 0, "兵甲排行": 0, "名师排行": 0,
+    "阵营排行": 0, "薪火排行": 0, "家园排行": 0,
+    "浩气神兵排行": 0, "恶人神兵排行": 0,
+    "浩气爱心排行": 0, "恶人爱心排行": 0,
+    "赛季恶人战功榜": 0, "赛季浩气战功榜": 0,
+    "上周恶人战功榜": 0, "上周浩气战功榜": 0,
+    "本周恶人战功榜": 0, "本周浩气战功榜": 0,
+    "试炼之地": 1, "拍卖": 0, "的卢": 0, "金价": 0, "配方": 1,
+    "帮战": 0, "沙盘": 0, "诛恶": 0, "名片": 1, "全部名片": 1, "随机名片": 0,
     "奇遇": 1, "查询": 1, "未出": 1, "汇总": 0, "近期": 0,
     "精耐": 1, "成就": 2, "角色": 1, "资历排行": 0, "聊天": 1, "统战": 0,
     "花价": 0, "拜师": 0, "收徒": 0, "招募": 0, "团长": 0, "团牌": 0,
-    "开服": 0, "副本": 1, "资历": 1, "交易行": 1,
-    "跨服名剑": 0, "武林争霸": 0, "捕快": 0, "浪客": 0, "决斗": 0,
+    "开服": 0, "全服状态": 0, "副本": 1, "资历": 1, "交易行": 1,
+    "跨服名剑榜": 0, "武林争霸": 0, "捕快荣誉榜": 0, "江湖浪客榜": 0, "决斗挑战榜": 0,
     "资历分布": 1,
 }
 
 SERVER_SECOND_COMMANDS = frozenset({
-    "物价", "统计", "骗子", "贴吧物价", "掉落",
+    "物价", "统计", "贴吧物价", "掉落",
 })
 
 
@@ -103,22 +96,43 @@ def _is_optional_tail(cmd: str, value: str) -> bool:
     text = (value or "").strip()
     if not text:
         return False
-    if cmd in {"战绩", "跨服名剑"} and text.lower() in MODE_TOKENS:
+    if cmd in {"战绩", "跨服名剑榜"} and text.lower() in MODE_TOKENS:
         return True
     if cmd == "武林争霸" and text in {"浩气", "恶人", "浩气盟", "恶人谷", "1", "2"}:
         return True
-    if cmd == "决斗" and text in {"公开", "私密", "1", "2"}:
+    if cmd == "决斗挑战榜" and text in {"公开", "私密", "1", "2"}:
         return True
-    if cmd in {"金价", "阵营拍卖", "近期", "汇总", "聊天", "资历分布"} and text.isdigit():
+    if cmd in {"金价", "拍卖", "近期", "汇总", "聊天", "资历分布"} and text.isdigit():
         return True
-    if cmd == "阵营拍卖" and not text.isdigit():
+    if cmd == "拍卖" and not text.isdigit():
         return True
-    if cmd in {"随机秀", "资历排行"} and text in SCHOOL_TAILS:
+    if cmd in {"随机名片", "资历排行"} and text in SCHOOL_TAILS:
         return True
     return False
 
-def inject_server_args(cmd: str, args: list[str], bound: str, known_servers: set[str] | None = None) -> list[str] | str:
+UNKNOWN_SERVER = "UNKNOWN_SERVER"
+
+
+def canonicalize_server_token(value: str, resolver=None) -> str:
+    text = (value or "").strip()
+    if not text:
+        return ""
+    if not callable(resolver):
+        return text
+    official = resolver(text)
+    return official or ""
+
+
+def canonicalize_args(args: list[str], resolver=None) -> list[str]:
+    return list(args)
+
+
+def inject_server_args(cmd: str, args: list[str], bound: str, known_servers: set[str] | None = None, resolver=None) -> list[str] | str:
     bound = (bound or "").strip()
+    if callable(resolver):
+        official_bound = resolver(bound)
+        if official_bound:
+            bound = official_bound
     args = list(args)
 
     if cmd in SERVER_ARITY:
@@ -131,11 +145,18 @@ def inject_server_args(cmd: str, args: list[str], bound: str, known_servers: set
             if not bound:
                 return UNBOUND_SERVER
             return [bound] + core + tail
-        return args
+        explicit = core[0]
+        official = canonicalize_server_token(explicit, resolver)
+        if not official:
+            return UNKNOWN_SERVER
+        return [official] + core[1:] + tail
 
     if cmd in SERVER_SECOND_COMMANDS:
         if len(args) >= 2:
-            return args
+            official = canonicalize_server_token(args[1], resolver)
+            if not official:
+                return UNKNOWN_SERVER
+            return [args[0], official] + args[2:]
         if not bound:
             return UNBOUND_SERVER
         if len(args) == 1:
@@ -145,7 +166,12 @@ def inject_server_args(cmd: str, args: list[str], bound: str, known_servers: set
     if cmd == "818":
         if not args:
             return [bound] + args if bound else args
-        return args
+        official = canonicalize_server_token(args[0], resolver)
+        if official:
+            return [official] + args[1:]
+        if bound:
+            return args
+        return UNKNOWN_SERVER
 
     return args
 
@@ -156,6 +182,32 @@ class AdminCommand:
     target: str = ""
     value: str = ""
     error: str = ""
+
+
+ADMIN_COMMAND_IDS = ("Token", "推栏", "认领", "查询令牌", "绑定", "打开", "关闭")
+
+
+def remap_admin_parts(parts: list[str], catalog: dict | None) -> list[str]:
+    if not parts:
+        return parts
+    trigger = parts[0]
+    if not catalog:
+        return parts
+    current_names = {}
+    for command_id in ADMIN_COMMAND_IDS:
+        current_names[command_id] = str((catalog.get(command_id) or {}).get("command") or command_id)
+    for command_id, current in current_names.items():
+        if trigger == current:
+            return [command_id, *parts[1:]]
+        if command_id == "Token" and current == "Token" and trigger.lower() == "token":
+            return ["Token", *parts[1:]]
+    for command_id, current in current_names.items():
+        old_names = {command_id}
+        if command_id == "Token":
+            old_names.add("token")
+        if trigger in old_names and current not in old_names:
+            return ["__renamed__", *parts[1:]]
+    return parts
 
 
 def parse_admin_command(parts: list[str], is_private: bool) -> AdminCommand:
@@ -184,11 +236,18 @@ def parse_admin_command(parts: list[str], is_private: bool) -> AdminCommand:
     return AdminCommand(error="unknown")
 
 
-def hint_unbound() -> str:
+def current_command_name(catalog: dict | None, command_id: str) -> str:
+    if not catalog:
+        return command_id
+    return str((catalog.get(command_id) or {}).get("command") or command_id)
+
+
+def hint_unbound(catalog: dict | None = None) -> str:
+    bind = current_command_name(catalog, "绑定")
     return (
         "当前会话未绑定区服。\n"
-        "请先由插件管理员发送：/绑定 区服名\n"
-        "例如：/绑定 梦江南"
+        f"请先由插件管理员发送：/{bind} 区服名\n"
+        f"例如：/{bind} 梦江南"
     )
 
 
@@ -199,44 +258,51 @@ def hint_bind_ok(server: str) -> str:
     )
 
 
-def hint_bind_denied() -> str:
-    return "绑定区服仅限插件管理员或 AstrBot 管理员。请先 /认领 剑网3机器人"
+def hint_bind_denied(catalog: dict | None = None) -> str:
+    claim = current_command_name(catalog, "认领")
+    return f"绑定区服仅限插件管理员或 AstrBot 管理员。请先 /{claim} 剑网3机器人"
 
 
-def hint_push_need_bind() -> str:
+def hint_push_need_bind(catalog: dict | None = None) -> str:
+    bind = current_command_name(catalog, "绑定")
     return (
         "请先绑定区服后再打开推送。\n"
-        "发送：/绑定 区服名\n"
-        "例如：/绑定 梦江南"
+        f"发送：/{bind} 区服名\n"
+        f"例如：/{bind} 梦江南"
     )
 
 
-def hint_push_ok(kind: str, enabled: bool) -> str:
-    action = "打开" if enabled else "关闭"
-    return f"已为当前会话{action}{kind}推送。"
+def hint_push_ok(kind: str, enabled: bool, catalog: dict | None = None) -> str:
+    open_cmd = current_command_name(catalog, "打开")
+    close_cmd = current_command_name(catalog, "关闭")
+    notice = current_command_name(catalog, "通知管理")
+    action = open_cmd if enabled else close_cmd
+    return f"已为当前会话{action}{kind}推送。发送 /{notice} 可查看全部开关。"
 
 
-def hint_need_token() -> str:
+def hint_need_token(catalog: dict | None = None) -> str:
+    token_cmd = current_command_name(catalog, "Token")
     return (
         "该功能需要 JX3API Token，当前会话尚未配置。\n"
         "请前往 https://www.jx3api.com 购买 Token。\n"
         "\n"
         "配置方式（请私聊机器人，不要在群里发送 Token）：\n"
         "1. 在目标群发送 /sid ，复制该群 UMO\n"
-        "2. 私聊发送：/Token <UMO> <你的Token>\n"
-        "例如：/Token <UMO> <你的Token>\n"
+        f"2. 私聊发送：/{token_cmd} <UMO> <你的Token>\n"
+        f"例如：/{token_cmd} <UMO> <你的Token>\n"
         "\n"
         "也可让机器人管理员在插件页面为该会话填写，或勾选「使用全局 Token」。"
     )
 
 
-def hint_need_ticket() -> str:
+def hint_need_ticket(catalog: dict | None = None) -> str:
+    ticket_cmd = current_command_name(catalog, "推栏")
     return (
         "该功能需要推栏标识，当前未配置。\n"
         "推栏默认使用全局配置；如需本会话单独使用，请私聊机器人（不要在群里发送）：\n"
         "1. 在目标群发送 /sid ，复制该群 UMO\n"
-        "2. 私聊发送：/推栏 <UMO> <你的推栏标识>\n"
-        "例如：/推栏 <UMO> <你的推栏标识>"
+        f"2. 私聊发送：/{ticket_cmd} <UMO> <你的推栏标识>\n"
+        f"例如：/{ticket_cmd} <UMO> <你的推栏标识>"
     )
 
 
@@ -288,12 +354,33 @@ def hint_claim_taken(name: str) -> str:
     return f"该机器人已被认领。当前插件管理员：{name or '已记录'}"
 
 
-def hint_need_claim() -> str:
+def hint_need_claim(catalog: dict | None = None) -> str:
+    claim = current_command_name(catalog, "认领")
     return (
         "绑定区服、打开推送、配置 Token/推栏仅限插件管理员。\n"
-        "请先由 AstrBot 管理员或认领人发送：/认领 剑网3机器人"
+        f"请先由 AstrBot 管理员或认领人发送：/{claim} 剑网3机器人"
     )
 
 
-def hint_claim_phrase() -> str:
-    return "用法：/认领 剑网3机器人"
+def hint_claim_phrase(catalog: dict | None = None) -> str:
+    claim = current_command_name(catalog, "认领")
+    return f"用法：/{claim} 剑网3机器人"
+
+
+def format_command_error(cmd: str, error: BaseException, catalog: dict | None = None) -> str:
+    detail = str(error or "").strip()
+    if detail.startswith("缺少参数") or "required" in detail.lower():
+        return hint_command_usage(cmd, catalog)
+    if detail:
+        return f"{hint_command_usage(cmd, catalog)}\n{detail}"
+    return hint_command_usage(cmd, catalog)
+
+
+def hint_unknown_server() -> str:
+    return "请输入正确的区服。"
+
+
+def hint_command_usage(cmd: str, catalog: dict | None = None) -> str:
+    from .command_catalog import command_usage
+    usage = command_usage(cmd, catalog)
+    return f"请发送: 「 {usage} 」"
