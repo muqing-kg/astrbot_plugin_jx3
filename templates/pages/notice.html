@@ -12,7 +12,7 @@
             <span>{{ group.enabled_count }} / {{ group.total }} 已开启</span>
         </div>
         <div class="notice-grid">
-            {% for item in group.items %}
+            {% for item in group.events %}
             <div class="notice-item {% if item.enabled %}is-on{% else %}is-off{% endif %}">
                 <span class="notice-dot"></span>
                 <span class="notice-name">{{ item.name }}</span>

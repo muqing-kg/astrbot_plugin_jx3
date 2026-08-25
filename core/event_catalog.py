@@ -335,7 +335,7 @@ def build_notice_view(display_name: str, server: str, enabled: set[str] | list[s
             "name": group["name"],
             "enabled_count": enabled_count,
             "total": len(items),
-            "items": items,
+            "events": items,
         })
     return {
         "title": "通知管理",
