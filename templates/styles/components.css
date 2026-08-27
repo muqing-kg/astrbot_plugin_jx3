@@ -476,7 +476,9 @@
 
 .jx3-template .zl-groups {
     display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
     gap: 14px;
+    align-items: start;
 }
 
 .jx3-template .zl-group {
@@ -485,6 +487,7 @@
     border-radius: 14px;
     background: transparent;
     box-shadow: var(--jx3-shadow-sm);
+    break-inside: avoid;
 }
 
 .jx3-template .zl-group__head {
@@ -538,8 +541,12 @@
 }
 
 .jx3-template .zl-progress {
-    height: 12px;
+    height: 18px;
     margin-top: 10px;
+}
+
+.jx3-template .zl-progress .progress-fill {
+    height: 100%;
 }
 
 .jx3-template .zl-progress .progress-fill.bar-high {
