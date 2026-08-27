@@ -543,23 +543,23 @@
 }
 
 .jx3-template .zl-progress .progress-fill.bar-high {
-    background: linear-gradient(90deg, #5a8f6e, #7bb58d);
+    background: linear-gradient(90deg, #2d7a51, #5aa170);
 }
 
 .jx3-template .zl-progress .progress-fill.bar-mid {
-    background: linear-gradient(90deg, #d9a441, #e8bd70);
+    background: linear-gradient(90deg, #c9891f, #e2ab43);
 }
 
 .jx3-template .zl-progress .progress-fill.bar-low {
-    background: linear-gradient(90deg, #c45c7a, #dc8aa3);
+    background: linear-gradient(90deg, #b9405f, #d46f85);
 }
 
 .jx3-template .zl-progress .progress-fill.bar-full {
-    background: linear-gradient(90deg, #b8863b, #d4a455);
+    background: linear-gradient(90deg, #7b4fa0, #a878c4);
 }
 
 .jx3-template .zl-progress .progress-fill.bar-min {
-    background: linear-gradient(90deg, #9a93a0, #b7b0bc);
+    background: linear-gradient(90deg, #7f8894, #9da6b0);
 }
 
 .jx3-template .zl-cat-0 { color: #2b5da6; }

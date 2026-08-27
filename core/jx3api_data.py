@@ -235,11 +235,11 @@ class JX3APIService:
     def _bar_style(bar_class: str) -> str:
         """进度条按覆盖区间返回实际渐变色。"""
         colors = {
-            "bar-full": ("#b8863b", "#d4a455"),
-            "bar-high": ("#5a8f6e", "#7bb58d"),
-            "bar-mid": ("#d9a441", "#e8bd70"),
-            "bar-low": ("#c45c7a", "#dc8aa3"),
-            "bar-min": ("#9a93a0", "#b7b0bc"),
+            "bar-full": ("#7b4fa0", "#a878c4"),
+            "bar-high": ("#2d7a51", "#5aa170"),
+            "bar-mid": ("#c9891f", "#e2ab43"),
+            "bar-low": ("#b9405f", "#d46f85"),
+            "bar-min": ("#7f8894", "#9da6b0"),
         }
         start, end = colors.get(bar_class, ("#d9899f", "#c45c7a"))
         return f"linear-gradient(90deg, {start}, {end})"
@@ -254,12 +254,12 @@ class JX3APIService:
         if max_num <= 0:
             return ""
         fixed = {
-            50: "#7b4fa0",
+            50: "#b8863b",
             100: "#2d7a51",
             150: "#b96a1f",
             200: "#1f8a70",
             250: "#2b5da6",
-            300: "#b8863b",
+            300: "#7b4fa0",
         }
         if max_num in fixed:
             return fixed[max_num]
