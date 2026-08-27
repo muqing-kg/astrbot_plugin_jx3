@@ -39,3 +39,10 @@ output/
 
 # 参考素材，不随插件分发
 图片参考/
+
+# 本地测试、过程渲染与内部记录，不随项目分发
+tests/
+渲染验收/
+docs/文字类返回汇总.md
+.playwright-mcp/
+PROGRESS.md
