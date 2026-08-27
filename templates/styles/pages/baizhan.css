@@ -25,22 +25,22 @@
 
 .baizhan-page .grid {
     display: grid;
-    grid-template-columns: repeat(var(--grid-columns, 4), minmax(0, 1fr));
+    grid-template-columns: repeat(var(--grid-columns, 5), minmax(0, 1fr));
     gap: 10px;
 }
 
 .baizhan-page .cell {
     display: grid;
-    grid-template-rows: 24px 26px 34px;
+    grid-template-rows: 20px 22px 28px;
     align-content: start;
     align-items: center;
     justify-items: center;
-    gap: 4px;
-    min-height: 116px;
-    padding: 8px 8px 6px;
+    gap: 3px;
+    min-height: 76px;
+    padding: 6px 6px 5px;
     text-align: center;
     border: 1px solid var(--jx3-border-faint);
-    border-radius: 14px;
+    border-radius: 13px;
     box-shadow: var(--jx3-shadow-sm);
 }
 

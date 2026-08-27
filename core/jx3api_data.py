@@ -245,45 +245,78 @@ class JX3APIService:
         return f"linear-gradient(90deg, {start}, {end})"
 
     @staticmethod
-    def _limit_color_class(maximum: Any) -> str:
-        """招收上限按固定档位统一配色，未列出的交给默认样式。"""
+    def _limit_color_style(maximum: Any) -> str:
+        """招收上限按固定档位分配颜色，超出档位的按稳定哈希自动取色。"""
         try:
             max_num = int(str(maximum).strip())
         except (TypeError, ValueError):
             return ""
-        if max_num == 300:
-            return "member-limit-300"
-        if max_num == 250:
-            return "member-limit-250"
-        if max_num == 50:
-            return "member-limit-50"
-        return ""
+        if max_num <= 0:
+            return ""
+        fixed = {
+            50: "#7b4fa0",
+            100: "#2d7a51",
+            150: "#b96a1f",
+            200: "#1f8a70",
+            250: "#2b5da6",
+            300: "#b8863b",
+        }
+        if max_num in fixed:
+            return fixed[max_num]
+        palette = (
+            "#1d7f8f", "#8a4f7d", "#c96a2e", "#4f7d43",
+            "#6b5b9e", "#9a7e2d", "#3f7f9e", "#a0563a",
+        )
+        mixed = max_num & 0xFFFFFFFFFFFFFFFF
+        mixed ^= (mixed >> 30)
+        mixed = (mixed * 0xBF58476D1CE4E5B9) & 0xFFFFFFFFFFFFFFFF
+        mixed ^= (mixed >> 27)
+        mixed = (mixed * 0x94D049BB133111EB) & 0xFFFFFFFFFFFFFFFF
+        mixed ^= (mixed >> 31)
+        return palette[mixed % len(palette)]
 
     @staticmethod
-    def _member_cell(member: Any, maximum: Any) -> tuple[str, str, str, str]:
-        """返回 (实际人数, 人数颜色类, 招收上限, 上限颜色类)。"""
+    def _member_band_class(member: Any) -> str:
+        """已收人数按 50/100/150/200/250/300 六档上色，满员由调用方接管。"""
+        try:
+            member_num = int(str(member).strip())
+        except (TypeError, ValueError):
+            return ""
+        bands = (
+            ("member-band-1", 50),
+            ("member-band-2", 100),
+            ("member-band-3", 150),
+            ("member-band-4", 200),
+            ("member-band-5", 250),
+            ("member-band-6", 300),
+        )
+        for cls, upper in bands:
+            if member_num <= upper:
+                return cls
+        return "member-band-6"
+
+    @staticmethod
+    def _member_cell(member: Any, maximum: Any) -> tuple[str, str, str, str, str]:
+        """返回 (实际人数, 人数颜色类, 招收上限, 上限颜色, 人数内联颜色)。"""
         if maximum in (None, "") or member in (None, ""):
-            return "", "", "", ""
+            return "", "", "", "", ""
         try:
             member_num = int(str(member).strip())
             max_num = int(str(maximum).strip())
         except (TypeError, ValueError):
-            return "", "", "", ""
-        limit_class = JX3APIService._limit_color_class(max_num)
+            return "", "", "", "", ""
+        limit_style = JX3APIService._limit_color_style(max_num)
         if max_num <= 0:
-            return str(member_num), "", str(max_num), limit_class
-        ratio = member_num / max_num
-        if ratio >= 1:
-            count_class = limit_class or "member-full"
-        elif ratio >= 0.9:
-            count_class = "member-near-full"
-        elif ratio >= 0.7:
-            count_class = "member-high"
-        elif ratio >= 0.4:
-            count_class = "member-mid"
-        else:
-            count_class = "member-low"
-        return str(member_num), count_class, str(max_num), limit_class
+            return str(member_num), "", str(max_num), limit_style, limit_style
+        if member_num >= max_num:
+            return str(member_num), "member-full", str(max_num), limit_style, limit_style
+        return (
+            str(member_num),
+            JX3APIService._member_band_class(member_num),
+            str(max_num),
+            limit_style,
+            "",
+        )
 
     def _camp_code(self, camp: str) -> int:
         text = str(camp or "").strip()
@@ -713,7 +746,7 @@ class JX3APIService:
             if name in TONG_RANK_NAMES0:
                 for item in items:
                     if isinstance(item, dict):
-                        item["member_count"], item["member_class"], item["member_limit"], item["member_limit_class"] = self._member_cell(
+                        item["member_count"], item["member_class"], item["member_limit"], item["member_limit_style"], item["member_count_style"] = self._member_cell(
                             item.get("memberCount"), item.get("maxMemberCount")
                         )
             elif name in TONG_RANK_NAMES1:
@@ -721,7 +754,7 @@ class JX3APIService:
                     if isinstance(item, dict):
                         limit_value = item.get("maxLimit")
                         item["limit_display"] = str(limit_value) if limit_value not in (None, "") else "-"
-                        item["limit_class"] = self._limit_color_class(limit_value) or "member-limit"
+                        item["limit_style"] = self._limit_color_style(limit_value)
             rank_name = payload.get("name", name)
             if "赛季" in rank_name:
                 page_kicker = "GUILD SEASON"
@@ -1352,7 +1385,7 @@ class JX3APIService:
                 root = int(len(layers) ** 0.5)
                 if root * root < len(layers):
                     root += 1
-                return_data["data"]["columns"] = max(4, root)   
+                return_data["data"]["columns"] = max(5, root)   
 
         return await self._request_api(
             path="/monster/weekly",
