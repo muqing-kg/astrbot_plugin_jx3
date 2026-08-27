@@ -14,7 +14,9 @@ async def read_json_payload(request: Any) -> dict[str, Any]:
         if callable(json_attr):
             data = await json_attr(default={})
         else:
-            data = await json_attr
+            data = json_attr
+            if hasattr(data, "__await__"):
+                data = await data
     except Exception:
         return {}
     return data if isinstance(data, dict) else {}

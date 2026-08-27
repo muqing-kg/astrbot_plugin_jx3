@@ -56,15 +56,19 @@
         border-radius: 12px;
         box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
     }table {
-        min-width: 420px;
-        text-align: left;
-    }th,
+        min-width: 400px;
+        text-align: center;
+    }
+
+    th,
     td {
-        white-space: nowrap;
+        white-space: normal;
+        text-align: center;
     }
 
     th {
         font-weight: 700;
+        text-align: center;
     }
 
     .server-col {

@@ -3,9 +3,7 @@
 
 
 <div class="container data-page">
-    <h1>名剑排行</h1>
-
-    <table class="data-table data-table--spaced">
+<table class="data-table data-table--spaced">
         <thead>
             <tr>
                 <th>排名</th>
@@ -35,9 +33,28 @@
 
                 <td>{{ m.roleName }}</td>
 
-                <td>{{ m.zoneName }} · {{ m.serverName }}</td>
+                <td>
+                    {% if m.zoneName and m.serverName %}
+                        {{ m.zoneName }} · {{ m.serverName }}
+                    {% elif m.zoneName %}
+                        {{ m.zoneName }}
+                    {% elif m.serverName %}
+                        {{ m.serverName }}
+                    {% else %}
+                        跨服
+                    {% endif %}
+                </td>
 
-                <td>{{ m.forceName }}</td>
+                <td>
+                    <div class="icon-label icon-label--inline">
+                        {% if icons.sect.get(m.forceName) %}
+                        <img class="icon-label__icon" src="{{ icons.sect[m.forceName] }}" alt="{{ m.forceName }}">
+                        {% else %}
+                        <span class="icon-label__spacer"></span>
+                        {% endif %}
+                        <span>{{ m.forceName }}</span>
+                    </div>
+                </td>
 
                 <td>{{ m.score }}</td>
 

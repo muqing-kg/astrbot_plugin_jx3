@@ -1,30 +1,30 @@
 :root {
-    --jx3-bg-deep: #d7e2ea;
-    --jx3-bg: #e8eef2;
-    --jx3-bg-raised: #f4f8fb;
-    --jx3-surface: #ffffff;
-    --jx3-surface-strong: #f7fafc;
-    --jx3-surface-soft: #f2f6f9;
-    --jx3-surface-muted: #e7eef3;
-    --jx3-border: #9eb3c4;
-    --jx3-border-strong: #6f8aa0;
-    --jx3-border-soft: rgba(47, 79, 104, 0.16);
-    --jx3-border-faint: rgba(47, 79, 104, 0.10);
-    --jx3-gold: #9a6b24;
-    --jx3-gold-bright: #8a4b12;
-    --jx3-gold-muted: #b45309;
-    --jx3-text: #1a2a36;
-    --jx3-text-secondary: #334655;
-    --jx3-text-muted: #5d6b7a;
-    --jx3-blue: #1f6f8b;
-    --jx3-green: #2c7a4b;
-    --jx3-red: #b54a45;
-    --jx3-purple: #6b4f9a;
-    --jx3-shadow-sm: 0 4px 12px rgba(26, 42, 54, 0.08);
-    --jx3-shadow-md: 0 12px 30px rgba(26, 42, 54, 0.10);
-    --jx3-radius-sm: 6px;
-    --jx3-radius-md: 10px;
-    --jx3-radius-lg: 14px;
+    --jx3-bg-deep: #f3dce2;
+    --jx3-bg: #fdf1f3;
+    --jx3-bg-raised: #fff7f8;
+    --jx3-surface: #fefcfd;
+    --jx3-surface-strong: #ffffff;
+    --jx3-surface-soft: #fff5f7;
+    --jx3-surface-muted: #f7e6ea;
+    --jx3-border: #f0c9d3;
+    --jx3-border-strong: #d9899f;
+    --jx3-border-soft: rgba(196, 92, 122, 0.18);
+    --jx3-border-faint: rgba(196, 92, 122, 0.10);
+    --jx3-gold: #d9899f;
+    --jx3-gold-bright: #c45c7a;
+    --jx3-gold-muted: #e3a4b4;
+    --jx3-text: #3f3a46;
+    --jx3-text-secondary: #5c5666;
+    --jx3-text-muted: #9a93a0;
+    --jx3-blue: #5b7ea8;
+    --jx3-green: #5a8f6e;
+    --jx3-red: #c45c7a;
+    --jx3-purple: #8a6aa8;
+    --jx3-shadow-sm: 0 6px 16px rgba(196, 92, 122, 0.08);
+    --jx3-shadow-md: 0 14px 32px rgba(196, 92, 122, 0.10);
+    --jx3-radius-sm: 8px;
+    --jx3-radius-md: 16px;
+    --jx3-radius-lg: 22px;
     --jx3-space-1: 4px;
     --jx3-space-2: 8px;
     --jx3-space-3: 12px;
@@ -96,7 +96,10 @@
     --jx3-page-width: 1180px;
 }
 
-.jx3-template--dilujilu,
+.jx3-template--dilujilu {
+    --jx3-page-width: 1460px;
+}
+
 .jx3-template--jinjia,
 .jx3-template--juesheliaotian,
 .jx3-template--tuanduizhaomu,
@@ -119,5 +122,9 @@
 }
 
 .jx3-template--helps {
-    --jx3-page-width: 720px;
+    --jx3-page-width: 1000px;
+}
+
+.jx3-template--notice {
+    --jx3-page-width: 1000px;
 }

@@ -3,9 +3,7 @@
 
 
 <div class="container">
-    <h1>奇遇汇总 • {{ server }}</h1>
-    <div class="data-page__meta">最近 {{ num }} 天 · 更新时间：{{ update_time }}</div>
-    <div class="card-grid" style="--grid-columns: 3">
+<div class="card-grid" style="--grid-columns: 3">
         {% for m in items %}
         <div class="collection-card">
             {% if icons.serendipity.get(m.event) %}

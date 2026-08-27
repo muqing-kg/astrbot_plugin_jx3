@@ -1,6 +1,10 @@
 const statusEl = document.getElementById("status");
 const cardsEl = document.getElementById("cards");
+const commandListEl = document.getElementById("commandList");
+const serverListEl = document.getElementById("serverList");
+const resetBtn = document.getElementById("resetBtn");
 let bridge = null;
+let currentView = "sessions";
 
 function setStatus(text, isError = false) {
   if (!text) {
@@ -70,19 +74,22 @@ function waitForPluginBridge(timeoutMs = 8000) {
   });
 }
 
-async function apiGet(endpoint, params) {
-  return bridge.apiGet(endpoint, params);
-}
-
-async function apiPost(endpoint, body) {
-  return bridge.apiPost(endpoint, body);
-}
-
 function pill(label, on) {
   return `<span class="pill ${on ? "on" : ""}">${escapeHtml(label)}</span>`;
 }
 
-function render(payload) {
+function setView(view) {
+  currentView = view;
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.view === view);
+  });
+  document.querySelectorAll(".view-panel").forEach((panel) => {
+    panel.classList.toggle("active", panel.dataset.viewPanel === view);
+  });
+  resetBtn.hidden = view === "sessions";
+}
+
+function renderSessions(payload) {
   const sessions = payload.sessions || [];
   cardsEl.innerHTML = "";
   if (!sessions.length) {
@@ -105,7 +112,7 @@ function sessionCard(row) {
       </div>
       <div class="pills">
         ${pill(row.server || "未绑定区服", Boolean(row.server))}
-        ${pill("Token " + (row.token_status || "未配置"), Boolean(row.has_token || row.use_global_token))}
+        ${pill("Token " + (row.token_status || "未配置"), Boolean(row.has_token))}
         ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
         ${pill(row.bot_enabled === false ? "机器人已关闭" : "机器人开启", row.bot_enabled !== false)}
       </div>
@@ -158,7 +165,7 @@ function sessionCard(row) {
     try {
       await fn();
       setStatus("已保存");
-      await load();
+      await loadSessions();
     } catch (err) {
       setStatus(err.message || "保存失败", true);
     }
@@ -173,19 +180,19 @@ function sessionCard(row) {
     const ticket = card.querySelector('[data-k="ticket"]').value.trim();
     if (act === "bind") {
       if (!row.umo || !server) return setStatus("请填写区服", true);
-      await run(() => apiPost("page/sessions/bind", { umo: row.umo, server }));
+      await run(() => bridge.apiPost("page/sessions/bind", { umo: row.umo, server }));
     } else if (act === "token") {
       if (!row.umo || !token) return setStatus("请填写 Token", true);
-      await run(() => apiPost("page/sessions/token", { umo: row.umo, token }));
+      await run(() => bridge.apiPost("page/sessions/token", { umo: row.umo, token }));
     } else if (act === "ticket") {
       if (!row.umo || !ticket) return setStatus("请填写推栏标识", true);
-      await run(() => apiPost("page/sessions/ticket", { umo: row.umo, ticket }));
+      await run(() => bridge.apiPost("page/sessions/ticket", { umo: row.umo, ticket }));
     } else if (act === "clear-server") {
-      await run(() => apiPost("page/sessions/clear-server", { umo: row.umo }));
+      await run(() => bridge.apiPost("page/sessions/clear-server", { umo: row.umo }));
     } else if (act === "clear-token") {
-      await run(() => apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "token" }));
+      await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "token" }));
     } else if (act === "clear-ticket") {
-      await run(() => apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "ticket" }));
+      await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "ticket" }));
     }
   });
 
@@ -193,9 +200,9 @@ function sessionCard(row) {
     const enabled = ev.target.checked;
     try {
       if (!row.umo) throw new Error("当前会话缺少标识");
-      await apiPost("page/sessions/use-global", { umo: row.umo, enabled });
+      await bridge.apiPost("page/sessions/use-global", { umo: row.umo, enabled });
       setStatus(enabled ? "已启用全局 JX3API Token" : "已关闭全局 JX3API Token");
-      await load();
+      await loadSessions();
     } catch (err) {
       ev.target.checked = !enabled;
       setStatus(err.message || "保存失败", true);
@@ -205,9 +212,9 @@ function sessionCard(row) {
     const enabled = ev.target.checked;
     try {
       if (!row.umo) throw new Error("当前会话缺少标识");
-      await apiPost("page/sessions/bot", { umo: row.umo, enabled });
+      await bridge.apiPost("page/sessions/bot", { umo: row.umo, enabled });
       setStatus(enabled ? "已开启该会话机器人" : "已关闭该会话机器人");
-      await load();
+      await loadSessions();
     } catch (err) {
       ev.target.checked = !enabled;
       setStatus(err.message || "保存失败", true);
@@ -216,18 +223,119 @@ function sessionCard(row) {
   return card;
 }
 
-async function load() {
-  const data = await apiGet("page/sessions");
-  render(data);
+function renderCommands(payload) {
+  const commands = payload.commands || [];
+  commandListEl.innerHTML = `<div class="head"><span>功能</span><span>命令</span><span>描述</span><span></span></div>`;
+  for (const row of commands) {
+    const el = document.createElement("div");
+    el.className = "row";
+    el.innerHTML = `
+      <div class="id">${escapeHtml(row.id)}</div>
+      <input data-k="command" value="${escapeHtml(row.command || "")}" />
+      <input data-k="desc" value="${escapeHtml(row.desc || "")}" />
+      <button data-act="save" type="button">保存</button>
+    `;
+    el.querySelector('[data-act="save"]').addEventListener("click", async () => {
+      try {
+        await bridge.apiPost("page/commands/save", {
+          id: row.id,
+          command: el.querySelector('[data-k="command"]').value.trim(),
+          desc: el.querySelector('[data-k="desc"]').value.trim(),
+        });
+        setStatus("已保存");
+        await loadCommands();
+      } catch (err) {
+        setStatus(err.message || "保存失败", true);
+      }
+    });
+    commandListEl.appendChild(el);
+  }
 }
 
+function renderServers(payload) {
+  const servers = payload.servers || [];
+  serverListEl.innerHTML = `<div class="head"><span>正式区服</span><span>别名</span><span></span><span></span></div>`;
+  for (const row of servers) {
+    const el = document.createElement("div");
+    el.className = "row";
+    el.innerHTML = `
+      <div class="id">${escapeHtml(row.server)}</div>
+      <input data-k="aliases" value="${escapeHtml(row.aliases_text || "")}" placeholder="多个别名用逗号分隔" />
+      <div></div>
+      <button data-act="save" type="button">保存</button>
+    `;
+    el.querySelector('[data-act="save"]').addEventListener("click", async () => {
+      try {
+        await bridge.apiPost("page/servers/save", {
+          server: row.server,
+          aliases: el.querySelector('[data-k="aliases"]').value.trim(),
+        });
+        setStatus("已保存");
+        await loadServers();
+      } catch (err) {
+        setStatus(err.message || "保存失败", true);
+      }
+    });
+    serverListEl.appendChild(el);
+  }
+}
+
+async function loadSessions() {
+  renderSessions(await bridge.apiGet("page/sessions"));
+}
+
+async function loadCommands() {
+  renderCommands(await bridge.apiGet("page/commands"));
+}
+
+async function loadServers() {
+  renderServers(await bridge.apiGet("page/servers"));
+}
+
+async function loadCurrent() {
+  if (currentView === "commands") return loadCommands();
+  if (currentView === "servers") return loadServers();
+  return loadSessions();
+}
+
+document.querySelectorAll(".tab-btn").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    setView(btn.dataset.view);
+    try {
+      await loadCurrent();
+      setStatus("");
+    } catch (err) {
+      setStatus(err.message || "加载失败", true);
+    }
+  });
+});
+
 document.getElementById("refreshBtn").addEventListener("click", () => {
-  load().then(() => setStatus("已刷新")).catch((e) => setStatus(e.message, true));
+  loadCurrent().then(() => setStatus("已刷新")).catch((e) => setStatus(e.message, true));
+});
+
+resetBtn.addEventListener("click", async () => {
+  try {
+    if (currentView === "commands") {
+      await bridge.apiPost("page/commands/reset", {});
+      setStatus("已恢复默认命令");
+      await loadCommands();
+      return;
+    }
+    if (currentView === "servers") {
+      await bridge.apiPost("page/servers/reset", {});
+      setStatus("已恢复默认别名");
+      await loadServers();
+    }
+  } catch (err) {
+    setStatus(err.message || "恢复失败", true);
+  }
 });
 
 waitForPluginBridge()
   .then((readyBridge) => {
     bridge = readyBridge;
-    return load();
+    setView("sessions");
+    return loadCurrent();
   })
   .catch((e) => setStatus(e.message, true));

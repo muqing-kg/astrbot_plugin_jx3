@@ -1,0 +1,40 @@
+.auction-amount {
+    font-variant-numeric: tabular-nums;
+    font-weight: 800;
+}
+
+.amount--high {
+    color: #c0392b;
+}
+
+.amount--mid {
+    color: #c45c7a;
+}
+
+.amount--low {
+    color: #5a8f6e;
+}
+
+.auction-item.item-color-0 {
+    color: #2b5da6;
+}
+
+.auction-item.item-color-1 {
+    color: #8a4f9f;
+}
+
+.auction-item.item-color-2 {
+    color: #2d7a51;
+}
+
+.auction-item.item-color-3 {
+    color: #a1611d;
+}
+
+.auction-item.item-color-4 {
+    color: #2a7d84;
+}
+
+.auction-item.item-color-5 {
+    color: #a63d73;
+}

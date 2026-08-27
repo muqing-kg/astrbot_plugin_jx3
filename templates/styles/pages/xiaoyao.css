@@ -1,0 +1,23 @@
+.kungfu-cell {
+    white-space: nowrap;
+}
+
+.kungfu-icon {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    border-radius: 4px;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.food-cell {
+    line-height: 1.45;
+}
+
+.boost-note {
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--jx3-text-muted);
+}

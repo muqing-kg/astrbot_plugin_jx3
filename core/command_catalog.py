@@ -26,14 +26,6 @@ DEFAULT_COMMAND_ROWS = [
         'desc': '日常活动 / 开服',
     },
     {
-        'id': '全服状态',
-        'group': '日常活动',
-        'command': '全服状态',
-        'command_tpl': '全服状态',
-        'example_tpl': '全服状态',
-        'desc': '日常活动 / 全服状态',
-    },
-    {
         'id': '科举',
         'group': '日常活动',
         'command': '科举',
@@ -170,14 +162,6 @@ DEFAULT_COMMAND_ROWS = [
         'desc': '配装工具 / 奇穴',
     },
     {
-        'id': '加速',
-        'group': '配装工具',
-        'command': '加速',
-        'command_tpl': '加速 [技能CD]',
-        'example_tpl': '加速 1.5',
-        'desc': '配装工具 / 加速',
-    },
-    {
         'id': '阵眼',
         'group': '配装工具',
         'command': '阵眼',
@@ -207,7 +191,7 @@ DEFAULT_COMMAND_ROWS = [
         'command': '骚话',
         'command_tpl': '骚话',
         'example_tpl': '骚话',
-        'desc': '配装工具 / 骚话',
+        'desc': '日常活动 / 骚话',
     },
     {
         'id': '聊天',
@@ -242,36 +226,12 @@ DEFAULT_COMMAND_ROWS = [
         'desc': '副本掉落 / 烟花',
     },
     {
-        'id': '试炼秒伤',
-        'group': '副本掉落',
-        'command': '试炼秒伤',
-        'command_tpl': '试炼秒伤 [赛季] [层数]',
-        'example_tpl': '试炼秒伤 1 10',
-        'desc': '副本掉落 / 试炼秒伤',
-    },
-    {
-        'id': '试炼赛季',
-        'group': '副本掉落',
-        'command': '试炼赛季',
-        'command_tpl': '试炼赛季',
-        'example_tpl': '试炼赛季',
-        'desc': '副本掉落 / 试炼赛季',
-    },
-    {
-        'id': '奇遇',
-        'group': '奇遇宠物',
-        'command': '奇遇',
-        'command_tpl': '奇遇 [服务器] [角色]',
-        'example_tpl': '奇遇 飞龙在天 小螺卜头',
-        'desc': '奇遇宠物 / 奇遇',
-    },
-    {
         'id': '查询',
         'group': '奇遇宠物',
         'command': '查询',
         'command_tpl': '查询 [服务器] [角色]',
         'example_tpl': '查询 飞龙在天 小螺卜头',
-        'desc': '奇遇宠物 / 查询',
+        'desc': '奇遇宠物 / 角色奇遇',
     },
     {
         'id': '未出',
@@ -831,7 +791,7 @@ DEFAULT_COMMAND_ROWS = [
         'command': '新闻',
         'command_tpl': '新闻 [数量]',
         'example_tpl': '新闻',
-        'desc': '会话设置 / 新闻',
+        'desc': '日常活动 / 新闻',
     },
     {
         'id': '维护',
@@ -839,7 +799,7 @@ DEFAULT_COMMAND_ROWS = [
         'command': '维护',
         'command_tpl': '维护 [数量]',
         'example_tpl': '维护',
-        'desc': '会话设置 / 维护',
+        'desc': '日常活动 / 维护',
     },
     {
         'id': '818',
@@ -847,7 +807,7 @@ DEFAULT_COMMAND_ROWS = [
         'command': '818',
         'command_tpl': '818 [服务器] [数量]',
         'example_tpl': '818 飞龙在天',
-        'desc': '会话设置 / 818',
+        'desc': '日常活动 / 818',
     },
     {
         'id': '答案之书',
@@ -855,7 +815,7 @@ DEFAULT_COMMAND_ROWS = [
         'command': '答案之书',
         'command_tpl': '答案之书',
         'example_tpl': '答案之书',
-        'desc': '会话设置 / 答案之书',
+        'desc': '日常活动 / 答案之书',
     },
     {
         'id': '舔狗语录',
@@ -863,7 +823,7 @@ DEFAULT_COMMAND_ROWS = [
         'command': '舔狗语录',
         'command_tpl': '舔狗语录',
         'example_tpl': '舔狗语录',
-        'desc': '会话设置 / 舔狗语录',
+        'desc': '日常活动 / 舔狗语录',
     },
     {
         'id': '喝什么',
@@ -871,7 +831,7 @@ DEFAULT_COMMAND_ROWS = [
         'command': '喝什么',
         'command_tpl': '喝什么',
         'example_tpl': '喝什么',
-        'desc': '会话设置 / 喝什么',
+        'desc': '日常活动 / 喝什么',
     },
     {
         'id': '吃什么',
@@ -879,7 +839,7 @@ DEFAULT_COMMAND_ROWS = [
         'command': '吃什么',
         'command_tpl': '吃什么',
         'example_tpl': '吃什么',
-        'desc': '会话设置 / 吃什么',
+        'desc': '日常活动 / 吃什么',
     },
     {
         'id': '渣男语录',
@@ -887,7 +847,7 @@ DEFAULT_COMMAND_ROWS = [
         'command': '渣男语录',
         'command_tpl': '渣男语录',
         'example_tpl': '渣男语录',
-        'desc': '会话设置 / 渣男语录',
+        'desc': '日常活动 / 渣男语录',
     },
 ]
 

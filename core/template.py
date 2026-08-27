@@ -1,6 +1,9 @@
 import asyncio
+import hashlib
 import re
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import aiofiles
 
@@ -18,6 +21,82 @@ _COMPONENT_STYLE_PATTERN = re.compile(
     re.DOTALL,
 )
 
+
+
+_PAGE_KICKER = {
+    "helps": "QUERY MENU",
+    "notice": "NOTICE",
+    "xiaoyao": "MEDICINE",
+    "baizhan": "HUNDRED BATTLES",
+    "bangzhanjilu": "WAR DECL.",
+    "chengbeng": "CRAFT COST",
+    "chengjiu": "ACHIEVEMENT",
+    "data_list": "DATA LIST",
+    "diaoluo": "LOOT LOG",
+    "dilujilu": "DILU LOG",
+    "fubenjilu": "RAID REWARD",
+    "guanaishouling": "PASS BOSS",
+    "huajia": "FLOWER PRICE",
+    "jiaoyihang": "TRADING POST",
+    "jineng": "SKILLS",
+    "jingnai": "STAMINA",
+    "jinjia": "GOLD PRICE",
+    "jinqiqiyu": "RECENT ADV.",
+    "juesheliaotian": "CHAT LOG",
+    "juesheqiyu": "ADVENTURE",
+    "mingjianpaihang": "ARENA RANK",
+    "mingjiantongji": "ARENA STATS",
+    "qiwu": "FURNISHINGS",
+    "qixue": "TALENTS",
+    "qiyuhuizong": "ADV. SUMMARY",
+    "qiyuliebiao": "ADV. LIST",
+    "qiyugonglue": "GUIDE",
+    "rank_role": "ROLE RANK",
+    "rank_tong0": "GUILD WEEKLY",
+    "rank_tong1": "GUILD RANK",
+    "rank_tong2": "GUILD RANK",
+    "richangyuche": "DAILY CAL.",
+    "shilianpaixing": "TRIAL RANK",
+    "shitu": "MENTOR",
+    "tuanduizhaomu": "TEAM RECRUIT",
+    "weizuoqiyu": "MISSING ADV.",
+    "wujia": "ITEM PRICE",
+    "xingxiashijian": "PRESTIGE",
+    "yanhuan": "FIREWORKS",
+    "zhanji": "ARENA RECORD",
+    "zhengyingpaimai": "CAMP AUCTION",
+    "zhenyingevent": "CAMP EVENT",
+    "zhuangshi": "HOMESTEAD",
+    "zhueevent": "WANTED",
+    "zili": "ACHIEVEMENT",
+    "zilipaixing": "ACHV. RANK",
+}
+
+_QUOTES_PATH = Path(__file__).parent.parent / "templates" / "daily_quotes.txt"
+_DEFAULT_QUOTES = [
+    "江湖路远，且行且看。",
+    "今日事了，明日再战。",
+    "剑未出鞘，心先安定。",
+]
+
+
+def _daily_quote(seed: str) -> str:
+    try:
+        lines = [
+            line.strip()
+            for line in _QUOTES_PATH.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        ]
+    except OSError:
+        lines = []
+    quotes = lines or _DEFAULT_QUOTES
+    day = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
+    digest = hashlib.sha1(f"{day}:{seed}".encode("utf-8")).hexdigest()
+    return quotes[int(digest[:8], 16) % len(quotes)]
+
+
+def _page_kicker(page_id: str) -> str:
+    return _PAGE_KICKER.get(page_id, "QUERY")
 
 class TemplateRepository:
     """将公共布局、设计系统和页面片段组装为完整 Jinja 模板。"""
@@ -116,6 +195,9 @@ class TemplateRepository:
             template = (
                 base.replace("__PAGE_ID__", page_path.stem)
                 .replace("<!--__PAGE_TITLE__-->", title)
+                .replace("<!--__PAGE_KICKER__-->", "{{ page_kicker | default('" + _page_kicker(page_path.stem) + "', true) }}")
+                .replace("<!--__PAGE_META__-->", "{{ page_meta | default('', true) }}")
+                .replace("<!--__PAGE_QUOTE__-->", "{{ page_quote | default('', true) }}")
                 .replace("/*__TOKENS_CSS__*/", tokens)
                 .replace("/*__BASE_CSS__*/", base_css)
                 .replace("/*__PAGE_CSS__*/", page_css)
@@ -126,6 +208,9 @@ class TemplateRepository:
             unresolved = (
                 "__PAGE_ID__",
                 "<!--__PAGE_TITLE__-->",
+                "<!--__PAGE_KICKER__-->",
+                "<!--__PAGE_META__-->",
+                "<!--__PAGE_QUOTE__-->",
                 "/*__TOKENS_CSS__*/",
                 "/*__BASE_CSS__*/",
                 "/*__PAGE_CSS__*/",

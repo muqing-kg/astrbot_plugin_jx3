@@ -9,9 +9,5 @@ support_platforms:
   - aiocqhttp
   - weixin_oc
 pages:
-  - name: sessions
-    title: 会话配置
-  - name: commands
-    title: 命令配置
-  - name: servers
-    title: 区服配置
+  - name: dashboard
+    title: 插件配置

@@ -244,6 +244,8 @@ class SessionStore:
         )
 
     async def clear_secret(self, umo: str, kind: str) -> None:
+        if kind not in ("token", "ticket"):
+            raise ValueError(f"不支持的密钥类型: {kind}")
         field = "token" if kind == "token" else "ticket"
         await self.ensure(umo)
         await self.sql.update(
@@ -331,7 +333,17 @@ class SessionStore:
             {"kind": kind, "server": server, "status": str(status)},
         )
 
-    def public_row(self, row: dict[str, Any], has_global_ticket: bool = False) -> dict[str, Any]:
+    def public_row(self, row: dict[str, Any], has_global_ticket: bool = False, has_global_token: bool = False) -> dict[str, Any]:
+        has_own_token = bool((row.get("token") or "").strip())
+        use_global_token = bool(row.get("use_global_token"))
+        if has_own_token:
+            token_status = mask_secret(row.get("token") or "")
+        elif use_global_token and has_global_token:
+            token_status = "使用全局"
+        elif use_global_token:
+            token_status = "全局未配置"
+        else:
+            token_status = "未配置"
         has_own_ticket = bool((row.get("ticket") or "").strip())
         ticket_status = mask_secret(row.get("ticket") or "")
         if not has_own_ticket and has_global_ticket:
@@ -340,11 +352,11 @@ class SessionStore:
             "umo": row.get("umo", ""),
             "display_name": row.get("display_name", ""),
             "server": row.get("server", ""),
-            "token_status": mask_secret(row.get("token") or ""),
+            "token_status": token_status,
             "ticket_status": ticket_status,
-            "has_token": bool((row.get("token") or "").strip()),
+            "has_token": has_own_token or (use_global_token and has_global_token),
             "has_ticket": has_own_ticket or has_global_ticket,
-            "use_global_token": bool(row.get("use_global_token")),
+            "use_global_token": use_global_token,
             "bot_enabled": self.is_bot_enabled(row),
             "push_kaifu": bool(row.get("push_kaifu")),
             "push_xinwen": bool(row.get("push_xinwen")),

@@ -2,10 +2,8 @@
 {# template-components: data-table #}
 
 
-<div class="container data-page">
-    <h1>的卢记录</h1>
-
-    <table class="data-table data-table--spaced">
+<div class="container data-page dilujilu-page">
+<table class="data-table data-table--spaced">
         <thead>
             <tr>
                 <th>服务器</th>
@@ -33,11 +31,29 @@
                 <td>{{ m.refreshTime }}</td>
                 <td>{{ m.captureTime }}</td>
                 <td>{{ m.captureRoleName }}</td>
-                <td>{{ m.captureCampName }}</td>
+                <td class="data-cell--camp data-cell--center data-cell--nowrap {% if m.captureCampName == '恶人谷' %}camp-eren{% elif m.captureCampName == '浩气盟' %}camp-haoqi{% elif m.captureCampName == '中立' %}camp-neutral{% endif %}">
+                    {% if m.captureCampName == '恶人谷' and icons.img.get('恶人谷') %}
+                    <img class="camp-icon" src="{{ icons.img['恶人谷'] }}" alt="">
+                    {% elif m.captureCampName == '浩气盟' and icons.img.get('浩气盟') %}
+                    <img class="camp-icon" src="{{ icons.img['浩气盟'] }}" alt="">
+                    {% elif m.captureCampName == '中立' and icons.img.get('中立') %}
+                    <img class="camp-icon" src="{{ icons.img['中立'] }}" alt="">
+                    {% endif %}
+                    {{ m.captureCampName }}
+                </td>
                 <td>{{ m.auctionTime }}</td>
                 <td>{{ m.auctionAmount }}</td>
                 <td>{{ m.auctionRoleName }}</td>
-                <td>{{ m.auctionCampName }}</td>
+                <td class="data-cell--camp data-cell--center data-cell--nowrap {% if m.auctionCampName == '恶人谷' %}camp-eren{% elif m.auctionCampName == '浩气盟' %}camp-haoqi{% elif m.auctionCampName == '中立' %}camp-neutral{% endif %}">
+                    {% if m.auctionCampName == '恶人谷' and icons.img.get('恶人谷') %}
+                    <img class="camp-icon" src="{{ icons.img['恶人谷'] }}" alt="">
+                    {% elif m.auctionCampName == '浩气盟' and icons.img.get('浩气盟') %}
+                    <img class="camp-icon" src="{{ icons.img['浩气盟'] }}" alt="">
+                    {% elif m.auctionCampName == '中立' and icons.img.get('中立') %}
+                    <img class="camp-icon" src="{{ icons.img['中立'] }}" alt="">
+                    {% endif %}
+                    {{ m.auctionCampName }}
+                </td>
             </tr>
         {% endfor %}
         </tbody>

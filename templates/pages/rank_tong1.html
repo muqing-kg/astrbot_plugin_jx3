@@ -1,18 +1,27 @@
-{# template-title: 帮会榜单 #}
+{# template-title: {{ rank_name | default('帮会榜单') }} #}
 {# template-components: data-table #}
 
+{% set camp_class = 'camp-eren' if ('恶人' in (rank_name or '')) else ('camp-haoqi' if ('浩气' in (rank_name or '')) else '') %}
 
 <div class="container data-page">
-    <h1>{{ rank_name }}</h1>
-    <div class="data-page__meta">{{ server }} · 更新时间：{{ update_time }}</div>
-
-    <table class="data-table">
+{% if camp_class %}
+<div class="camp-banner {{ camp_class }}">
+    {% if camp_class == 'camp-eren' and icons.img.get('恶人谷') %}
+    <img class="camp-icon camp-icon--large" src="{{ icons.img['恶人谷'] }}" alt="">
+    <span>恶人谷</span>
+    {% elif camp_class == 'camp-haoqi' and icons.img.get('浩气盟') %}
+    <img class="camp-icon camp-icon--large" src="{{ icons.img['浩气盟'] }}" alt="">
+    <span>浩气盟</span>
+    {% endif %}
+</div>
+{% endif %}
+<table class="data-table data-table--camp-tinted {{ camp_class }}">
         <thead>
             <tr>
                 <th>排名</th>
                 <th>帮会名称</th>
                 <th>帮主</th>
-                <th>人数</th>
+                <th>招收上限</th>
                 <th>排行积分</th>
             </tr>
         </thead>
@@ -20,10 +29,10 @@
         <tbody>
         {% for item in items %}
             <tr>
-                <td class="data-cell--rank">{{ loop.index }}</td>
+                <td class="data-cell--rank {% if loop.index == 1 %}rank-1{% elif loop.index == 2 %}rank-2{% elif loop.index == 3 %}rank-3{% endif %}">{{ loop.index }}</td>
                 <td class="data-cell--name data-cell--xwide data-cell--wrap">{{ item.tongName }}</td>
                 <td class="data-cell--name data-cell--wide data-cell--wrap">{{ item.masterName }}</td>
-                <td class="data-cell--center data-cell--nowrap data-cell--numeric">{{ item.maxLimit }}</td>
+                <td class="data-cell--center data-cell--nowrap data-cell--numeric {{ item.limit_class or '' }}">{{ item.limit_display or '-' }}</td>
                 <td class="data-cell--score">{{ item.totalScore }}</td>
             </tr>
         {% endfor %}

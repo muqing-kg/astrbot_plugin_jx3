@@ -1,5 +1,7 @@
 from astrbot.core import html_renderer
 from astrbot.api import logger
+import re
+from typing import Any
 from astrbot.api.event import AstrMessageEvent, MessageChain
 from astrbot.core.utils.session_waiter import (
     SessionController,
@@ -10,6 +12,109 @@ from .jx3api_data import JX3APIService
 from .aijx3_data import AIJX3Service
 from .jx3box_data import JX3BOXService
 from .async_task import AsyncTask
+
+
+
+PAGE_META_NONE = {
+    "helps.html",
+    "xiaoyao.html",
+    "baizhan.html",
+    "guanaishouling.html",
+    "xingxiashijian.html",
+    "mingjiantongji.html",
+    "mingjianpaihang.html",
+}
+
+def _meta_pick(payload: dict, *keys: str) -> str:
+    for key in keys:
+        value = payload.get(key)
+        if value not in (None, ""):
+            return str(value).strip()
+    return ""
+
+def _meta_mode_label(mode: Any) -> str:
+    text = str(mode or "").strip().lower()
+    if text in {"0", "2", "22", "2v2"}:
+        return "2V2"
+    if text in {"2", "5", "55", "5v5"}:
+        return "5V5"
+    return "3V3"
+
+def build_page_meta(template: str, payload: dict) -> str:
+    match = re.search(r"<body[^>]*jx3-template--([a-z0-9_]+)", template or "")
+    page_id = match.group(1) if match else ""
+    filename = f"{page_id}.html" if page_id else ""
+    if filename in PAGE_META_NONE:
+        return ""
+    server = _meta_pick(payload, "server", "serverName")
+    role = _meta_pick(payload, "roleName", "role_name", "role", "name")
+    mode = _meta_pick(payload, "mode")
+    total = payload.get("total")
+    items = payload.get("items") or payload.get("list") or payload.get("lists")
+    item_count = len(items) if isinstance(items, list) else None
+    if filename == "notice.html":
+        return " · ".join(part for part in [_meta_pick(payload, "display_name"), server] if part)
+    if filename in {"juesheqiyu.html", "weizuoqiyu.html", "yanhuan.html", "jingnai.html", "chengjiu.html", "zili.html", "zhanji.html", "fubenjilu.html", "juesheliaotian.html"}:
+        parts = [part for part in [server, role] if part]
+        if filename == "zhanji.html" and mode:
+            parts.append(f"{_meta_mode_label(mode)} 模式")
+        if filename == "juesheliaotian.html" and total not in (None, ""):
+            parts.append(f"{total} 条")
+        return " · ".join(parts)
+    if filename in {"jinjia.html", "huajia.html", "jiaoyihang.html", "qiyuhuizong.html", "jinqiqiyu.html", "qiyuliebiao.html", "bangzhanjilu.html", "zhueevent.html", "dilujilu.html", "zhengyingpaimai.html", "tuanduizhaomu.html", "shitu.html", "diaoluo.html"}:
+        parts = [part for part in [server] if part]
+        if filename == "bangzhanjilu.html":
+            match_count = payload.get("match_count") or item_count
+            if match_count:
+                parts.append(f"{match_count} 场")
+            ongoing = payload.get("ongoing_count")
+            if ongoing not in (None, ""):
+                parts.append(f"进行中 {ongoing}")
+            short_time = _meta_pick(payload, "short_time")
+            if short_time:
+                parts.append(short_time)
+        elif filename == "shitu.html":
+            title = _meta_pick(payload, "title")
+            if title:
+                parts.append(title)
+            if item_count:
+                parts.append(f"{item_count} 人")
+            update_time = _meta_pick(payload, "update_time")
+            if update_time:
+                parts.append(update_time)
+        elif filename == "qiyuliebiao.html":
+            qname = _meta_pick(payload, "qiyuname", "name")
+            if qname:
+                parts.append(qname)
+        elif filename in {"diaoluo.html", "zhengyingpaimai.html", "jiaoyihang.html", "huajia.html"}:
+            item_name = _meta_pick(payload, "name", "keyword")
+            if item_name and item_name != server:
+                parts.append(item_name)
+        elif item_count:
+            parts.append(f"{item_count} 条")
+        return " · ".join(parts)
+    if filename in {"jineng.html", "qixue.html"}:
+        return _meta_pick(payload, "name")
+    if filename in {"zhuangshi.html", "qiwu.html", "wujia.html", "chengbeng.html"}:
+        return _meta_pick(payload, "name")
+    if filename == "zilipaixing.html":
+        return " · ".join(part for part in [server, _meta_pick(payload, "school")] if part)
+    if filename == "rank_role.html" or filename.startswith("rank_"):
+        rank_name = _meta_pick(payload, "rank_name")
+        parts = [part for part in [server] if part]
+        if "恶人" in rank_name:
+            parts.append("恶人谷")
+        elif "浩气" in rank_name:
+            parts.append("浩气盟")
+        if rank_name:
+            parts.append(rank_name)
+        short_time = _meta_pick(payload, "update_time")
+        if short_time:
+            parts.append(short_time)
+        return " · ".join(parts)
+    if filename == "data_list.html" and payload.get("groups"):
+        return " · ".join(part for part in [_meta_pick(payload, "server", "serverName"), _meta_pick(payload, "role_name", "roleName")] if part)
+    return ""
 
 
 class MessageBuilder:
@@ -95,6 +200,12 @@ class MessageBuilder:
                     "type": "jpeg"
                 }
                 data["data"]["icons"] = self.icons
+                if not data["data"].get("page_quote"):
+                    quote = await self.jx3api.shaohua()
+                    if quote.get("code") == 200 and quote.get("data"):
+                        data["data"]["page_quote"] = str(quote["data"]).strip()
+                if not data["data"].get("page_meta"):
+                    data["data"]["page_meta"] = build_page_meta(data.get("temp") or "", data["data"])
                 url = await self.html_render(data["temp"], data["data"], options=options)
                 await event.send(event.image_result(url)) 
             else:
@@ -199,12 +310,12 @@ class MessageBuilder:
                 try:
                     await macro_select_waiter(event)  
                 except TimeoutError:
-                    await event.send(event.plain_result("选择超时，已结束会话")) 
+                    await event.send(event.plain_result("选择超时，已结束会话"))
                 except Exception:
                     logger.error("选择发生异常", exc_info=True)
 
             else:
-                await event.send(event.plain_result(f"未搜索到相关内容")) 
+                await event.send(event.plain_result("未搜索到相关内容"))
                 return
                 
         except Exception as e:
@@ -448,18 +559,6 @@ class MessageBuilder:
         """ 外观搜索 关键词 """
         return await self.T2I_image_msg(event, lambda: self.jx3api.waiguansousuo(name))
 
-    async def  jisuji(self, event: AstrMessageEvent, cooldown: float = 1.5):
-        """ 急速 [技能CD] """
-        return await self.T2I_image_msg(event, lambda: self.jx3api.jisuji(cooldown))
-
-    async def  shilianmiaoshang(self, event: AstrMessageEvent, season: str, floor: int):
-        """ 试炼秒伤 赛季 层数 """
-        return await self.T2I_image_msg(event, lambda: self.jx3api.shilianmiaoshang(season, floor))
-
-    async def  shiliansaiji(self, event: AstrMessageEvent):
-        """ 试炼赛季 """
-        return await self.T2I_image_msg(event, self.jx3api.shiliansaiji)
-
     async def  zhengyingpaimai(self, event: AstrMessageEvent,server: str , name: str = "", limit: int = 50 ):
         """ 阵营拍卖 物品名称 服务器"""
         return await self.T2I_image_msg(event, lambda: self.jx3api.zhengyingpaimai(server, name, limit))
@@ -521,7 +620,7 @@ class MessageBuilder:
         return await self.T2I_image_msg(event, lambda: self.jx3api.jinqiqiyu(server,limit))
 
     async def  juesheqiyu(self, event: AstrMessageEvent, server: str, name: str):
-        """ 奇遇 服务器 角色 """
+        """ 查询 服务器 角色 """
         return await self.T2I_image_msg(event, lambda: self.jx3api.juesheqiyu(server,name, 0))
 
     async def  qiyutongji(self, event: AstrMessageEvent,adventureName: str, server: str = "",limit: int = 20):
@@ -656,10 +755,6 @@ class MessageBuilder:
     async def  keju(self, event: AstrMessageEvent,subject: str, limit: int = 5):
         """ 科举 题目 条数"""
         return await self.plain_msg(event, lambda: self.jx3api.keju(subject,limit))
-
-    async def  zhuangtai(self, event: AstrMessageEvent):
-        """ 区服"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.zhuangtai(""))
 
     async def  kaifu(self, event: AstrMessageEvent,server: str):
         """ 开服 服务器"""
