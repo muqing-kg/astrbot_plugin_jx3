@@ -1,0 +1,26 @@
+.platform-price {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-variant-numeric: tabular-nums;
+}
+
+.platform-price.is-best {
+    color: var(--jx3-gold-bright);
+    font-weight: 800;
+}
+
+.platform-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex: 0 0 auto;
+}
+
+.platform-dot--tieba { background: #5b7ea8; }
+.platform-dot--wanbaolou { background: #c45c7a; }
+.platform-dot--dd373 { background: #5a8f6e; }
+.platform-dot--uu898 { background: #8a6aa8; }
+.platform-dot--5173 { background: #b8863c; }
+.platform-dot--7881 { background: #4d9f9f; }

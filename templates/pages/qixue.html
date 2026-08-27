@@ -3,10 +3,7 @@
 
 
 <div class="container data-page">
-    <h1>奇穴 • {{ name }}</h1>
-    <div class="data-page__meta">更新时间：{{ update_time }}</div>
-
-    {% for group in groups %}
+{% for group in groups %}
     <div class="data-section">
         <div class="data-section__title">{{ group['title'] }}</div>
         <div class="card-grid" style="--grid-columns: 2; --grid-gap: 14px">

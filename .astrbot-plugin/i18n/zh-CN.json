@@ -4,17 +4,12 @@
     "desc": "聚合剑网三游戏数据，提供查询、图片渲染和后台推送。"
   },
   "pages": {
-    "sessions": {
-      "title": "会话配置",
-      "description": "已绑定区服的群/私聊。可开关该会话机器人并配置区服与密钥。"
-    },
-    "commands": {
-      "title": "命令配置",
-      "description": "全局改命令。改名后只认新命令，帮助图跟着新命令走。"
-    },
-    "servers": {
-      "title": "区服配置",
-      "description": "正式名固定。别名可自定义，查询和绑定可用别名，返回内容用正式区服名。"
+    "dashboard": {
+      "title": "插件配置",
+      "description": "会话、命令、区服都在这一页。用标签切换。",
+      "sessions": "会话配置",
+      "commands": "命令配置",
+      "servers": "区服配置"
     }
   }
 }

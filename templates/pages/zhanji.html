@@ -2,13 +2,11 @@
 
 
 <div class="container">
-    <h1>角色战绩 • {{ serverName }} • {{ roleName }}</h1>
-
-    {% if performance.get('2v2') %}
+{% if performance.get('2v2') %}
     <table class="data-table table-striped">
         <thead>
             <tr>
-                <th>2v2</th>
+                <th>2V2</th>
                 <th>总场次</th>
                 <th>最佳</th>
                 <th>胜场</th>
@@ -35,7 +33,7 @@
     <table class="data-table table-striped">
         <thead>
             <tr>
-                <th>3v3</th>
+                <th>3V3</th>
                 <th>总场次</th>
                 <th>最佳</th>
                 <th>胜场</th>
@@ -62,7 +60,7 @@
     <table class="data-table table-striped">
         <thead>
             <tr>
-                <th>5v5</th>
+                <th>5V5</th>
                 <th>总场次</th>
                 <th>最佳</th>
                 <th>胜场</th>
@@ -99,8 +97,17 @@
         <tbody>
         {% for m in history %}
             <tr>
-                <td>{{ m.kungfu }}</td>
-                <td>{{ m.avgGrade }}段 {{ m.pvpType }}</td>
+                <td>
+                    <div class="icon-label icon-label--inline">
+                        {% if icons.sect.get(m.kungfu) %}
+                        <img class="icon-label__icon" src="{{ icons.sect[m.kungfu] }}" alt="{{ m.kungfu }}">
+                        {% else %}
+                        <span class="icon-label__spacer"></span>
+                        {% endif %}
+                        <span>{{ m.kungfu }}</span>
+                    </div>
+                </td>
+                <td>{{ m.avgGrade }}段 {{ m.pvp_type_text or '' }}</td>
                 <td class="{{ 'mmr-up' if m.mmr > 0 else 'mmr-down' }}">{{ m.totalMmr }} {{ m.mmr }}</td>
                 <td>{{ m.endTime - m.startTime }}</td>
                 <td class="start-time" data-ts="{{ m.startTime }}">{{ m.startTime }}</td>

@@ -18,7 +18,7 @@ class AsyncSQLiteDB:
         await self.connect()
         return self
 
-    async def __aexit__(self, exc_type, exc, tb):
+    async def __aexit__(self, _exc_type, _exc, _tb):
         await self.close()
 
     async def connect(self):

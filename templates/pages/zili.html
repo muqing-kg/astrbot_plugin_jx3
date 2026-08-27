@@ -1,11 +1,11 @@
 {# template-title: 资历查询 #}
+{# template-components: data-table #}
 
 
 <div class="container">
     <div class="header">
         <div class="title-row">
-            <h1>资历查询</h1>
-            <div class="role">
+<div class="role">
                 {% if icons.sect.get(force_name) %}
                 <img class="force-icon" src="{{ icons.sect[force_name] }}" alt="{{ force_name }}">
                 {% endif %}
@@ -13,7 +13,15 @@
             </div>
         </div>
         <div class="meta">
-            {{ zone }} · {{ server }} · {{ force_name }} · {{ camp_name }} · 帮会：{{ tong_name }}<br>
+            {{ zone }} · {{ server }} · {{ force_name }} ·
+            {% if camp_name == '恶人谷' and icons.img.get('恶人谷') %}
+            <img class="camp-icon camp-icon--inline" src="{{ icons.img['恶人谷'] }}" alt="">
+            {% elif camp_name == '浩气盟' and icons.img.get('浩气盟') %}
+            <img class="camp-icon camp-icon--inline" src="{{ icons.img['浩气盟'] }}" alt="">
+            {% elif camp_name == '中立' and icons.img.get('中立') %}
+            <img class="camp-icon camp-icon--inline" src="{{ icons.img['中立'] }}" alt="">
+            {% endif %}
+            {% if camp_name == '恶人谷' %}<span class="camp-label camp-eren">{{ camp_name }}</span>{% elif camp_name == '浩气盟' %}<span class="camp-label camp-haoqi">{{ camp_name }}</span>{% elif camp_name == '中立' %}<span class="camp-label camp-neutral">{{ camp_name }}</span>{% else %}{{ camp_name }}{% endif %} · 帮会：{{ tong_name }}<br>
             资历更新时间：{{ updated_at or "未知" }} · 查询时间：{{ update_time }}
         </div>
     </div>

@@ -3,14 +3,7 @@
 
 
 <div class="container data-page">
-    <h1>{{ title }}</h1>
-    <div class="data-page__meta">
-        {{ server }}
-        {% if keyword %} · 关键词：{{ keyword }}{% endif %}
-        · 更新时间：{{ update_time }}
-    </div>
-
-    <table class="data-table">
+<table class="data-table">
         <thead>
             <tr>
                 <th>职业</th>
@@ -27,9 +20,11 @@
         {% for item in items %}
             <tr>
                 <td class="data-cell--medium">
-                    <div class="icon-label">
+                    <div class="icon-label icon-label--inline">
                         {% if icons.sect.get(item.forceName) %}
                         <img class="icon-label__icon" src="{{ icons.sect[item.forceName] }}" alt="{{ item.forceName }}">
+                        {% else %}
+                        <span class="icon-label__spacer"></span>
                         {% endif %}
                         <span>{{ item.forceName }}</span>
                     </div>
@@ -38,7 +33,16 @@
                 <td class="data-cell--center data-cell--nowrap">{{ item.roleLevel }}</td>
                 <td class="data-cell--center data-cell--nowrap">{{ item.bodyName }}</td>
                 <td>{{ item.tongName }}</td>
-                <td class="data-cell--center data-cell--nowrap">{{ item.campName }}</td>
+                <td class="data-cell--center data-cell--nowrap data-cell--camp {% if item.campName == "恶人谷" %}camp-eren{% elif item.campName == "浩气盟" %}camp-haoqi{% elif item.campName == "中立" %}camp-neutral{% endif %}">
+                    {% if item.campName == "恶人谷" and icons.img.get('恶人谷') %}
+                    <img class="camp-icon" src="{{ icons.img['恶人谷'] }}" alt="">
+                    {% elif item.campName == "浩气盟" and icons.img.get('浩气盟') %}
+                    <img class="camp-icon" src="{{ icons.img['浩气盟'] }}" alt="">
+                    {% elif item.campName == "中立" and icons.img.get('中立') %}
+                    <img class="camp-icon" src="{{ icons.img['中立'] }}" alt="">
+                    {% endif %}
+                    {{ item.campName }}
+                </td>
                 <td class="data-cell--copy">{{ item.comment }}</td>
             </tr>
         {% endfor %}

@@ -2,7 +2,7 @@
 import json
 import aiohttp
 import asyncio
-from typing import Optional, Dict, Any, Union, List
+from typing import Any, Dict, List, Optional
 from aiohttp import ClientTimeout, ClientSession
 
 from astrbot.api import logger
@@ -39,7 +39,7 @@ class APIClient:
         await self.get_session()
         return self
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+    async def __aexit__(self, _exc_type, _exc_val, _exc_tb):
         await self.close()
 
     def _redact(self, data: Optional[Dict], keys=("token", "ticket")):

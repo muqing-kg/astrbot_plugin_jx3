@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .event_catalog import GLOBAL_KINDS, PUSH_FIELD, PUSH_TYPES
+from .event_catalog import PUSH_TYPES
 
 UNBOUND_SERVER = "UNBOUND_SERVER"
 CREDENTIAL_MISSING = "CREDENTIAL_MISSING"
@@ -31,12 +31,11 @@ NEED_TOKEN = frozenset({
     "上周恶人战功榜", "上周浩气战功榜",
     "本周恶人战功榜", "本周浩气战功榜",
     "试炼之地", "拍卖", "的卢", "金价", "物价", "配方", "万宝楼", "诛恶",
-    "名片", "全部名片", "随机名片", "奇遇", "查询", "未出", "汇总", "近期", "统计",
+    "名片", "全部名片", "随机名片", "查询", "未出", "汇总", "近期", "统计",
     "精耐", "百战", "成就", "角色", "阵眼", "资历排行", "技能", "奇穴", "资历",
     "贴吧物价", "818", "副本", "掉落",
     "跨服名剑榜", "武林争霸", "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
     "资历分布", "外观搜索",
-    "加速", "试炼秒伤", "试炼赛季",
 })
 
 # 命令最少需要的非服务器参数个数。少填了就把绑定服插到最前。
@@ -51,13 +50,18 @@ SERVER_ARITY = {
     "本周恶人战功榜": 0, "本周浩气战功榜": 0,
     "试炼之地": 1, "拍卖": 0, "的卢": 0, "金价": 0, "配方": 1,
     "帮战": 0, "沙盘": 0, "诛恶": 0, "名片": 1, "全部名片": 1, "随机名片": 0,
-    "奇遇": 1, "查询": 1, "未出": 1, "汇总": 0, "近期": 0,
+    "查询": 1, "未出": 1, "汇总": 0, "近期": 0,
     "精耐": 1, "成就": 2, "角色": 1, "资历排行": 0, "聊天": 1, "统战": 0,
     "花价": 0, "拜师": 0, "收徒": 0, "招募": 0, "团长": 0, "团牌": 0,
-    "开服": 0, "全服状态": 0, "副本": 1, "资历": 1, "交易行": 1,
+    "开服": 0, "副本": 1, "资历": 1, "交易行": 1,
     "跨服名剑榜": 0, "武林争霸": 0, "捕快荣誉榜": 0, "江湖浪客榜": 0, "决斗挑战榜": 0,
     "资历分布": 1,
 }
+
+# 跨服/全服榜单：不强制注入绑定区服，缺省查询返回各自真实区服。
+CROSS_SERVER_COMMANDS = frozenset({
+    "跨服名剑榜", "武林争霸", "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
+})
 
 SERVER_SECOND_COMMANDS = frozenset({
     "物价", "统计", "贴吧物价", "掉落",
@@ -102,9 +106,7 @@ def _is_optional_tail(cmd: str, value: str) -> bool:
         return True
     if cmd == "决斗挑战榜" and text in {"公开", "私密", "1", "2"}:
         return True
-    if cmd in {"金价", "拍卖", "近期", "汇总", "聊天", "资历分布"} and text.isdigit():
-        return True
-    if cmd == "拍卖" and not text.isdigit():
+    if cmd in {"金价", "近期", "汇总", "聊天", "资历分布"} and text.isdigit():
         return True
     if cmd in {"随机名片", "资历排行"} and text in SCHOOL_TAILS:
         return True
@@ -127,13 +129,34 @@ def canonicalize_args(args: list[str], resolver=None) -> list[str]:
     return list(args)
 
 
-def inject_server_args(cmd: str, args: list[str], bound: str, known_servers: set[str] | None = None, resolver=None) -> list[str] | str:
+def inject_server_args(cmd: str, args: list[str], bound: str, resolver=None) -> list[str] | str:
     bound = (bound or "").strip()
     if callable(resolver):
         official_bound = resolver(bound)
         if official_bound:
             bound = official_bound
     args = list(args)
+
+    if cmd in CROSS_SERVER_COMMANDS:
+        core = list(args)
+        tail = []
+        while core and _is_optional_tail(cmd, core[-1]):
+            tail.insert(0, core.pop())
+        if not core:
+            return tail
+        official = canonicalize_server_token(core[0], resolver)
+        if not official:
+            return UNKNOWN_SERVER
+        return [official] + core[1:] + tail
+
+    if cmd == "拍卖":
+        if args:
+            official = canonicalize_server_token(args[0], resolver)
+            if official:
+                return [official] + args[1:]
+        if bound:
+            return [bound] + args
+        return UNBOUND_SERVER
 
     if cmd in SERVER_ARITY:
         needed = SERVER_ARITY[cmd]
@@ -165,13 +188,13 @@ def inject_server_args(cmd: str, args: list[str], bound: str, known_servers: set
 
     if cmd == "818":
         if not args:
-            return [bound] + args if bound else args
+            return [bound] if bound else UNBOUND_SERVER
         official = canonicalize_server_token(args[0], resolver)
         if official:
             return [official] + args[1:]
         if bound:
-            return args
-        return UNKNOWN_SERVER
+            return [bound] + args
+        return UNBOUND_SERVER if args[0].isdigit() else UNKNOWN_SERVER
 
     return args
 
@@ -246,8 +269,8 @@ def hint_unbound(catalog: dict | None = None) -> str:
     bind = current_command_name(catalog, "绑定")
     return (
         "当前会话未绑定区服。\n"
-        f"请先由插件管理员发送：/{bind} 区服名\n"
-        f"例如：/{bind} 梦江南"
+        f"请先由插件管理员发送：{bind} 区服名\n"
+        f"例如：{bind} 梦江南"
     )
 
 
@@ -260,15 +283,15 @@ def hint_bind_ok(server: str) -> str:
 
 def hint_bind_denied(catalog: dict | None = None) -> str:
     claim = current_command_name(catalog, "认领")
-    return f"绑定区服仅限插件管理员或 AstrBot 管理员。请先 /{claim} 剑网3机器人"
+    return f"绑定区服仅限插件管理员或 AstrBot 管理员。请先 {claim} 剑网3机器人"
 
 
 def hint_push_need_bind(catalog: dict | None = None) -> str:
     bind = current_command_name(catalog, "绑定")
     return (
         "请先绑定区服后再打开推送。\n"
-        f"发送：/{bind} 区服名\n"
-        f"例如：/{bind} 梦江南"
+        f"发送：{bind} 区服名\n"
+        f"例如：{bind} 梦江南"
     )
 
 
@@ -277,7 +300,7 @@ def hint_push_ok(kind: str, enabled: bool, catalog: dict | None = None) -> str:
     close_cmd = current_command_name(catalog, "关闭")
     notice = current_command_name(catalog, "通知管理")
     action = open_cmd if enabled else close_cmd
-    return f"已为当前会话{action}{kind}推送。发送 /{notice} 可查看全部开关。"
+    return f"已为当前会话{action}{kind}推送。发送 {notice} 可查看全部开关。"
 
 
 def hint_need_token(catalog: dict | None = None) -> str:
@@ -288,8 +311,8 @@ def hint_need_token(catalog: dict | None = None) -> str:
         "\n"
         "配置方式（请私聊机器人，不要在群里发送 Token）：\n"
         "1. 在目标群发送 /sid ，复制该群 UMO\n"
-        f"2. 私聊发送：/{token_cmd} <UMO> <你的Token>\n"
-        f"例如：/{token_cmd} <UMO> <你的Token>\n"
+        f"2. 私聊发送：{token_cmd} <UMO> <你的Token>\n"
+        f"例如：{token_cmd} <UMO> <你的Token>\n"
         "\n"
         "也可让机器人管理员在插件页面为该会话填写，或勾选「使用全局 Token」。"
     )
@@ -301,8 +324,8 @@ def hint_need_ticket(catalog: dict | None = None) -> str:
         "该功能需要推栏标识，当前未配置。\n"
         "推栏默认使用全局配置；如需本会话单独使用，请私聊机器人（不要在群里发送）：\n"
         "1. 在目标群发送 /sid ，复制该群 UMO\n"
-        f"2. 私聊发送：/{ticket_cmd} <UMO> <你的推栏标识>\n"
-        f"例如：/{ticket_cmd} <UMO> <你的推栏标识>"
+        f"2. 私聊发送：{ticket_cmd} <UMO> <你的推栏标识>\n"
+        f"例如：{ticket_cmd} <UMO> <你的推栏标识>"
     )
 
 
@@ -358,13 +381,13 @@ def hint_need_claim(catalog: dict | None = None) -> str:
     claim = current_command_name(catalog, "认领")
     return (
         "绑定区服、打开推送、配置 Token/推栏仅限插件管理员。\n"
-        f"请先由 AstrBot 管理员或认领人发送：/{claim} 剑网3机器人"
+        f"请先由 AstrBot 管理员或认领人发送：{claim} 剑网3机器人"
     )
 
 
 def hint_claim_phrase(catalog: dict | None = None) -> str:
     claim = current_command_name(catalog, "认领")
-    return f"用法：/{claim} 剑网3机器人"
+    return f"用法：{claim} 剑网3机器人"
 
 
 def format_command_error(cmd: str, error: BaseException, catalog: dict | None = None) -> str:

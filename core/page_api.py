@@ -50,9 +50,17 @@ class SessionPageAPI:
     async def list_sessions(self):
         rows = await self.plugin.sessions.list_bound()
         has_global_ticket = bool(self.plugin._global_ticket())
+        has_global_token = bool(self.plugin._global_token())
         return self.json_response({
-            "sessions": [self.plugin.sessions.public_row(row, has_global_ticket=has_global_ticket) for row in rows],
-            "has_global_token": bool(self.plugin._global_token()),
+            "sessions": [
+                self.plugin.sessions.public_row(
+                    row,
+                    has_global_ticket=has_global_ticket,
+                    has_global_token=has_global_token,
+                )
+                for row in rows
+            ],
+            "has_global_token": has_global_token,
             "has_global_ticket": has_global_ticket,
             "notice": "该页面仅供 AstrBot 后台主人使用，请勿暴露到公网。",
         })
@@ -126,6 +134,8 @@ class SessionPageAPI:
         kind = str(data.get("kind") or "token").strip()
         if not umo:
             return self.error_response("缺少 umo", status_code=400)
+        if kind not in {"token", "ticket"}:
+            return self.error_response("不支持的密钥类型", status_code=400)
         await self.plugin.sessions.clear_secret(umo, kind)
         return self.json_response({"ok": True})
 

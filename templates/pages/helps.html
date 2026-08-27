@@ -1,27 +1,38 @@
-{# template-title: 帮助 #}
+{# template-title: 查询功能 #}
 <div class="container help-page">
-    <div class="help-title">
-        <img src="{{ icons.img.get('jx3', '') }}" alt="">
-        <strong>帮助</strong>
-    </div>
-    <table class="help-table">
-        <thead>
-            <tr>
-                <th>功能</th>
-                <th>命令</th>
-                <th>示例</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% set ns = namespace(group='') %}
-        {% for row in rows %}
-        <tr>
-            <td class="help-feature">{% if row.group != ns.group %}{{ row.group }}{% endif %}</td>
-            <td class="help-command">{{ row.command }}</td>
-            <td class="help-example">{{ row.example }}</td>
-        </tr>
-        {% set ns.group = row.group %}
-        {% endfor %}
-        </tbody>
-    </table>
+    {% set ns = namespace(group='') %}
+    {% for row in rows %}
+        {% if row.group != ns.group %}
+            {% if ns.group %}
+                </tbody>
+            </table>
+            </section>
+            {% endif %}
+            <section class="help-group">
+                <div class="help-group-head">
+                    <strong>{{ row.group }}</strong>
+                    <span>{{ rows | selectattr('group', 'equalto', row.group) | list | length }}</span>
+                </div>
+                <table class="help-table">
+                    <thead>
+                        <tr>
+                            <th>功能</th>
+                            <th>命令</th>
+                            <th>示例</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            {% set ns.group = row.group %}
+        {% endif %}
+                        <tr>
+                            <td class="help-feature">{{ row.desc.split(' / ')[-1] if row.desc else row.id }}</td>
+                            <td class="help-command">{{ row.command }}</td>
+                            <td class="help-example">{{ row.example }}</td>
+                        </tr>
+    {% endfor %}
+    {% if ns.group %}
+                    </tbody>
+                </table>
+            </section>
+    {% endif %}
 </div>

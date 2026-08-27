@@ -3,10 +3,7 @@
 
 
 <div class="container data-page">
-    <h1>名剑统计 • {{ mode }}</h1>
-    <div class="data-page__meta">更新时间：{{ update_time }}</div>
-
-    <table class="data-table data-table--nowrap">
+<table class="data-table data-table--nowrap">
         <thead>
             <tr>
                 <th>门派</th>
@@ -19,9 +16,11 @@
         {% for m in items %}
             <tr>
                 <td>
-                    <div class="icon-label">
+                    <div class="icon-label icon-label--inline">
                         {% if icons.sect.get(m.forceName) %}
                         <img class="icon-label__icon" src="{{ icons.sect[m.forceName] }}" alt="{{ m.forceName }}">
+                        {% else %}
+                        <span class="icon-label__spacer"></span>
                         {% endif %}
                         <span>{{ m.forceName }}</span>
                     </div>

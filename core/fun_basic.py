@@ -4,11 +4,6 @@ from zoneinfo import ZoneInfo
 import base64
 import os
 
-from astrbot import logger
-
-from .template import load_template
-    
-
 def gold_to_string(gold_amount):
     """
     将金钱数值转换为字符串表示形式
@@ -149,3 +144,32 @@ def format_remaining(ts):
         return f"{hours}时{minutes:02d}分{seconds:02d}秒"
     except (TypeError, ValueError):
         return ""
+
+
+def format_duration(seconds) -> str:
+    try:
+        total = int(seconds or 0)
+    except (TypeError, ValueError):
+        return ""
+    if total <= 0:
+        return ""
+    hours, rem = divmod(total, 3600)
+    minutes, secs = divmod(rem, 60)
+    if hours and minutes:
+        return f"{hours}小时 {minutes} 分"
+    if hours:
+        return f"{hours}小时"
+    if minutes:
+        return f"{minutes} 分"
+    return f"{secs} 秒"
+
+
+def format_short_time(ts) -> str:
+    text = format_time(ts)
+    if not text:
+        return ""
+    try:
+        dt = datetime.strptime(text, "%Y-%m-%d %H:%M:%S")
+        return dt.strftime("%m/%d %H:%M")
+    except ValueError:
+        return text

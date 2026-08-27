@@ -1,9 +1,18 @@
 {# template-title: 小药表 #}
 {# template-components: data-table data-extras #}
 
+{% macro food_cell(cell) %}
+    {% if cell %}
+        <div class="food-cell">{{ cell.name }}</div>
+        {% if cell.boost %}<div class="boost-note">{{ cell.boost }}</div>{% endif %}
+    {% else %}
+        -
+    {% endif %}
+{% endmacro %}
+
 
 <div class="container data-page">
-    <h1>小药汇总</h1>
+
 
     <table class="data-table data-table--center">
         <thead>
@@ -28,19 +37,24 @@
         <tbody>
         {% for m in items %}
             <tr>
-                <td class="data-cell--strong">{{ m.kungfu }}</td>
+                <td class="data-cell--strong kungfu-cell">
+                    {% if icons.sect.get(m.school) %}
+                        <img class="kungfu-icon" src="{{ icons.sect[m.school] }}" alt="{{ m.school }}">
+                    {% endif %}
+                    {{ m.kungfu }}
+                </td>
 
                 <!-- 紫色 -->
-                <td class="text-purple">{{ m.purple["增强食品"] }}</td>
-                <td class="text-purple">{{ m.purple["增强药品"] }}</td>
-                <td class="text-purple">{{ m.purple["辅助食品"] }}</td>
-                <td class="text-purple">{{ m.purple["辅助药品"] }}</td>
+                <td class="text-purple">{{ food_cell(m.purple["增强食品"]) }}</td>
+                <td class="text-purple">{{ food_cell(m.purple["增强药品"]) }}</td>
+                <td class="text-purple">{{ food_cell(m.purple["辅助食品"]) }}</td>
+                <td class="text-purple">{{ food_cell(m.purple["辅助药品"]) }}</td>
 
                 <!-- 蓝色 -->
-                <td class="text-blue">{{ m.blue["增强食品"] }}</td>
-                <td class="text-blue">{{ m.blue["增强药品"] }}</td>
-                <td class="text-blue">{{ m.blue["辅助食品"] }}</td>
-                <td class="text-blue">{{ m.blue["辅助药品"] }}</td>
+                <td class="text-blue">{{ food_cell(m.blue["增强食品"]) }}</td>
+                <td class="text-blue">{{ food_cell(m.blue["增强药品"]) }}</td>
+                <td class="text-blue">{{ food_cell(m.blue["辅助食品"]) }}</td>
+                <td class="text-blue">{{ food_cell(m.blue["辅助药品"]) }}</td>
             </tr>
         {% endfor %}
         </tbody>

@@ -44,12 +44,7 @@
 
 
 <div class="container">
-
-    <h1>
-        黑市物价 • {{ name }}
-    </h1>
-
-    {% if view %}
+{% if view %}
     <img
         src="{{ view }}"
         alt="{{ name }}"
@@ -62,6 +57,7 @@
     {% endif %}
 
     <div class="meta-row">
+        <span>别名：{{ alias }}</span>
         <span>分类：{{ category }}</span>
         <span>发售时间：{{ date }}</span>
         <span class="price">参考价格：{{ retail }} 元</span>

@@ -1,66 +1,30 @@
-.jx3-template--helps {
-    --jx3-page-width: 720px;
-}
-
-.help-page {
-    width: 720px;
-    padding: 10px;
-    background: transparent;
-}
-
-.help-title {
+.jx3-template--helps { --jx3-page-width: 1000px; }
+.help-page { width: 100%; padding: 0; }
+.help-group { margin: 0 0 18px; padding: 0; background: transparent; box-shadow: none; border-radius: 0; }
+.help-group:last-of-type { margin-bottom: 0; }
+.help-group-head {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 10px;
-    margin: 10px 0 16px;
+    justify-content: space-between;
+    margin-bottom: 8px;
     color: #c45c7a;
-    font-size: 28px;
-    font-weight: 800;
+    font-size: 18px;
 }
-
-.help-title img {
-    width: 50px;
-    height: 50px;
-}
-
-.help-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: transparent;
-    text-align: center;
-}
-
+.help-group-head span { color: #9a93a0; font-size: 13px; }
+.help-table { width: 100%; border-collapse: collapse; text-align: center; background: transparent; }
 .help-table thead th {
-    padding: 12px 10px;
+    padding: 10px 8px;
     color: #fff;
     background: #d9899f;
-    font-size: 16px;
-    font-weight: 700;
-}
-
-.help-table td {
-    padding: 12px 10px;
-    color: #4a4458;
     font-size: 15px;
-    vertical-align: middle;
-}
-
-.help-table tbody tr:nth-child(even) {
-    background: rgba(216, 137, 159, 0.08);
-}
-
-.help-table tbody tr:nth-child(odd) {
-    background: transparent;
-}
-
-.help-feature {
-    color: #c45c7a;
     font-weight: 700;
 }
-
-.help-command,
-.help-example {
-    color: #4a4458;
-    font-weight: 500;
+.help-table td {
+    padding: 11px 8px;
+    color: #5c5666;
+    font-size: 15px;
+    border-bottom: 1px solid rgba(196, 92, 122, 0.08);
 }
+.help-table tbody tr:last-child td { border-bottom: 0; }
+.help-feature { color: #c45c7a; font-weight: 700; }
+.help-command, .help-example { color: #5c5666; font-weight: 500; }

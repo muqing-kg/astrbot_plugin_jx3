@@ -1,18 +1,11 @@
-import json
-import html
-import re
-from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Union
-from inspect import isawaitable
 from typing import Any, Awaitable, Callable, Dict, Optional
 
 from astrbot.api import logger
 from astrbot.api import AstrBotConfig
-import astrbot.api.message_components as Comp
 
 from .request import APIClient
 from .sqlite import AsyncSQLiteDB
-from .fun_basic import load_template,gold_to_parts,week_to_num,compare_date_str,format_time,format_remaining
+from .template import load_template
 
 
 class AIJX3Service:

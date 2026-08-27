@@ -1,0 +1,35 @@
+.qiyu-guide {
+    color: var(--jx3-text-secondary);
+    font-size: 15px;
+    line-height: 1.75;
+    word-break: break-word;
+}
+
+.qiyu-guide h2 {
+    margin: 22px 0 10px;
+    color: var(--jx3-gold-bright);
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.qiyu-guide h3 {
+    color: var(--jx3-text);
+    font-size: 17px;
+    margin: 16px 0 8px;
+}
+
+.qiyu-guide p {
+    margin: 8px 0;
+}
+
+.qiyu-guide img {
+    max-width: 100%;
+    height: auto;
+    margin: 8px 0;
+    border-radius: 8px;
+}
+
+.qiyu-guide strong {
+    color: var(--jx3-text);
+    font-weight: 700;
+}

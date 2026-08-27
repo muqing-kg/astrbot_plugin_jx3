@@ -3,14 +3,46 @@
 
 
 <div class="container data-page">
-    <h1>{{ title }}</h1>
-    {% if subtitle %}
-    <div class="data-page__meta">{{ subtitle }}</div>
-    {% endif %}
     {% if note %}
     <div class="data-note">{{ note }}</div>
     {% endif %}
-    <table class="data-table table-striped">
+    {% if groups %}
+    <div class="zl-groups">
+        {% for group in groups %}
+        <section class="zl-group">
+            <div class="zl-group__head">
+                <span class="zl-group__name {{ group.color_class }}">{{ group.name }}</span>
+                <span class="zl-group__count">{{ group['items'] | length }} 项</span>
+            </div>
+            {% for item in group['items'] %}
+            <div class="zl-item">
+                <div class="zl-item__top">
+                    <span class="zl-item__name">{{ item.sub_name }}</span>
+                    <span class="zl-item__stat">{{ item.done }} / {{ item.total }} · {{ item.percent_text }}</span>
+                </div>
+                <div class="progress zl-progress">
+                    <div class="progress-fill {{ item.bar_class }}" style="width: {{ item.percent }}%;"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </section>
+        {% endfor %}
+    </div>
+    {% else %}
+    {% if camp_name %}
+    <div class="camp-banner {{ camp_class }}">
+        {% if camp_class == 'camp-eren' and icons.img.get('恶人谷') %}
+        <img class="camp-icon camp-icon--large" src="{{ icons.img['恶人谷'] }}" alt="">
+        <span>{{ camp_name }}</span>
+        {% elif camp_class == 'camp-haoqi' and icons.img.get('浩气盟') %}
+        <img class="camp-icon camp-icon--large" src="{{ icons.img['浩气盟'] }}" alt="">
+        <span>{{ camp_name }}</span>
+        {% else %}
+        <span>{{ camp_name }}</span>
+        {% endif %}
+    </div>
+    {% endif %}
+    <table class="data-table table-striped {% if camp_name %}data-table--camp-tinted {{ camp_class }}{% endif %}">
         <thead>
             <tr>
                 {% for col in columns %}
@@ -20,12 +52,27 @@
         </thead>
         <tbody>
         {% for row in rows %}
+        {% set row_index = loop.index %}
             <tr>
                 {% for cell in row %}
-                <td class="data-cell--wrap">{{ cell }}</td>
+                {% if loop.index == 1 and columns[0] == '排名' %}
+                <td class="data-cell--wrap data-cell--rank rank-{{ row_index }}">
+                {% else %}
+                <td class="data-cell--wrap">
+                {% endif %}
+                    {% if icons.sect.get(cell) %}
+                    <div class="icon-label icon-label--inline">
+                        <img class="icon-label__icon" src="{{ icons.sect[cell] }}" alt="{{ cell }}">
+                        <span>{{ cell }}</span>
+                    </div>
+                    {% else %}
+                    {{ cell }}
+                    {% endif %}
+                </td>
                 {% endfor %}
             </tr>
         {% endfor %}
         </tbody>
     </table>
+    {% endif %}
 </div>

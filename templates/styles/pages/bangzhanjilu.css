@@ -1,0 +1,14 @@
+.jx3-template--bangzhanjilu { --jx3-page-width: 1000px; }
+.bangzhan-page { width: 100%; }
+.bangzhan-page .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 16px;
+}
+.bangzhan-page .stat-card__value.is-live { color: #5a8f6e; }
+.bangzhan-page .stat-card__value.is-hot { color: #c45c7a; font-size: 18px; }
+.bangzhan-table td { color: #5c5666; }
+.bangzhan-table .is-attacker { color: #c45c7a; font-weight: 700; }
+.bangzhan-table tr.is-live .data-cell--duration,
+.bangzhan-table tr.is-live .data-cell--time:nth-last-child(2) { color: #5a8f6e; font-weight: 700; }

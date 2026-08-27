@@ -3,8 +3,7 @@
 
 
 <div class="container data-page">
-    <h1>角色烟花</h1>
-    <table class="data-table table-striped">
+<table class="data-table table-striped">
         <thead>
             <tr>
                 <th>服务器</th>
@@ -21,8 +20,8 @@
                 <td>{{ m.server }}</td>
                 <td>{{ m.firework }}</td>
                 <td>{{ m.mapName }}</td>
-                <td>{{ m.sender }}</td>
-                <td>{{ m.receiver }}</td>
+                <td class="data-cell--nowrap {{ 'query-role' if m.sender == roleName else '' }}">{{ m.sender }}</td>
+                <td class="data-cell--nowrap {{ 'query-role' if m.receiver == roleName else '' }}">{{ m.receiver }}</td>
                 <td>{{ m.time }}</td>
             </tr>
         {% endfor %}

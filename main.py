@@ -22,7 +22,6 @@ from .core.session_policy import (
     UNBOUND_SERVER,
     UNKNOWN_SERVER,
     CLAIM_PHRASE,
-    hint_bind_denied,
     hint_bind_ok,
     hint_claim_ok,
     hint_claim_phrase,
@@ -42,7 +41,6 @@ from .core.session_policy import (
     current_command_name,
     format_command_error,
     hint_unknown_server,
-    hint_command_usage,
     strip_command_prefix,
 )
 from .core.credentials import reset_request_credentials, set_request_credentials
@@ -132,6 +130,10 @@ class Jx3ApiPlugin(Star):
             "sect": load_as_base64(str(self.plugin_temp_sect)),
             "serendipity": load_as_base64(str(self.plugin_temp_serendipity)),
         }
+        neutral = self.icons["img"].get("中立")
+        if neutral:
+            self.icons["sect"].setdefault("大侠", neutral)
+            self.icons["sect"].setdefault("中立", neutral)
 
     def create_all(self):
         self.local_sql_db = AsyncSQLiteDB(str(self.local_data_path))
@@ -207,9 +209,6 @@ class Jx3ApiPlugin(Star):
             "决斗挑战榜": self.jx3cmd.juedou,
             "资历分布": self.jx3cmd.zilifenbu,
             "外观搜索": self.jx3cmd.waiguansousuo,
-            "加速": self.jx3cmd.jisuji,
-            "试炼秒伤": self.jx3cmd.shilianmiaoshang,
-            "试炼赛季": self.jx3cmd.shiliansaiji,
             "拍卖": self.jx3cmd.zhengyingpaimai,
             "的卢": self.jx3cmd.dilujilu,
             "金价": self.jx3cmd.jinjia,
@@ -222,7 +221,6 @@ class Jx3ApiPlugin(Star):
             "名片": self.jx3cmd.jueshemingpian,
             "全部名片": self.jx3cmd.shuoyoumingpian,
             "随机名片": self.jx3cmd.shuijimingpian,
-            "奇遇": self.jx3cmd.juesheqiyu,
             "查询": self.jx3cmd.juesheqiyu,
             "未出": self.jx3cmd.weizuoqiyu,
             "汇总": self.jx3cmd.qiyuhuizong,
@@ -260,7 +258,6 @@ class Jx3ApiPlugin(Star):
             "贴吧物价": self.jx3cmd.tiebawujia,
             "818": self.jx3cmd.bagua,
             "科举": self.jx3cmd.keju,
-            "全服状态": self.jx3cmd.zhuangtai,
             "开服": self.jx3cmd.kaifu,
             "技改": self.jx3cmd.jigai,
             "副本": self.jx3cmd.fubeng,
@@ -329,16 +326,16 @@ class Jx3ApiPlugin(Star):
             return event.plain_result(hint_group_secret())
         if parsed.error == "missing_server":
             bind = current_command_name(self.command_catalog, "绑定")
-            return event.plain_result(f"用法：/{bind} 区服名\n例如：/{bind} 梦江南")
+            return event.plain_result(f"用法：{bind} 区服名\n例如：{bind} 梦江南")
         if parsed.error == "missing_push_type":
             open_cmd = current_command_name(self.command_catalog, "打开")
             close_cmd = current_command_name(self.command_catalog, "关闭")
             notice = current_command_name(self.command_catalog, "通知管理")
-            return event.plain_result(f"用法：/{open_cmd} 新闻 或 /{close_cmd} 新闻\n发送 /{notice} 查看全部事件类型")
+            return event.plain_result(f"用法：{open_cmd} 新闻 或 {close_cmd} 新闻\n发送 {notice} 查看全部事件类型")
         if parsed.error == "missing_secret_args":
             token_cmd = current_command_name(self.command_catalog, "Token")
             ticket_cmd = current_command_name(self.command_catalog, "推栏")
-            return event.plain_result(f"用法：/{token_cmd} <UMO> <Token> 或 /{ticket_cmd} <UMO> <推栏标识>")
+            return event.plain_result(f"用法：{token_cmd} <UMO> <Token> 或 {ticket_cmd} <UMO> <推栏标识>")
         if parsed.error:
             return None
 

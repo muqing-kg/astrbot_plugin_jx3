@@ -1,33 +1,25 @@
 {# template-title: 百战异闻录 #}
 
-
-<div class="container">
-    <h1>百战异闻录</h1>
+<div class="container baizhan-page">
     <div class="info-bar">
         <div class="time">{{ start }} 至 {{ end }}</div>
         <div class="boss-final">荡剑恩仇：{{ boss }}</div>
     </div>
-    <div class="grid">
-        {% for row in range(0, list|length, 10) %}
-            {% set slice = list[row:row+10] %}
-            {% if (row // 10) % 2 == 1 %}
-                {% set slice = slice[::-1] %}
-            {% endif %}
-            {% for item in slice %}
-            <div class="cell">
-                <div class="index">第{{ item.index }}层</div>
-                <div class="boss">{{ item.name }}</div>
+    <div class="grid" style="--grid-columns: {{ columns | default(4) }}">
+        {% for item in list %}
+        <div class="cell">
+            <span class="index">第{{ item.index }}层</span>
+            <span class="boss">{{ item.name }}</span>
+            <div class="effects">
                 {% if item.data.list %}
-                    <div class="buff">
-                        {% for b in item.data.list %}
-                            {{ b }}{% if not loop.last %} / {% endif %}
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="buff">无</div>
+                <span class="effect">
+                    {% for effect in item.data.list %}
+                    <span class="effect-part {{ effect.class }}">{{ effect.text }}</span>
+                    {% endfor %}
+                </span>
                 {% endif %}
             </div>
-            {% endfor %}
+        </div>
         {% endfor %}
     </div>
 </div>

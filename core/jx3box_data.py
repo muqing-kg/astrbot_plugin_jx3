@@ -1,18 +1,15 @@
 import json
-import html
 import re
 from datetime import datetime, timedelta
-from typing import Dict, Any, Optional, List, Union
-from inspect import isawaitable
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from astrbot.api import logger
 from astrbot.api import AstrBotConfig
-import astrbot.api.message_components as Comp
 
 from .request import APIClient
 from .sqlite import AsyncSQLiteDB
-from .fun_basic import load_template,gold_to_parts,week_to_num,compare_date_str,format_time,format_remaining
+from .fun_basic import gold_to_parts
+from .template import load_template
 from .credentials import current_token
 
 ACHIEVEMENT_CHOICES = [
@@ -191,8 +188,11 @@ class JX3BOXService:
         try:
             return_data["data"] = {}
             content = data2["post"]["content"]
-            return_data["temp"] = content
-        except Exception as e:
+            content = re.sub(r"<h1(?=[\s>])", "<h2", content, flags=re.IGNORECASE)
+            content = re.sub(r"</h1>", "</h2>", content, flags=re.IGNORECASE)
+            return_data["data"]["content"] = content
+            return_data["temp"] = await load_template("qiyugonglue.html")
+        except Exception:
             logger.exception("处理返回数据失败")
             return_data["msg"] = "处理返回数据失败"
             return return_data
@@ -316,7 +316,7 @@ class JX3BOXService:
             return_data["data"]["list"] = pid_list
             return_data["data"]["num"] = n
 
-        except Exception as e:
+        except Exception:
             logger.exception("处理返回数据失败")
             return_data["msg"] = "处理返回数据失败"
             return return_data

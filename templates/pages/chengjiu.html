@@ -1,17 +1,9 @@
 {# template-title: {{ roleName | default("角色") }} - 成就查询 #}
 
     <main class="page-container">
-        <header class="page-header">
-            <div class="header-content">
-                <h1>角色成就 • {{ roleName | default("未知角色", true) }}</h1>
-
-                <div class="header-line"></div>
-            </div>
-        </header>
-
         <section class="achievement-list">
-            {% if data %}
-                {% for item in data %}
+            {% if data.data %}
+                {% for item in data.data %}
                     <article
                         class="
                             achievement-card

@@ -3,7 +3,7 @@
 
 
 <div class="container data-page">
-    <h1>金价</h1>
+
     <table class="data-table table-striped">
         <thead>
             <tr>
@@ -20,13 +20,37 @@
         <tbody>
         {% for m in items %}
             <tr>
-                <td>{{ m.server }}</td>
-                <td>{{ m.tieba }}</td>
-                <td>{{ m.wanbaolou }}</td>
-                <td>{{ m.dd373 }}</td>
-                <td>{{ m.uu898 }}</td>
-                <td>{{ m['5173'] }}</td>
-                <td>{{ m['7881'] }}</td>
+                <td class="data-cell--strong">{{ m.server }}</td>
+                <td>
+                    <span class="platform-price{% if m.lowest_platform == 'tieba' %} is-best{% endif %}">
+                        <i class="platform-dot platform-dot--tieba"></i>{{ m.tieba }}
+                    </span>
+                </td>
+                <td>
+                    <span class="platform-price{% if m.lowest_platform == 'wanbaolou' %} is-best{% endif %}">
+                        <i class="platform-dot platform-dot--wanbaolou"></i>{{ m.wanbaolou }}
+                    </span>
+                </td>
+                <td>
+                    <span class="platform-price{% if m.lowest_platform == 'dd373' %} is-best{% endif %}">
+                        <i class="platform-dot platform-dot--dd373"></i>{{ m.dd373 }}
+                    </span>
+                </td>
+                <td>
+                    <span class="platform-price{% if m.lowest_platform == 'uu898' %} is-best{% endif %}">
+                        <i class="platform-dot platform-dot--uu898"></i>{{ m.uu898 }}
+                    </span>
+                </td>
+                <td>
+                    <span class="platform-price{% if m.lowest_platform == '5173' %} is-best{% endif %}">
+                        <i class="platform-dot platform-dot--5173"></i>{{ m['5173'] }}
+                    </span>
+                </td>
+                <td>
+                    <span class="platform-price{% if m.lowest_platform == '7881' %} is-best{% endif %}">
+                        <i class="platform-dot platform-dot--7881"></i>{{ m['7881'] }}
+                    </span>
+                </td>
                 <td>{{ m.date }}</td>
             </tr>
         {% endfor %}
