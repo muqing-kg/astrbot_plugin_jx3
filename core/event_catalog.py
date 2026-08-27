@@ -200,119 +200,277 @@ def _fmt_time(value: Any) -> str:
 
 def format_event_text(action: int, payload: dict[str, Any]) -> str:
     data = payload or {}
-    server = data.get("server") or ""
-    zone = data.get("zone") or data.get("zoneName") or ""
+    server = str(data.get("server") or "").strip()
+    zone = str(data.get("zone") or data.get("zoneName") or "").strip()
     where = " · ".join(part for part in (zone, server) if part)
+
+    def value(*keys):
+        for key in keys:
+            item = data.get(key)
+            if item not in (None, ""):
+                return item
+        return ""
 
     if action == 2001:
         status = data.get("status")
-        state = "开服" if str(status) in {"1", "True", "true"} or status == 1 else "维护"
-        return f"【{server or '未知区服'}】{state}了！"
+        state = ""
+        if status not in (None, ""):
+            state = "开服" if str(status) in {"1", "True", "true"} or status == 1 else "维护"
+        place = f"【{server}】" if server else ""
+        if state:
+            return f"{place}{state}了！"
+        return f"{place}区服状态更新"
     if action == 2002:
         return "\n".join(
             part for part in (
-                str(data.get("type") or "官方新闻"),
-                str(data.get("title") or ""),
-                str(data.get("url") or ""),
-                str(data.get("date") or ""),
+                str(value("type")),
+                str(value("title")),
+                str(value("url")),
+                str(value("date")),
             ) if part
         )
     if action == 2003:
-        return (
-            "游戏客户端检查到新版本\n"
-            f"当前版本：{data.get('now_version') or '未知'}\n"
-            f"新版本：{data.get('new_version') or '未知'}\n"
-            f"更新包数：{data.get('package_num') or 0}\n"
-            f"更新包大小：{data.get('package_size') or '未知'}"
-        )
+        lines = ["游戏客户端检查到新版本"]
+        if value("now_version") not in (None, ""):
+            lines.append(f"当前版本：{value('now_version')}")
+        if value("new_version") not in (None, ""):
+            lines.append(f"新版本：{value('new_version')}")
+        if value("package_num") not in (None, ""):
+            lines.append(f"更新包数：{value('package_num')}")
+        if value("package_size") not in (None, ""):
+            lines.append(f"更新包大小：{value('package_size')}")
+        return "\n".join(lines)
     if action == 2004:
+        source = f"来自{value('tieba', 'name')}吧" if value("tieba", "name") else ""
         return "\n".join(
             part for part in (
-                str(data.get("title") or "八卦速报"),
-                str(data.get("url") or ""),
-                str(data.get("date") or ""),
-                f"来自{data.get('tieba') or data.get('name') or '未知'}吧" if (data.get("tieba") or data.get("name")) else "",
+                str(value("title")),
+                str(value("url")),
+                str(value("date")),
+                source,
             ) if part
         )
     if action == 2005:
-        return f"【{data.get('server') or '未知区服'}】关隘首领进入{data.get('stage') or '未知'}阶段"
+        place = f"【{server}】" if server else ""
+        stage = value("stage")
+        body = f"关隘首领进入{stage}阶段" if stage else "关隘首领"
+        return f"{place}{body}"
     if action == 2006:
-        title = data.get("name") or "云从预告"
-        site = data.get("site") or ""
-        desc = data.get("desc") or ""
+        lines = []
+        if value("name") not in (None, ""):
+            lines.append(str(value("name")))
+        if value("site") not in (None, ""):
+            lines.append(f"地点：{value('site')}")
+        if value("desc") not in (None, ""):
+            lines.append(str(value("desc")))
         when = _fmt_time(data.get("time"))
-        lines = [str(title)]
-        if site:
-            lines.append(f"地点：{site}")
-        if desc:
-            lines.append(str(desc))
         if when:
             lines.append(f"时间：{when}")
         return "\n".join(lines)
     if action == 1001:
-        return f"{where}的【{data.get('name') or '未知'}】触发了 {data.get('event') or '奇遇'}"
+        name = value("name")
+        event = value("event")
+        if name and event:
+            core = f"【{name}】触发了 {event}"
+        elif name:
+            core = f"【{name}】触发奇遇"
+        elif event:
+            core = f"触发了 {event}"
+        else:
+            core = "奇遇触发"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1002:
-        return f"{where} 马驹刷新：{data.get('map_name') or '未知地图'}"
+        map_name = value("map_name")
+        core = f"马驹刷新：{map_name}" if map_name else "马驹刷新"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1003:
-        return f"{where} 【{data.get('name') or '未知'}】捕获了{data.get('horse') or '马驹'}（{data.get('map_name') or '未知地图'}）"
+        name = value("name")
+        horse = value("horse")
+        if name:
+            core = f"{name} 捕获了{horse}" if horse else f"{name} 捕获马驹"
+        elif horse:
+            core = f"捕获了{horse}"
+        else:
+            core = "马驹捕获"
+        map_name = value("map_name")
+        if map_name:
+            core = f"{core}（{map_name}）"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1005:
-        return f"{where} 扶摇已开启"
+        return "\n".join(part for part in (where, "扶摇已开启") if part)
     if action == 1006:
-        names = data.get("name") or "未知"
+        names = value("name")
         if isinstance(names, list):
-            names = "、".join(str(item) for item in names if str(item).strip()) or "未知"
-        return f"{where} 扶摇点名：{names}"
+            names = "、".join(str(item) for item in names if str(item).strip())
+        core = f"扶摇点名：{names}" if names else "扶摇点名"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1008:
-        return f"{where} 的卢每日：{data.get('map_name') or ''} {data.get('name') or ''}".strip()
+        detail = " ".join(part for part in (str(value("map_name")), str(value("name"))) if part)
+        core = f"的卢每日：{detail}" if detail else "的卢每日"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1009:
-        return f"{where} 的卢刷新：{data.get('map_name') or '未知地图'}"
+        map_name = value("map_name")
+        core = f"的卢刷新：{map_name}" if map_name else "的卢刷新"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1010:
-        return f"{where} {data.get('capture_camp_name') or ''} {data.get('capture_role_name') or ''} 捕获的卢（{data.get('map_name') or ''}）".strip()
+        core = " ".join(
+            part for part in (
+                str(value("capture_camp_name")),
+                str(value("capture_role_name")),
+                "捕获的卢",
+            ) if part
+        )
+        map_name = value("map_name")
+        if map_name:
+            core = f"{core}（{map_name}）"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1011:
-        return f"{where} {data.get('auction_role_name') or ''} 拍得的卢 {data.get('auction_amount') or ''}".strip()
+        core = " ".join(
+            part for part in (
+                str(value("auction_role_name")),
+                "拍得的卢",
+                str(value("auction_amount")),
+            ) if part
+        )
+        return "\n".join(part for part in (where, core) if part)
     if action == 1012:
-        return f"{where} {data.get('role_name') or ''} 在{data.get('map_name') or ''} 获得 {data.get('item_name') or ''} x{data.get('item_amount') or ''}".strip()
+        core = " ".join(
+            part for part in (
+                str(value("role_name")),
+                f"在{value('map_name')}" if value("map_name") else "",
+                "获得",
+                str(value("item_name")),
+                f"x{value('item_amount')}" if value("item_amount") not in (None, "") else "",
+            ) if part
+        )
+        return "\n".join(part for part in (where, core) if part)
     if action == 1013:
-        return f"{where} {data.get('role_name') or ''} 拍得 {data.get('item_name') or ''} x{data.get('item_amount') or ''}".strip()
+        core = " ".join(
+            part for part in (
+                str(value("role_name")),
+                "拍得",
+                str(value("item_name")),
+                f"x{value('item_amount')}" if value("item_amount") not in (None, "") else "",
+            ) if part
+        )
+        return "\n".join(part for part in (where, core) if part)
     if action == 1014:
-        return f"{where} 诛恶刷新：{data.get('map_name') or '未知地图'}"
+        map_name = value("map_name")
+        core = f"诛恶刷新：{map_name}" if map_name else "诛恶刷新"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1015:
-        return f"{where} 追魂点名：{data.get('role_name') or '未知'}（{data.get('role_server') or ''}）"
+        role = value("role_name")
+        role_server = value("role_server")
+        core = "追魂点名"
+        if role:
+            core += f"：{role}"
+        if role_server:
+            core += f"（{role_server}）"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1017:
-        return f"{where} {data.get('tong_name') or ''} 祭祀 {data.get('castle_name') or ''}".strip()
+        core = " ".join(
+            part for part in (
+                str(value("tong_name")),
+                "祭祀",
+                str(value("castle_name")),
+            ) if part
+        )
+        return "\n".join(part for part in (where, core) if part)
     if action == 1018:
-        return f"{where} 关隘首领 {data.get('leader_name') or ''} 进入{data.get('stage_name') or '未知'}阶段"
+        leader = value("leader_name")
+        stage = value("stage_name")
+        if leader and stage:
+            core = f"关隘首领 {leader} 进入{stage}阶段"
+        elif leader:
+            core = f"关隘首领 {leader}"
+        elif stage:
+            core = f"关隘首领进入{stage}阶段"
+        else:
+            core = "关隘首领"
+        return "\n".join(part for part in (where, core) if part)
     if action in {1101, 1103}:
-        return f"{where} {data.get('declaring_tong_name') or ''} 向 {data.get('accepting_tong_name') or ''} 宣战"
+        declaring = value("declaring_tong_name")
+        accepting = value("accepting_tong_name")
+        if declaring and accepting:
+            core = f"{declaring} 向 {accepting} 宣战"
+        elif declaring:
+            core = f"{declaring} 宣战"
+        elif accepting:
+            core = f"向 {accepting} 宣战"
+        else:
+            core = "宣战"
+        return "\n".join(part for part in (where, core) if part)
     if action in {1102, 1104}:
-        return f"{where} 宣战结束：{data.get('victory_tong_name') or data.get('declaring_tong_name') or ''}"
+        winner = value("victory_tong_name") or value("declaring_tong_name")
+        core = f"宣战结束：{winner}" if winner else "宣战结束"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1105:
-        return f"{where} 约战结束，胜方：{data.get('victory_tong_name') or '未知'}"
+        winner = value("victory_tong_name")
+        core = f"约战结束，胜方：{winner}" if winner else "约战结束"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1111:
-        return f"{where} 抢占粮仓：{data.get('castle_name') or ''}（{data.get('camp_name') or ''}）"
+        castle, camp = value("castle_name"), value("camp_name")
+        core = "抢占粮仓"
+        if castle:
+            core += f"：{castle}"
+        if camp:
+            core += f"（{camp}）"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1112:
-        return f"{where} 大旗重置：{data.get('castle_name') or ''}"
+        castle = value("castle_name")
+        core = f"大旗重置：{castle}" if castle else "大旗重置"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1113:
-        return f"{where} 大旗被夺：{data.get('castle_name') or ''}（{data.get('camp_name') or ''}）"
+        castle, camp = value("castle_name"), value("camp_name")
+        core = "大旗被夺"
+        if castle:
+            core += f"：{castle}"
+        if camp:
+            core += f"（{camp}）"
+        return "\n".join(part for part in (where, core) if part)
     if action in {1114, 1115}:
-        owner = data.get("tong_name") or data.get("camp_name") or ""
-        return f"{where} 据点占领：{data.get('castle_name') or ''} {owner}".strip()
+        castle = value("castle_name")
+        owner = value("tong_name") or value("camp_name")
+        core = "据点占领"
+        if castle:
+            core += f"：{castle}"
+        if owner:
+            core += f" {owner}"
+        return "\n".join(part for part in (where, core) if part)
     if action in {1116, 1117, 1118}:
-        return f"{where} {data.get('tong_name') or ''} 贡献排行更新"
+        tong = value("tong_name")
+        core = f"{tong} 贡献排行更新" if tong else "贡献排行更新"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1119:
-        return f"{where} {data.get('role_name') or ''} 拍得 {data.get('item_name') or ''} x{data.get('item_amount') or ''}".strip()
+        role = value("role_name")
+        item = value("item_name")
+        amount = value("item_amount")
+        pieces = [str(role), "拍得", str(item)]
+        if amount not in (None, ""):
+            pieces.append(f"x{amount}")
+        core = " ".join(piece for piece in pieces if piece)
+        if core == "拍得":
+            core = "战利品竞拍"
+        return "\n".join(part for part in (where, core) if part)
     if action in {1120, 1121, 1122}:
-        return f"{where} {data.get('tong_name') or data.get('chief_tong_name') or ''} 分红 {data.get('split_amount') or ''}".strip()
+        tong = value("tong_name") or value("chief_tong_name")
+        amount = value("split_amount")
+        core = "攻防分红"
+        if tong:
+            core = f"{tong} 分红"
+        if amount not in (None, ""):
+            core += f"：{amount}"
+        return "\n".join(part for part in (where, core) if part)
     if action == 1201:
         return "\n".join(
             part for part in (
-                str(data.get("user_name") or "微博更新"),
-                str(data.get("article_text") or ""),
-                str(data.get("url") or ""),
+                str(value("user_name")),
+                str(value("article_text")),
+                str(value("url")),
             ) if part
         )
-    kind = resolve_push_kind(action) or "事件"
-    return f"{kind}推送\n{where}".strip()
+    kind = resolve_push_kind(action) or ""
+    return "\n".join(part for part in (kind, where) if part)
 
 
 def build_notice_view(display_name: str, server: str, enabled: set[str] | list[str] | None = None) -> dict[str, Any]:

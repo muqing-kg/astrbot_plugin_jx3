@@ -22,7 +22,7 @@
             <img class="camp-icon camp-icon--inline" src="{{ icons.img['中立'] }}" alt="">
             {% endif %}
             {% if camp_name == '恶人谷' %}<span class="camp-label camp-eren">{{ camp_name }}</span>{% elif camp_name == '浩气盟' %}<span class="camp-label camp-haoqi">{{ camp_name }}</span>{% elif camp_name == '中立' %}<span class="camp-label camp-neutral">{{ camp_name }}</span>{% else %}{{ camp_name }}{% endif %} · 帮会：{{ tong_name }}<br>
-            资历更新时间：{{ updated_at or "未知" }} · 查询时间：{{ update_time }}
+            {% if updated_at %}资历更新时间：{{ updated_at }} · {% endif %}查询时间：{{ update_time }}
         </div>
     </div>
 
