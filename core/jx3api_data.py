@@ -599,7 +599,7 @@ class JX3APIService:
         # 数据处理
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
             maps = data.get("data") or {}
-            server_name = data.get("server") or server
+            server_name = server
             lines = [f"{server_name}·马场告示"]
             preferred = ["阴山大草原", "黑戈壁", "鲲鹏岛", "龙泉府 / 进图（21:10）"]
             names = [name for name in preferred if name in maps] or list(maps.keys())
@@ -755,7 +755,7 @@ class JX3APIService:
                         limit_value = item.get("maxLimit")
                         item["limit_display"] = str(limit_value) if limit_value not in (None, "") else "-"
                         item["limit_style"] = self._limit_color_style(limit_value)
-            rank_name = payload.get("name", name)
+            rank_name = name
             if "赛季" in rank_name:
                 page_kicker = "GUILD SEASON"
             elif "上周" in rank_name:
@@ -766,7 +766,7 @@ class JX3APIService:
                 page_kicker = ""
             return_data["data"] = {
                 "items": items,
-                "server": payload.get("server", server),
+                "server": server,
                 "rank_name": rank_name,
                 "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "page_kicker": page_kicker,
@@ -798,8 +798,8 @@ class JX3APIService:
 
             return_data["data"] = {
                 "items": items,
-                "name": data.get("name", name),
-                "server": data.get("server", server),
+                "name": name,
+                "server": server,
                 "update_time": format_time(data.get("time"))
             }
             
@@ -963,15 +963,15 @@ class JX3APIService:
 
             return_data["data"] = (
                 f"【万宝楼账号】\n"
-                f"{data.get('replyTitle') or '暂无标题'}\n\n"
+                f"{data.get('replyTitle')}\n\n"
 
                 f"【角色信息】\n"
-                f"区服：{data.get('serverName') or '未知'}\n"
-                f"角色：{data.get('roleName') or '未知'}\n"
-                f"等级：{data.get('roleLevel') or 0}\n"
-                f"门派：{data.get('forceName') or '未知'}\n"
-                f"体型：{data.get('bodyName') or '未知'}\n"
-                f"阵营：{data.get('campName') or '未知'}\n\n"
+                f"区服：{data.get('serverName')}\n"
+                f"角色：{data.get('roleName')}\n"
+                f"等级：{data.get('roleLevel')}\n"
+                f"门派：{data.get('forceName')}\n"
+                f"体型：{data.get('bodyName')}\n"
+                f"阵营：{data.get('campName')}\n\n"
 
                 f"【账号数据】\n"
                 f"装备分数：{data.get('equipScore') or 0}\n"
@@ -982,7 +982,7 @@ class JX3APIService:
                 f"【交易信息】\n"
                 f"挂牌价格：{data.get('priceNum') or 0} 元\n"
                 f"交易状态：{trade_status}\n"
-                f"商品编号：{data.get('id') or '未知'}\n"
+                f"商品编号：{data.get('id')}\n"
                 f"发布时间：{format_time(data.get('replyTime') or 0)}\n\n"
 
                 f"【调价记录】\n"
@@ -1101,8 +1101,8 @@ class JX3APIService:
                 return return_data
 
             zone_name = data.get("zoneName") or ""
-            server_name = data.get("serverName") or server
-            role_name = data.get("roleName") or name
+            server_name = server
+            role_name = name
             show_like = data.get("showLike", 0)
             title = " · ".join(part for part in (zone_name, server_name, role_name) if part)
             updated = self._card_update_text(data.get("cacheTime"))
@@ -1337,8 +1337,8 @@ class JX3APIService:
                 item["skill_color_text"] = color_map.get(color_key, str(color) if color is not None else "")
 
             return_data["data"] = {
-                "server": data.get("server", server),
-                "role_name": data.get("roleName", name),
+                "server": server,
+                "role_name": name,
                 "skill_energy": data.get("skillEnergy", ""),
                 "skill_stamina": data.get("skillStamina", ""),
                 "skill_count": data.get("skillCount", len(items)),
@@ -1420,25 +1420,22 @@ class JX3APIService:
                 if isinstance(item, dict) and item.get("name"):
                     if item.get("name") not in history_names:
                         history_names.append(item.get("name"))
-            if not history_names and data.get("roleName"):
-                history_names = [data.get("roleName")]
+            
             history_tongs = []
             for item in tong_names:
                 if isinstance(item, dict) and item.get("name") and item.get("name") not in history_tongs:
                     history_tongs.append(item.get("name"))
-            if not history_tongs and data.get("tongName"):
-                history_tongs = [data.get("tongName")]
-            role = data.get("roleName") or name
+            role = name
             return_data["data"] = (
                 f"{role}·详细信息：\n"
-                f"所属服务器：{data.get('zoneName') or '未知'}·{data.get('serverName') or server}\n"
-                f"角色体型：{data.get('forceName') or '未知'}·{data.get('bodyName') or '未知'}\n"
-                f"角色阵营：{data.get('campName') or '未知'}\n"
-                f"角色帮会：{data.get('tongName') or '无帮会'}\n"
-                f"角色标识：{data.get('roleId') or '未知'}\n"
-                f"全服标识：{data.get('globalId') or data.get('globalRoleId') or '未知'}\n"
-                f"历史名称：{'、'.join(history_names) or '无'}\n"
-                f"历史帮会：{'、'.join(history_tongs) or '无'}"
+                f"所属服务器：{data.get('zoneName') or ''}·{data.get('serverName') or ''}\n"
+                f"角色体型：{data.get('forceName') or ''}·{data.get('bodyName') or ''}\n"
+                f"角色阵营：{data.get('campName') or ''}\n"
+                f"角色帮会：{data.get('tongName') or ''}\n"
+                f"角色标识：{data.get('roleId') or ''}\n"
+                f"全服标识：{data.get('globalId') or data.get('globalRoleId') or ''}\n"
+                f"历史名称：{'、'.join(history_names)}\n"
+                f"历史帮会：{'、'.join(history_tongs)}"
             )
 
         return await self._request_api(
@@ -1457,7 +1454,7 @@ class JX3APIService:
                 return_data["msg"] = "未查询到该心法阵眼信息"
                 return return_data
 
-            result_msg = f"{data.get('name', name)}-{data.get('skillName', '')}\n"
+            result_msg = f"{name}-{data.get('skillName', '')}\n"
             for item in items:
                 if not isinstance(item, dict):
                     continue
@@ -1791,8 +1788,8 @@ class JX3APIService:
             # 仅展示前1条，避免消息过长
             for i, item in enumerate(data[:limit], 1): 
                 result_msg += f"{i}. 【{item.get('type', '无类型')}】\n"
-                result_msg += f"标题：{item.get('title', '未知时间')}\n"
-                result_msg += f"时间：{item.get('date', '未知时间')}\n"
+                result_msg += f"标题：{item.get('title')}\n"
+                result_msg += f"时间：{item.get('date')}\n"
                 result_msg += f"链接：{item.get('url', '无链接')}\n"
                 
             return_data["data"] = result_msg
@@ -1815,8 +1812,8 @@ class JX3APIService:
             # 仅展示前1条，避免消息过长
             for i, item in enumerate(data[:limit], 1): 
                 result_msg += f"{i}. 【{item.get('type', '无类型')}】\n"
-                result_msg += f"标题：{item.get('title', '未知时间')}\n"
-                result_msg += f"时间：{item.get('date', '未知时间')}\n"
+                result_msg += f"标题：{item.get('title')}\n"
+                result_msg += f"时间：{item.get('date')}\n"
                 result_msg += f"链接：{item.get('url', '无链接')}\n"
                 
             return_data["data"] = result_msg
@@ -1967,7 +1964,7 @@ class JX3APIService:
             else:
                 zone_label = "未知大区"
             state = "已开服" if opened else "维护中"
-            version = list_data.get("version") or list_data.get("now_version") or "未知"
+            version = list_data.get("version") or list_data.get("now_version") or ""
             maintain = format_time(list_data.get("maintainTime") or list_data.get("maintain") or list_data.get("time"))
             opened_at = format_time(list_data.get("openTime") or list_data.get("lastOpen") or "")
             if maintain:
@@ -1976,10 +1973,10 @@ class JX3APIService:
                 opened_at = datetime.strptime(opened_at, "%Y-%m-%d %H:%M:%S").strftime("%m月%d日 %H:%M:%S") if len(opened_at) >= 19 else opened_at
             return_data["status"] = status_bool
             return_data["data"] = (
-                f"{zone_label}：{list_data.get('server') or server} 「 {state} 」\n"
+                f"{zone_label}：{server} 「 {state} 」\n"
                 f"最新版本：{version}\n"
-                f"维护时间：{maintain or '未知'}\n"
-                f"上次开服：{opened_at or '未知'}"
+                f"维护时间：{maintain}\n"
+                f"上次开服：{opened_at}"
             )
 
         return await self._request_api(
@@ -1996,8 +1993,8 @@ class JX3APIService:
             result_msg = "最近技改\n"
             
             for i, item in enumerate(data[:3], 1): 
-                result_msg += f"{i}. {item.get('title', '无标题')}\n"
-                result_msg += f"时间：{item.get('time', '未知时间')}\n"
+                result_msg += f"{i}. {item.get('title')}\n"
+                result_msg += f"时间：{item.get('time')}\n"
                 result_msg += f"链接：{item.get('url', '无链接')}\n\n"
                 
             return_data["data"] = result_msg
@@ -2144,7 +2141,7 @@ class JX3APIService:
                     str(index),
                     self._pick(item, "corpsName", "name", "roleName"),
                     self._pick(item, "corpsLevel", "level"),
-                    self._pick(item, "server", "serverName") or server,
+                    self._pick(item, "server", "serverName"),
                     str(total),
                     win_rate,
                 ])
@@ -2195,7 +2192,7 @@ class JX3APIService:
                     self._pick(item, "rankNum", "rank", default=str(index)),
                     self._pick(item, "roleName", "name", "role_name"),
                     self._pick(item, "forceName", "force"),
-                    self._pick(item, "serverName", "server") or server,
+                    self._pick(item, "serverName", "server"),
                     self._pick(item, "score", "totalScore", "value", "bounty"),
                 ])
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
@@ -2216,7 +2213,7 @@ class JX3APIService:
                     self._pick(item, "rankNum", "rank", default=str(index)),
                     self._pick(item, "roleName", "name", "role_name"),
                     self._pick(item, "forceName", "force"),
-                    self._pick(item, "serverName", "server") or server,
+                    self._pick(item, "serverName", "server"),
                     self._pick(item, "score", "totalScore", "value", "bounty"),
                 ])
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
@@ -2240,7 +2237,7 @@ class JX3APIService:
                     self._pick(item, "rankNum", "rank", default=str(index)),
                     self._pick(item, "roleName", "name", "role_name"),
                     self._pick(item, "forceName", "force"),
-                    self._pick(item, "serverName", "server") or server,
+                    self._pick(item, "serverName", "server"),
                     self._pick(item, "money", "score", "totalScore", "value", "bounty"),
                 ])
             title = f"决斗挑战 {mode_name}"
@@ -2310,7 +2307,7 @@ class JX3APIService:
             if not groups:
                 return_data["msg"] = "暂无资历分布数据"
                 return
-            role = self._pick(payload, "roleName", "name", default=name)
+            role = name
             return_data["data"] = {
                 "groups": groups,
                 "server": server,
@@ -2356,7 +2353,7 @@ class JX3APIService:
                     self._pick(item, "masterName", "master_name"),
                     self._pick(item, "defend", "sacrifice", "count", default=""),
                 ])
-            title = f"{self._pick(payload, 'server', default=server)} 沙盘据点"
+            title = f"{server} 沙盘据点"
             subtitle = f"更新时间：{format_time(payload.get('update')) or self._now_text()}"
             self._set_table(return_data, title, ["据点", "帮会", "阵营", "帮主", "防守"], rows, subtitle, "暂无沙盘数据")
 

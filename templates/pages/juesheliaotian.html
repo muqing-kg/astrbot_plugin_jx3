@@ -16,7 +16,7 @@
         {% if list %}
             {% for m in list %}
                 <tr>
-                    <td class="role-col">{{ m["roleName"] | default("未知角色", true) }}</td>
+                    <td class="role-col">{{ m["roleName"] }}</td>
                     <td class="channel-col">
                         {% if m["channel"] == "世界" %}
                             <span class="channel-tag channel-world">{{ m["channel"] }}</span>
@@ -27,11 +27,11 @@
                         {% elif m["channel"] == "地图" %}
                             <span class="channel-tag channel-map">{{ m["channel"] }}</span>
                         {% else %}
-                            <span class="channel-tag channel-other">{{ m["channel"] | default("未知", true) }}</span>
+                            <span class="channel-tag channel-other">{{ m["channel"] }}</span>
                         {% endif %}
                     </td>
-                    <td class="message-col">{{ m["message"] | default("暂无消息内容", true) }}</td>
-                    <td class="time-col">{{ m["time"] | default("-", true) }}</td>
+                    <td class="message-col">{{ m["message"] }}</td>
+                    <td class="time-col">{{ m["time"] }}</td>
                 </tr>
             {% endfor %}
         {% else %}
