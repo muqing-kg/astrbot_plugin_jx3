@@ -924,81 +924,101 @@ class JX3APIService:
 
     async def bianhao(self, id: str) -> Dict[str, Any]:
         """编号搜索"""
-        # 数据处理
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
             if not isinstance(data, dict):
                 return_data["data"] = "账号角色数据格式错误"
                 return
 
-            # 同时兼容完整接口数据和直接传入 data 字段
             data = data.get("data", data)
 
             if not isinstance(data, dict):
                 return_data["data"] = "账号角色数据为空"
                 return
 
-            # 将 replyContent 中的 HTML 转换为纯文本
             detail = str(data.get("replyContent") or "")
             detail = re.sub(r"<br\s*/?>", "\n", detail, flags=re.IGNORECASE)
             detail = re.sub(r"<[^>]+>", "", detail)
-            detail = html.unescape(detail).strip() or "暂无账号详细信息"
+            detail = html.unescape(detail).strip()
 
-            # 交易状态
             trade_status = {
                 1: "公示中",
                 2: "出售中",
                 3: "出售中",
                 4: "已售出",
                 5: "已下架",
-            }.get(data.get("tradeStatus"), f"状态码 {data.get('tradeStatus', '未知')}")
+            }.get(data.get("tradeStatus"))
+            if not trade_status:
+                trade_status = str(data.get("tradeStatus") or "")
 
-            # 调价记录，接口中的时间为毫秒时间戳
-            update_prices = data.get("updatePrices") or []
-            update_price_text = "\n".join(
-                f"{index}. {format_time(int(item.get('updateTime') or 0) // 1000)}："
-                f"{item.get('updatePrice', 0)} 元"
-                for index, item in enumerate(update_prices, start=1)
-                if isinstance(item, dict)
-            ) or "暂无调价记录"
+            update_price_lines = []
+            for index, item in enumerate(data.get("updatePrices") or [], start=1):
+                if not isinstance(item, dict):
+                    continue
+                update_time = item.get("updateTime")
+                if update_time in (None, ""):
+                    continue
+                try:
+                    when = format_time(int(update_time) // 1000)
+                except (TypeError, ValueError):
+                    continue
+                price = item.get("updatePrice")
+                price_text = f"{price} 元" if price not in (None, "") else ""
+                update_price_lines.append(f"{index}. {when}：{price_text}".rstrip("：").strip())
 
-            return_data["data"] = (
-                f"【万宝楼账号】\n"
-                f"{data.get('replyTitle')}\n\n"
+            def field(label, raw):
+                text = "" if raw in (None, "") else str(raw)
+                return f"{label}：{text}" if text else ""
 
-                f"【角色信息】\n"
-                f"区服：{data.get('serverName')}\n"
-                f"角色：{data.get('roleName')}\n"
-                f"等级：{data.get('roleLevel')}\n"
-                f"门派：{data.get('forceName')}\n"
-                f"体型：{data.get('bodyName')}\n"
-                f"阵营：{data.get('campName')}\n\n"
+            role_lines = [
+                field("区服", data.get("serverName")),
+                field("角色", data.get("roleName")),
+                field("等级", data.get("roleLevel")),
+                field("门派", data.get("forceName")),
+                field("体型", data.get("bodyName")),
+                field("阵营", data.get("campName")),
+            ]
+            account_lines = [
+                field("装备分数", data.get("equipScore")),
+                field("江湖资历", data.get("seniorityNum")),
+                field("约见次数", data.get("meetingNum")),
+                field("关注人数", data.get("followNum")),
+            ]
+            trade_lines = [
+                field("挂牌价格", data.get("priceNum")),
+                field("交易状态", trade_status),
+                field("商品编号", data.get("id")),
+            ]
+            reply_time = data.get("replyTime")
+            if reply_time not in (None, ""):
+                try:
+                    trade_lines.append(f"发布时间：{format_time(int(reply_time))}")
+                except (TypeError, ValueError):
+                    pass
 
-                f"【账号数据】\n"
-                f"装备分数：{data.get('equipScore') or 0}\n"
-                f"江湖资历：{data.get('seniorityNum') or 0}\n"
-                f"约见次数：{data.get('meetingNum') or 0}\n"
-                f"关注人数：{data.get('followNum') or 0}\n\n"
+            sections = []
+            if data.get("replyTitle") not in (None, ""):
+                sections.append(f"【万宝楼账号】\n{data.get('replyTitle')}")
+            if any(role_lines):
+                sections.append("【角色信息】\n" + "\n".join(line for line in role_lines if line))
+            if any(account_lines):
+                sections.append("【账号数据】\n" + "\n".join(line for line in account_lines if line))
+            if any(trade_lines):
+                sections.append("【交易信息】\n" + "\n".join(trade_lines))
+            if update_price_lines:
+                sections.append("【调价记录】\n" + "\n".join(update_price_lines))
+            else:
+                sections.append("【调价记录】\n暂无调价记录")
+            if detail:
+                sections.append(f"【账号详情】\n{detail}")
 
-                f"【交易信息】\n"
-                f"挂牌价格：{data.get('priceNum') or 0} 元\n"
-                f"交易状态：{trade_status}\n"
-                f"商品编号：{data.get('id')}\n"
-                f"发布时间：{format_time(data.get('replyTime') or 0)}\n\n"
+            return_data["data"] = "\n\n".join(sections) if sections else "账号角色数据为空"
 
-                f"【调价记录】\n"
-                f"{update_price_text}\n\n"
-
-                f"【账号详情】\n"
-                f"{detail}"
-            )
-            
         return await self._request_api(
             path="/trade/wanbaolou",
-            params={"id": id,"token": self.token},
+            params={"id": id, "token": self.token},
             processor=processor,
             template=""
-        ) 
-
+        )
 
     async def bangzhanjilu(self, server: str) -> Dict[str, Any]:
         """帮战记录"""
@@ -1962,7 +1982,7 @@ class JX3APIService:
             elif zone:
                 zone_label = f"{zone}大区"
             else:
-                zone_label = "未知大区"
+                zone_label = ""
             state = "已开服" if opened else "维护中"
             version = list_data.get("version") or list_data.get("now_version") or ""
             maintain = format_time(list_data.get("maintainTime") or list_data.get("maintain") or list_data.get("time"))
@@ -1973,7 +1993,7 @@ class JX3APIService:
                 opened_at = datetime.strptime(opened_at, "%Y-%m-%d %H:%M:%S").strftime("%m月%d日 %H:%M:%S") if len(opened_at) >= 19 else opened_at
             return_data["status"] = status_bool
             return_data["data"] = (
-                f"{zone_label}：{server} 「 {state} 」\n"
+                f"{zone_label + '：' if zone_label else ''}{server} 「 {state} 」\n"
                 f"最新版本：{version}\n"
                 f"维护时间：{maintain}\n"
                 f"上次开服：{opened_at}"

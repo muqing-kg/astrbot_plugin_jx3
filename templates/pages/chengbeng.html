@@ -442,7 +442,7 @@
         const timestamp = Number(element.dataset.unix);
 
         if (!Number.isFinite(timestamp) || timestamp <= 0) {
-            element.textContent = "未知";
+            element.textContent = "";
             return;
         }
 
