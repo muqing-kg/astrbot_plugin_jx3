@@ -28,5 +28,23 @@
     "type": "string",
     "default": "",
     "hint": "默认全部会话使用这份推栏标识；会话自定义后优先用自定义。"
+  },
+  "jx3api_ws_url": {
+    "description": "JX3API 事件通道地址",
+    "type": "string",
+    "default": "wss://socket.nicemoe.cn",
+    "hint": "事件版主动推送使用的 WebSocket 地址。"
+  },
+  "jx3api_ws_token": {
+    "description": "JX3API 事件通道 Token",
+    "type": "string",
+    "default": "",
+    "hint": "用于连接事件通道；留空时使用全局 JX3API Token。"
+  },
+  "jx3api_ssl_verify": {
+    "description": "校验 JX3API 等接口的 TLS 证书",
+    "type": "bool",
+    "default": true,
+    "hint": "默认开启；如遇自签名或本地代理证书异常可关闭。"
   }
 }

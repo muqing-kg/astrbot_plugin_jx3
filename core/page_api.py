@@ -171,13 +171,12 @@ class SessionPageAPI:
             overrides.pop(command_id, None)
         else:
             overrides[command_id] = name
-        await self.plugin.settings.set_command_overrides(overrides)
         descs = await self.plugin.settings.command_descs()
         if desc:
             descs[command_id] = desc
         else:
             descs.pop(command_id, None)
-        await self.plugin.settings.set_command_descs(descs)
+        await self.plugin.settings.set_command_catalog(overrides, descs)
         self.plugin.command_catalog = apply_command_overrides(overrides)
         for key, value in descs.items():
             if key in self.plugin.command_catalog and value:
@@ -187,8 +186,7 @@ class SessionPageAPI:
 
     async def reset_commands(self):
         from .command_catalog import apply_command_overrides
-        await self.plugin.settings.set_command_overrides({})
-        await self.plugin.settings.set_command_descs({})
+        await self.plugin.settings.set_command_catalog({}, {})
         self.plugin.command_catalog = apply_command_overrides({})
         self.plugin.jx3api.command_catalog = self.plugin.command_catalog
         return self.json_response({"ok": True})

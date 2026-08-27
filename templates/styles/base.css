@@ -33,6 +33,9 @@ body.jx3-template {
 }
 
 .jx3-card--header {
+    display: flex;
+    align-items: center;
+    gap: 18px;
     padding: 22px 28px 18px;
     background:
         radial-gradient(circle at 8% 30%, rgba(255,255,255,0.95) 0 16px, transparent 17px),
@@ -40,30 +43,136 @@ body.jx3-template {
         linear-gradient(90deg, #fff7f8 0%, #fde8ee 55%, #f8dce4 100%);
 }
 
-.jx3-card--header::before,
-.jx3-card--header::after {
-    position: absolute;
-    content: "";
-    pointer-events: none;
+.jx3-header-text {
+    flex: 1 1 0;
+    min-width: 0;
+    position: relative;
+    z-index: 1;
+}
+
+.jx3-bot-panel {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 0 22px;
+    padding: 6px 20px;
+    border: 1px dashed rgba(196, 92, 122, 0.28);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.52);
+    position: relative;
+    z-index: 1;
+    text-align: center;
+    max-width: 300px;
+    overflow: hidden;
+}
+
+.jx3-bot-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #c45c7a;
+    font-size: 15px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.jx3-bot-name svg {
+    display: block;
+    width: 15px;
+    height: 15px;
+    color: #e78aa7;
+}
+
+.jx3-bot-poem {
+    margin-top: 4px;
+    max-width: 260px;
+    color: #9a93a0;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.jx3-top-wrap {
+    position: relative;
+    flex: 0 0 132px;
+    width: 132px;
+    height: 132px;
+    margin-right: 10px;
+    display: grid;
+    place-items: center;
     border-radius: 50%;
+    background: linear-gradient(145deg, #fffafb 0%, #ffeaf0 60%, #fbd5e0 100%);
+    border: 3px solid rgba(255, 255, 255, 0.9);
+    box-shadow:
+        0 10px 24px rgba(196, 92, 122, 0.16),
+        inset 0 0 0 7px rgba(255, 255, 255, 0.42);
 }
 
-.jx3-card--header::before {
-    width: 120px;
-    height: 120px;
-    right: 36px;
-    top: -28px;
-    background: rgba(217, 137, 159, 0.18);
-}
-
-.jx3-card--header::after {
-    width: 18px;
-    height: 18px;
-    right: 28px;
-    top: 22px;
-    background: rgba(217, 137, 159, 0.45);
-    transform: rotate(45deg);
+.jx3-top-wrap::before,
+.jx3-top-wrap::after {
+    content: "";
+    position: absolute;
+    width: 8px;
+    height: 8px;
     border-radius: 2px;
+    background: #f9a6c3;
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.jx3-top-wrap::before {
+    left: -14px;
+    top: 16px;
+    transform: rotate(18deg);
+}
+
+.jx3-top-wrap::after {
+    right: -12px;
+    bottom: 12px;
+    transform: rotate(-28deg);
+    background: #d9899f;
+}
+
+.jx3-top-action {
+    position: relative;
+    z-index: 2;
+    width: 108px;
+    height: 108px;
+    display: block;
+    object-fit: contain;
+    border-radius: 50%;
+    filter: drop-shadow(0 6px 10px rgba(196, 92, 122, 0.14));
+}
+
+.jx3-action-deco {
+    position: absolute;
+    z-index: 3;
+    pointer-events: none;
+    line-height: 1;
+}
+
+.jx3-action-deco svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.jx3-deco {
+    position: absolute;
+    z-index: 0;
+    pointer-events: none;
+    line-height: 1;
+}
+
+.jx3-deco svg {
+    display: block;
+    width: 100%;
+    height: 100%;
 }
 
 .jx3-kicker {

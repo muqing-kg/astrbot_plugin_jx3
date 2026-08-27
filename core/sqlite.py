@@ -1,5 +1,6 @@
 # pyright: reportOptionalMemberAccess=false
 
+import asyncio
 import aiosqlite
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -8,6 +9,7 @@ class AsyncSQLiteDB:
     def __init__(self, db_path: str = "data.db"):
         self.db_path = db_path
         self.conn: Optional[aiosqlite.Connection] = None
+        self._write_lock: asyncio.Lock = asyncio.Lock()
         
 
     # ======================
@@ -34,8 +36,21 @@ class AsyncSQLiteDB:
     # ======================
 
     async def execute(self, sql: str, params: Tuple = ()):
-        async with self.conn.execute(sql, params):
-            await self.conn.commit()
+        async with self._write_lock:
+            async with self.conn.execute(sql, params):
+                await self.conn.commit()
+
+    async def execute_many(self, statements: list[tuple[str, Tuple]]) -> None:
+        """在同一事务内依次执行多条写语句，任一条失败则整体回滚。"""
+        async with self._write_lock:
+            await self.conn.execute("BEGIN")
+            try:
+                for sql, params in statements:
+                    await self.conn.execute(sql, params)
+                await self.conn.commit()
+            except Exception:
+                await self.conn.rollback()
+                raise
 
     async def fetch_one(self, sql: str, params: Tuple = ()) -> Optional[Dict[str, Any]]:
         async with self.conn.execute(sql, params) as cursor:
@@ -61,10 +76,6 @@ class AsyncSQLiteDB:
         set_clause = ", ".join([f"{k}=?" for k in data.keys()])
         sql = f"UPDATE {table} SET {set_clause} WHERE {where}"
         await self.execute(sql, tuple(data.values()) + params)
-
-    async def delete(self, table: str, where: str, params: Tuple):
-        sql = f"DELETE FROM {table} WHERE {where}"
-        await self.execute(sql, params)
 
     async def select_one(self, table: str, where: str = "", params: Tuple = ()):
         sql = f"SELECT * FROM {table}"

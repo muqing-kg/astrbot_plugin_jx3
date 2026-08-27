@@ -1,5 +1,14 @@
 .jx3-template--notice { --jx3-page-width: 1000px; }
 .notice-page { width: 100%; padding: 0; }
+.notice-tip {
+    margin-bottom: 18px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: #fff7f9;
+    border: 1px solid #f3d5df;
+    color: #5c5666;
+    font-size: 13px;
+}
 .notice-group { margin: 0 0 16px; padding: 0; background: transparent; box-shadow: none; border-radius: 0; }
 .notice-group:last-of-type { margin-bottom: 0; }
 .notice-group-head {

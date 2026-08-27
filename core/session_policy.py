@@ -33,7 +33,7 @@ NEED_TOKEN = frozenset({
     "试炼之地", "拍卖", "的卢", "金价", "物价", "配方", "万宝楼", "诛恶",
     "名片", "全部名片", "随机名片", "查询", "未出", "汇总", "近期", "统计",
     "精耐", "百战", "成就", "角色", "阵眼", "资历排行", "技能", "奇穴", "资历",
-    "贴吧物价", "818", "副本", "掉落",
+    "贴吧物价", "818", "掉落",
     "跨服名剑榜", "武林争霸", "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
     "资历分布", "外观搜索",
 })
@@ -53,7 +53,7 @@ SERVER_ARITY = {
     "查询": 1, "未出": 1, "汇总": 0, "近期": 0,
     "精耐": 1, "成就": 2, "角色": 1, "资历排行": 0, "聊天": 1, "统战": 0,
     "花价": 0, "拜师": 0, "收徒": 0, "招募": 0, "团长": 0, "团牌": 0,
-    "开服": 0, "副本": 1, "资历": 1, "交易行": 1,
+    "开服": 0, "资历": 1, "交易行": 1,
     "跨服名剑榜": 0, "武林争霸": 0, "捕快荣誉榜": 0, "江湖浪客榜": 0, "决斗挑战榜": 0,
     "资历分布": 1,
 }
@@ -123,10 +123,6 @@ def canonicalize_server_token(value: str, resolver=None) -> str:
         return text
     official = resolver(text)
     return official or ""
-
-
-def canonicalize_args(args: list[str], resolver=None) -> list[str]:
-    return list(args)
 
 
 def inject_server_args(cmd: str, args: list[str], bound: str, resolver=None) -> list[str] | str:
@@ -281,11 +277,6 @@ def hint_bind_ok(server: str) -> str:
     )
 
 
-def hint_bind_denied(catalog: dict | None = None) -> str:
-    claim = current_command_name(catalog, "认领")
-    return f"绑定区服仅限插件管理员或 AstrBot 管理员。请先 {claim} 剑网3机器人"
-
-
 def hint_push_need_bind(catalog: dict | None = None) -> str:
     bind = current_command_name(catalog, "绑定")
     return (
@@ -310,7 +301,7 @@ def hint_need_token(catalog: dict | None = None) -> str:
         "请前往 https://www.jx3api.com 购买 Token。\n"
         "\n"
         "配置方式（请私聊机器人，不要在群里发送 Token）：\n"
-        "1. 在目标群发送 /sid ，复制该群 UMO\n"
+        "1. 在目标群或私聊发送 sid ，复制该会话 UMO\n"
         f"2. 私聊发送：{token_cmd} <UMO> <你的Token>\n"
         f"例如：{token_cmd} <UMO> <你的Token>\n"
         "\n"
@@ -323,7 +314,7 @@ def hint_need_ticket(catalog: dict | None = None) -> str:
     return (
         "该功能需要推栏标识，当前未配置。\n"
         "推栏默认使用全局配置；如需本会话单独使用，请私聊机器人（不要在群里发送）：\n"
-        "1. 在目标群发送 /sid ，复制该群 UMO\n"
+        "1. 在目标群或私聊发送 sid ，复制该会话 UMO\n"
         f"2. 私聊发送：{ticket_cmd} <UMO> <你的推栏标识>\n"
         f"例如：{ticket_cmd} <UMO> <你的推栏标识>"
     )
@@ -332,7 +323,7 @@ def hint_need_ticket(catalog: dict | None = None) -> str:
 def hint_group_secret() -> str:
     return (
         "请勿在群聊中发送 Token 或推栏标识。\n"
-        "请先在目标群发送 /sid 复制 UMO，再私聊机器人完成配置。"
+        "请先在目标群或私聊发送 sid 复制 UMO，再私聊机器人完成配置。"
     )
 
 
@@ -347,7 +338,7 @@ def hint_secret_saved(kind: str, umo: str) -> str:
 def hint_umo_invalid() -> str:
     return (
         "未找到该 UMO 对应的会话。\n"
-        "请先在目标群或私聊发送 /sid ，复制完整 UMO 后再试。"
+        "请先在目标群或私聊发送 sid ，复制完整 UMO 后再试。"
     )
 
 

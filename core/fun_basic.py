@@ -4,36 +4,6 @@ from zoneinfo import ZoneInfo
 import base64
 import os
 
-def gold_to_string(gold_amount):
-    """
-    将金钱数值转换为字符串表示形式
-
-    Args:
-        gold_amount (int): 金钱数值，单位为铜币
-
-    Returns:
-        str: 格式化后的金钱字符串，例如 "1金2银3铜"
-    """
-    if not gold_amount:
-        return "无价格"
-
-    parts = []
-    started = False  # 标记是否已经遇到第一个非零位
-
-    bricks = gold_amount // 100000000
-    gold = (gold_amount % 100000000) // 10000
-    silver = (gold_amount % 10000) // 100
-    copper = gold_amount % 100
-
-    for value, unit in [(bricks, "砖"), (gold, "金"), (silver, "银"), (copper, "铜")]:
-        if value != 0:
-            started = True
-        if started:
-            parts.append(f"{value}{unit}")
-
-    return "".join(parts)
-
-
 def gold_to_parts(gold_amount):
     """将铜钱数拆成模板可渲染的货币片段"""
     try:

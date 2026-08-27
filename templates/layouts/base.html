@@ -14,14 +14,28 @@
 <body class="jx3-template jx3-template--__PAGE_ID__">
     <div class="jx3-shell">
         <header class="jx3-card jx3-card--header">
-            <div class="jx3-kicker">JX3 · <!--__PAGE_KICKER__--> · <!--__PAGE_TITLE__--></div>
-            <h1 class="jx3-title"><!--__PAGE_TITLE__--></h1>
-            <p class="jx3-meta"><!--__PAGE_META__--></p>
+            <div class="jx3-header-text">
+                <div class="jx3-kicker">JX3 · <!--__PAGE_KICKER__--> · <!--__PAGE_TITLE__--></div>
+                <h1 class="jx3-title"><!--__PAGE_TITLE__--></h1>
+                <p class="jx3-meta"><!--__PAGE_META__--></p>
+            </div>
+            {% if deco_caption %}
+            <div class="jx3-bot-panel">{{ deco_caption | default('') }}</div>
+            {% endif %}
+            {% if action_icon %}
+            <div class="jx3-top-wrap">
+                <img class="jx3-top-action" alt="" src="{{ ((icons or {}).get('img') or {}).get(action_icon, '') }}">
+                {{ deco_action | default('') }}
+            </div>
+            {% endif %}
+            {{ deco_header | default('') }}
         </header>
         <main class="jx3-card jx3-card--body">
+{{ deco_body | default('') }}
 <!--__PAGE_CONTENT__-->
         </main>
         <footer class="jx3-card jx3-card--foot">
+            {{ deco_foot | default('') }}
             <div class="jx3-quote"><!--__PAGE_QUOTE__--></div>
         </footer>
     </div>

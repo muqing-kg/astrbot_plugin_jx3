@@ -202,14 +202,6 @@ DEFAULT_COMMAND_ROWS = [
         'desc': '配装工具 / 聊天',
     },
     {
-        'id': '副本',
-        'group': '副本掉落',
-        'command': '副本',
-        'command_tpl': '副本 [服务器] [角色]',
-        'example_tpl': '副本 飞龙在天 小螺卜头',
-        'desc': '副本掉落 / 副本',
-    },
-    {
         'id': '掉落',
         'group': '副本掉落',
         'command': '掉落',
@@ -586,6 +578,22 @@ DEFAULT_COMMAND_ROWS = [
         'desc': '排行榜单 / 本周浩气战功榜',
     },
     {
+        'id': '排行榜',
+        'group': '排行榜单',
+        'command': '排行榜',
+        'command_tpl': '排行榜',
+        'example_tpl': '排行榜',
+        'desc': '排行榜单 / 排行榜',
+    },
+    {
+        'id': '战功榜',
+        'group': '排行榜单',
+        'command': '战功榜',
+        'command_tpl': '战功榜 [阵营]',
+        'example_tpl': '战功榜 恶人',
+        'desc': '排行榜单 / 战功榜',
+    },
+    {
         'id': '试炼之地',
         'group': '排行榜单',
         'command': '试炼之地',
@@ -715,11 +723,11 @@ DEFAULT_COMMAND_ROWS = [
     },
     {
         'id': '功能',
-        'group': '会话设置',
+        'group': '帮助入口',
         'command': '功能',
         'command_tpl': '功能',
         'example_tpl': '功能',
-        'desc': '会话设置 / 功能',
+        'desc': '帮助入口 / 功能',
     },
     {
         'id': '认领',
@@ -862,11 +870,6 @@ def _clone(catalog: dict) -> dict:
     return deepcopy(catalog)
 
 
-def default_command_for(command_id: str) -> str:
-    row = DEFAULT_COMMANDS.get(command_id) or {}
-    return str(row.get("command") or command_id)
-
-
 def apply_command_overrides(overrides: dict[str, str] | None) -> dict:
     catalog = _clone(DEFAULT_COMMANDS)
     for command_id, name in (overrides or {}).items():
@@ -920,7 +923,12 @@ def _replace_command_text(text: str, old: str, new: str) -> str:
     return re.sub(rf"(?<!\S){re.escape(old)}(?!\S)", new, text)
 
 
-def help_rows(catalog: dict | None = None) -> list[dict]:
+def help_rows(
+    catalog: dict | None = None,
+    *,
+    exclude_groups: set[str] | None = None,
+    exclude_ids: set[str] | None = None,
+) -> list[dict]:
     catalog = catalog or DEFAULT_COMMANDS
     group_order = []
     for item in DEFAULT_COMMAND_ROWS:
@@ -929,6 +937,10 @@ def help_rows(catalog: dict | None = None) -> list[dict]:
     ordered = sorted(DEFAULT_COMMAND_ROWS, key=lambda item: (group_order.index(item["group"]), DEFAULT_COMMAND_ROWS.index(item)))
     rows = []
     for item in ordered:
+        if exclude_groups and item["group"] in exclude_groups:
+            continue
+        if exclude_ids and item["id"] in exclude_ids:
+            continue
         row = catalog.get(item["id"], item)
         old = item["command"]
         new = str(row.get("command") or old)
@@ -947,14 +959,16 @@ def public_command_rows(catalog: dict | None = None) -> list[dict]:
     rows = []
     for item in DEFAULT_COMMAND_ROWS:
         row = catalog.get(item["id"], item)
+        old = item["command"]
+        new = str(row.get("command") or old)
         desc = str(row.get("desc") or "")
         if not desc or desc == f"{item['group']} / {item['id']}":
-            desc = str(item.get("command_tpl") or item["id"])
+            desc = _replace_command_text(str(item.get("command_tpl") or item["id"]), old, new)
         rows.append({
             "id": item["id"],
             "group": item["group"],
             "default_command": item["command"],
-            "command": str(row.get("command") or item["command"]),
+            "command": new,
             "desc": desc,
         })
     return rows
@@ -964,7 +978,10 @@ def command_usage(command_id: str, catalog: dict | None = None) -> str:
     catalog = catalog or DEFAULT_COMMANDS
     row = (catalog.get(command_id) or DEFAULT_COMMANDS.get(command_id) or {})
     tpl = str(row.get("command_tpl") or row.get("command") or command_id)
+    default_row = DEFAULT_COMMANDS.get(command_id) or {}
+    old = str(default_row.get("command") or command_id)
     name = str(row.get("command") or command_id)
     # Keep the first pattern only, drop alternate "cmd | cmd [x]" duplication.
+    tpl = _replace_command_text(tpl, old, name)
     first = tpl.split("|")[0].strip()
     return first or name

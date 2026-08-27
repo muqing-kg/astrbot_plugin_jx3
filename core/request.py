@@ -2,7 +2,7 @@
 import json
 import aiohttp
 import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from aiohttp import ClientTimeout, ClientSession
 
 from astrbot.api import logger
@@ -17,7 +17,9 @@ class APIClient:
     3. 支持异步上下文管理器 (Async Context Manager)。
     """
 
-    def __init__(self, base_timeout: int = 10, ssl_verify: bool = False):
+    _SUCCESS_CODES = frozenset((200, "200", "0", 0, 1))
+
+    def __init__(self, base_timeout: int = 10, ssl_verify: bool = True):
         self.base_timeout = base_timeout
         self.ssl_verify = ssl_verify
         self._session: Optional[ClientSession] = None
@@ -103,7 +105,7 @@ class APIClient:
                     logger.error(f"无法解析响应为 JSON。原始内容: {text[:100]}...")
                     return None
 
-            logger.debug(f"响应数据: {data}")
+            logger.debug(f"响应数据: {type(data).__name__}, 长度 {len(data) if hasattr(data, '__len__') else '未知'}")
             return self._validate_api_payload(data)
 
         except aiohttp.ClientError as e:
@@ -124,9 +126,9 @@ class APIClient:
                 return None
         
         if isinstance(data, dict) and 'code' in data:
-            # 兼容多种成功状态码：200, "0", 0, 1
             code = data.get('code')
-            if code not in [200, "0", 0, 1]:
+            # 按 JX3API 当前接口文档维护成功码白名单，上游新增成功码时需同步。
+            if code not in self._SUCCESS_CODES:
                 msg = data.get('msg') or data.get('message', '未知错误')
                 logger.error(f"API业务报错: code={code}, msg={msg}")
                 return {"_error": str(msg), "_code": code}
@@ -154,49 +156,3 @@ class APIClient:
         if key and isinstance(data, dict):
             return data.get(key, {})
         return data
-
-    async def all_pages(
-        self, 
-        method: str, 
-        url: str, 
-        params_data: Optional[Dict] = None, 
-        out_key: str = "", 
-        list_key: str = "list", 
-        max_pages: int = 10
-    ) -> List[Any]:
-        """
-        分页获取所有数据
-        :param method: GET 或 POST
-        :param list_key: 列表数据在 JSON 中的字段名，如 'data' 或 'list'
-        """
-        all_data = []
-        current_page = 1
-        params = params_data.copy() if params_data else {}
-
-        while True:
-            params["page"] = str(current_page)
-            
-            if method.upper() == "POST":
-                data = await self.post(url, data=params, out_key=out_key)
-            else:
-                data = await self.get(url, params=params, out_key=out_key)
-
-            # 终止条件判断
-            if not data or isinstance(data, bytes):
-                break
-            
-            # 如果 data 是列表本身（有些API直接返回列表）
-            page_items = data if isinstance(data, list) else data.get(list_key)
-            
-            if not page_items:
-                break
-
-            all_data.extend(page_items)
-
-            if current_page >= max_pages:
-                break
-
-            current_page += 1
-            logger.info(f"已获取第 {current_page} 页数据")
-
-        return all_data

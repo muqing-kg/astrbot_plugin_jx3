@@ -34,7 +34,6 @@ _PAGE_KICKER = {
     "data_list": "DATA LIST",
     "diaoluo": "LOOT LOG",
     "dilujilu": "DILU LOG",
-    "fubenjilu": "RAID REWARD",
     "guanaishouling": "PASS BOSS",
     "huajia": "FLOWER PRICE",
     "jiaoyihang": "TRADING POST",

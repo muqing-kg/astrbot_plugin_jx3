@@ -20,7 +20,9 @@ from .credentials import current_token, current_ticket
 class JX3APIService:
     def __init__(self, config: AstrBotConfig, sqlite: AsyncSQLiteDB, cache_sqlite: Optional[AsyncSQLiteDB] = None):
         # 实例化 API Client
-        self._api: APIClient = APIClient()
+        self._api: APIClient = APIClient(
+            ssl_verify=bool(config.get("jx3api_ssl_verify", True))
+        )
         # 引用插件配置文件
         self._config = config
         # 引用sqlite
@@ -344,7 +346,7 @@ class JX3APIService:
             return_data["msg"] = "系统错误：模板文件不存在"
             return return_data
         catalog = getattr(self, "command_catalog", None)
-        return_data["data"] = {"rows": help_rows(catalog)}
+        return_data["data"] = {"rows": help_rows(catalog, exclude_groups={"会话设置"})}
         return_data["code"] = 200
    
         return return_data
@@ -359,7 +361,11 @@ class JX3APIService:
             logger.error(f"加载模板失败: {e}")
             return_data["msg"] = "系统错误：模板文件不存在"
             return return_data
-        return_data["data"] = build_notice_view(display_name, server, enabled)
+        from .session_policy import current_command_name
+        view = build_notice_view(display_name, server, enabled)
+        view["open_command"] = current_command_name(getattr(self, "command_catalog", None), "打开")
+        view["close_command"] = current_command_name(getattr(self, "command_catalog", None), "关闭")
+        return_data["data"] = view
         return_data["code"] = 200
         return return_data
 
@@ -2121,29 +2127,6 @@ class JX3APIService:
         ) 
 
 
-    async def fubengjilu(self, server:str, name: str ) -> Dict[str, Any]:
-        """副本记录"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            return_data["data"]["list"] = data
-            return_data["data"]["server"] = server
-            return_data["data"]["roleName"] = name
-
-        return await self._request_api(
-            path="/raid/records",
-            params= {"server": server,"name": name,"token": self.token,},
-            processor=processor,
-            template="fubenjilu.html"
-        ) 
-    
-
-
-    
-
-
-    
-        
-
-
 
     async def kuafumingjian(self, server: str = "", mode: str = "33") -> Dict[str, Any]:
         """跨服名剑"""
@@ -2359,26 +2342,6 @@ class JX3APIService:
 
         return await self._request_api("/trade/item/search", {"name": name, "token": self.token}, processor, "data_list.html")
 
-    async def shapan(self, server: str) -> Dict[str, Any]:
-        """沙盘据点"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            payload = data if isinstance(data, dict) else {}
-            items = self._as_list(payload)
-            rows = []
-            for item in items:
-                rows.append([
-                    self._pick(item, "castleName", "castle_name"),
-                    self._pick(item, "tongName", "tong_name"),
-                    self._pick(item, "campName", "camp_name"),
-                    self._pick(item, "masterName", "master_name"),
-                    self._pick(item, "defend", "sacrifice", "count", default=""),
-                ])
-            title = f"{server} 沙盘据点"
-            subtitle = f"更新时间：{format_time(payload.get('update')) or self._now_text()}"
-            self._set_table(return_data, title, ["据点", "帮会", "阵营", "帮主", "防守"], rows, subtitle, "暂无沙盘数据")
-
-        return await self._request_api("/sand/records", {"server": server, "token": self.token}, processor, "data_list.html")
-
     async def qiyugonglue(self, name: str) -> Dict[str, Any]:
         """奇遇攻略"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
@@ -2444,6 +2407,9 @@ class JX3APIService:
         data = await self._api.post("https://www.jx3api.com/token/stats", data={"token": token}, out_key=None)
         if not data:
             result["msg"] = "令牌无效或查询失败"
+            return result
+        if isinstance(data, dict) and data.get("_error"):
+            result["msg"] = f"JX3API 令牌不可用：{data['_error']}"
             return result
         payload = data.get("data") if isinstance(data, dict) and "data" in data else data
         if not isinstance(payload, dict):

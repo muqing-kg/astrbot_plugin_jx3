@@ -93,7 +93,7 @@ function renderSessions(payload) {
   const sessions = payload.sessions || [];
   cardsEl.innerHTML = "";
   if (!sessions.length) {
-    cardsEl.innerHTML = '<div class="empty">暂无已绑定区服的群/私聊。先在对应会话发送 /绑定 区服名。</div>';
+    cardsEl.innerHTML = '<div class="empty">暂无已绑定区服的群/私聊。先在对应会话发送 绑定 区服名。</div>';
     return;
   }
   for (const row of sessions) {
