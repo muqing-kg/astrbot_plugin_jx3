@@ -141,7 +141,7 @@ class JX3APIService:
                     return value
         return []
 
-    def _rank_items(self, data: Any) -> list:
+    def _rank_items(self, data: Any, inherit: bool = True) -> list:
         flat = []
         for item in self._as_list(data):
             if isinstance(item, dict):
@@ -152,16 +152,17 @@ class JX3APIService:
                         nested = value
                         break
                 if nested is not None:
-                    inherited = {
-                        key: item[key]
-                        for key in ("server", "serverName", "zoneName", "campName")
-                        if item.get(key)
-                    }
-                    for child in nested:
-                        if isinstance(child, dict):
-                            for key, value in inherited.items():
-                                child.setdefault(key, value)
-                    flat.extend(self._rank_items(nested))
+                    if inherit:
+                        inherited = {
+                            key: item[key]
+                            for key in ("server", "serverName", "zoneName", "campName")
+                            if item.get(key)
+                        }
+                        for child in nested:
+                            if isinstance(child, dict):
+                                for key, value in inherited.items():
+                                    child.setdefault(key, value)
+                    flat.extend(self._rank_items(nested, inherit=inherit))
                 else:
                     flat.append(item)
             else:
@@ -231,27 +232,58 @@ class JX3APIService:
         return ""
 
     @staticmethod
-    def _member_cell(member: Any, maximum: Any) -> tuple[str, str, str]:
-        """返回 (实际人数, 人数颜色类, 招收上限)。上限颜色单独统一，不随人数区间变化。"""
+    def _bar_style(bar_class: str) -> str:
+        """进度条按覆盖区间返回实际渐变色。"""
+        colors = {
+            "bar-full": ("#b8863b", "#d4a455"),
+            "bar-high": ("#5a8f6e", "#7bb58d"),
+            "bar-mid": ("#d9a441", "#e8bd70"),
+            "bar-low": ("#c45c7a", "#dc8aa3"),
+            "bar-min": ("#9a93a0", "#b7b0bc"),
+        }
+        start, end = colors.get(bar_class, ("#d9899f", "#c45c7a"))
+        return f"linear-gradient(90deg, {start}, {end})"
+
+    @staticmethod
+    def _limit_color_class(maximum: Any) -> str:
+        """招收上限按固定档位统一配色，未列出的交给默认样式。"""
+        try:
+            max_num = int(str(maximum).strip())
+        except (TypeError, ValueError):
+            return ""
+        if max_num == 300:
+            return "member-limit-300"
+        if max_num == 250:
+            return "member-limit-250"
+        if max_num == 50:
+            return "member-limit-50"
+        return ""
+
+    @staticmethod
+    def _member_cell(member: Any, maximum: Any) -> tuple[str, str, str, str]:
+        """返回 (实际人数, 人数颜色类, 招收上限, 上限颜色类)。"""
         if maximum in (None, "") or member in (None, ""):
-            return "", "", ""
+            return "", "", "", ""
         try:
             member_num = int(str(member).strip())
             max_num = int(str(maximum).strip())
         except (TypeError, ValueError):
-            return "", "", ""
+            return "", "", "", ""
+        limit_class = JX3APIService._limit_color_class(max_num)
         if max_num <= 0:
-            return str(member_num), "", str(max_num)
+            return str(member_num), "", str(max_num), limit_class
         ratio = member_num / max_num
         if ratio >= 1:
-            count_class = "member-full"
-        elif ratio >= 0.8:
+            count_class = limit_class or "member-full"
+        elif ratio >= 0.9:
+            count_class = "member-near-full"
+        elif ratio >= 0.7:
             count_class = "member-high"
-        elif ratio >= 0.5:
+        elif ratio >= 0.4:
             count_class = "member-mid"
         else:
             count_class = "member-low"
-        return str(member_num), count_class, str(max_num)
+        return str(member_num), count_class, str(max_num), limit_class
 
     def _camp_code(self, camp: str) -> int:
         text = str(camp or "").strip()
@@ -681,7 +713,7 @@ class JX3APIService:
             if name in TONG_RANK_NAMES0:
                 for item in items:
                     if isinstance(item, dict):
-                        item["member_count"], item["member_class"], item["member_limit"] = self._member_cell(
+                        item["member_count"], item["member_class"], item["member_limit"], item["member_limit_class"] = self._member_cell(
                             item.get("memberCount"), item.get("maxMemberCount")
                         )
             elif name in TONG_RANK_NAMES1:
@@ -689,7 +721,7 @@ class JX3APIService:
                     if isinstance(item, dict):
                         limit_value = item.get("maxLimit")
                         item["limit_display"] = str(limit_value) if limit_value not in (None, "") else "-"
-                        item["limit_class"] = "member-limit"
+                        item["limit_class"] = self._limit_color_class(limit_value) or "member-limit"
             rank_name = payload.get("name", name)
             if "赛季" in rank_name:
                 page_kicker = "GUILD SEASON"
@@ -2098,14 +2130,14 @@ class JX3APIService:
         camp_name = "恶人谷" if camp_code == 2 else "浩气盟"
 
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            items = self._rank_items(data)
+            items = self._rank_items(data, inherit=False)
             rows = []
             for index, item in enumerate(items, 1):
                 rows.append([
                     self._pick(item, "rankNum", "rank", default=str(index)),
                     self._pick(item, "tongName", "tong_name", "name"),
                     self._pick(item, "masterName", "master_name"),
-                    self._pick(item, "serverName", "server") or server,
+                    self._pick(item, "serverName", "server"),
                     self._pick(item, "score", "totalScore", "titlePoint", "value"),
                 ])
             title = f"武林争霸 {camp_name}"
@@ -2222,6 +2254,7 @@ class JX3APIService:
                     "percent": percent,
                     "percent_text": f"{percent}%",
                     "bar_class": bar_class,
+                    "bar_style": self._bar_style(bar_class),
                 })
 
             def walk(node, prefix: str) -> None:
