@@ -12,6 +12,7 @@ from .jx3api_data import JX3APIService
 from .aijx3_data import AIJX3Service
 from .jx3box_data import JX3BOXService
 from .async_task import AsyncTask
+from .decorations import build_decorated_payload, estimate_body_length, fetch_poem_line
 
 
 
@@ -54,7 +55,7 @@ def build_page_meta(template: str, payload: dict) -> str:
     item_count = len(items) if isinstance(items, list) else None
     if filename == "notice.html":
         return " · ".join(part for part in [_meta_pick(payload, "display_name"), server] if part)
-    if filename in {"juesheqiyu.html", "weizuoqiyu.html", "yanhuan.html", "jingnai.html", "chengjiu.html", "zili.html", "zhanji.html", "fubenjilu.html", "juesheliaotian.html"}:
+    if filename in {"juesheqiyu.html", "weizuoqiyu.html", "yanhuan.html", "jingnai.html", "chengjiu.html", "zili.html", "zhanji.html", "juesheliaotian.html"}:
         parts = [part for part in [server, role] if part]
         if filename == "zhanji.html" and mode:
             parts.append(f"{_meta_mode_label(mode)} 模式")
@@ -119,6 +120,21 @@ def build_page_meta(template: str, payload: dict) -> str:
 
 class MessageBuilder:
     """回复消息构建"""
+    RANKING_IDS = (
+        "名剑排行", "名剑统计", "跨服名剑榜", "武林争霸", "捕快荣誉榜",
+        "江湖浪客榜", "决斗挑战榜", "资历排行", "名士排行", "江湖排行",
+        "兵甲排行", "名师排行", "阵营排行", "薪火排行", "家园排行",
+        "浩气神兵排行", "恶人神兵排行", "浩气爱心排行", "恶人爱心排行",
+        "试炼之地",
+    )
+    ZHANGONG_ALL = (
+        "本周恶人战功榜", "上周恶人战功榜", "赛季恶人战功榜",
+        "本周浩气战功榜", "上周浩气战功榜", "赛季浩气战功榜",
+    )
+    ZHANGONG_EWE = ("本周恶人战功榜", "上周恶人战功榜", "赛季恶人战功榜")
+    ZHANGONG_HAO = ("本周浩气战功榜", "上周浩气战功榜", "赛季浩气战功榜")
+    CARD_IDS = ("名片", "全部名片")
+
     ZILI_MENU_TEXT = (
         "请选择资历查询类型：\n"
         "0：资历总览\n"
@@ -199,7 +215,9 @@ class MessageBuilder:
                     "omit_background": False,
                     "type": "jpeg"
                 }
-                data["data"]["icons"] = self.icons
+                body_length = estimate_body_length(data.get("temp") or "", data["data"], self.icons)
+                poem_line = await fetch_poem_line()
+                data["data"].update(build_decorated_payload(self.icons, body_length, poem_line))
                 if not data["data"].get("page_quote"):
                     quote = await self.jx3api.shaohua()
                     if quote.get("code") == 200 and quote.get("data"):
@@ -243,142 +261,150 @@ class MessageBuilder:
             await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试")) 
 
 
-    async def handler_plain_image_msg(self, event: AstrMessageEvent, action1, action2):
-        """两轮会话消息发送通用，先文本列表等反馈序号在发送图片"""
-        # 会话触发
-        try:
-            # 获取一轮数据
-            data = await action1()
-            if data["code"] == 200:
-                # 发送一轮消息
-                await event.send(event.plain_result(data["msg"])) 
-                # 获取触发用户ID
-                user_id = event.get_sender_id()
+    @property
+    def command_catalog(self):
+        return getattr(self.jx3api, "command_catalog", None) or None
 
-                # 二轮会话流程
-                @session_waiter(timeout=30)
-                async def macro_select_waiter(controller: SessionController,new_event: AstrMessageEvent):
-                    # 跳过非触发用户消息
-                    if new_event.get_sender_id() != user_id:
-                        return
-                    # 获取用户消息
-                    msg = new_event.get_message_str().strip()
-                    # 判断消息是否为数字
-                    if not msg.isdigit():
-                        await new_event.send(
-                            MessageChain().message("输入异常，结束会话")
-                        )
-                        controller.stop()
-                        return
-                    # 判断数字是否在有效值内
-                    num = int(msg)
-                    if num < 1 or num > data["data"]["num"]:
-                        await new_event.send(
-                            MessageChain().message("无效序号，结束会话")
-                        )
-                        controller.stop()
-                        return
-                    
-                    # 获取二轮数据
-                    try:
-                        data1 = await action2(data["data"]["list"][num])
-                        if data1["code"] != 200:
-                            await new_event.send(
-                                MessageChain().message("获取详细数据失败")
-                            )
-                            controller.stop()
-                            return
-                        
-                        # 消息拼接发送
-                        chain = MessageChain()
-                        msg_text = data1["data"]
-                        chain.message(msg_text)
-                        if data1["temp"] != "":
-                            url = await self.html_render(data1["temp"], {}, options={})
-                            chain.url_image(url)
-                        await new_event.send(chain)
+    def _cmd_display_name(self, command_id: str) -> str:
+        if not self.command_catalog:
+            return command_id
+        return str((self.command_catalog.get(command_id) or {}).get("command") or command_id)
 
-                    except Exception as e:
-                        logger.error(f"功能函数执行错误: {e}")
-                        await new_event.send(
-                            MessageChain().message(str(e) or "渲染失败，请稍后重试")
-                        )
+    async def _send_choice_and_wait(
+        self,
+        event: AstrMessageEvent,
+        menu_text: str,
+        count: int,
+        runner,
+        *,
+        allow_zero: bool = False,
+        timeout: int = 10,
+    ):
+        text = str(menu_text).rstrip()
+        if "发送序号即可" not in text:
+            text += "\n\n发送序号即可，10 秒后自动选 1"
+        await event.send(event.plain_result(text))
+        user_id = event.get_sender_id()
 
-                    controller.stop()
-
-                # 二轮会话激活
-                try:
-                    await macro_select_waiter(event)  
-                except TimeoutError:
-                    await event.send(event.plain_result("选择超时，已结束会话"))
-                except Exception:
-                    logger.error("选择发生异常", exc_info=True)
-
-            else:
-                await event.send(event.plain_result("未搜索到相关内容"))
+        @session_waiter(timeout=timeout)
+        async def choice_waiter(controller: SessionController, new_event: AstrMessageEvent):
+            if new_event.get_sender_id() != user_id:
                 return
-                
-        except Exception as e:
-            logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试"))
-
-
-    async def handler_zili_msg(self, event: AstrMessageEvent, name: str, server: str):
-        """资历查询专用两轮会话，第一轮文本菜单，第二轮图片"""
-        try:
-            await event.send(event.plain_result(self.ZILI_MENU_TEXT))
-            user_id = event.get_sender_id()
-
-            @session_waiter(timeout=30)
-            async def zili_select_waiter(controller: SessionController, new_event: AstrMessageEvent):
-                if new_event.get_sender_id() != user_id:
-                    return
-
-                msg = new_event.get_message_str().strip()
-                if not msg.isdigit():
-                    await new_event.send(MessageChain().message("输入异常，结束会话"))
-                    controller.stop()
-                    return
-
-                choice = int(msg)
-                if choice < 0 or choice > 18:
+            msg = new_event.get_message_str().strip()
+            if msg.startswith("/"):
+                msg = msg[1:].strip()
+            if not msg.isdigit():
+                await new_event.send(MessageChain().message("输入异常，结束会话"))
+                controller.stop()
+                return
+            choice = int(msg)
+            if allow_zero:
+                if choice < 0 or choice > count:
                     await new_event.send(MessageChain().message("无效序号，结束会话"))
                     controller.stop()
                     return
-
-                try:
-                    data = await self.jx3box.zili(name, server, choice)
-                    if data["code"] != 200:
-                        await new_event.send(MessageChain().message(data.get("msg", "获取资历数据失败")))
-                        controller.stop()
-                        return
-
-                    options = {
-                        "quality": 100,
-                        "device_scale_factor_level": "normal",
-                        "full_page": True,
-                        "omit_background": False,
-                        "type": "jpeg"
-                    }
-                    data["data"]["icons"] = self.icons
-                    url = await self.html_render(data["temp"], data["data"], options=options)
-                    await new_event.send(new_event.image_result(url))
-                except Exception as e:
-                    logger.error(f"资历查询执行错误: {e}")
-                    await new_event.send(MessageChain().message(str(e) or "渲染失败，请稍后重试"))
-
+            elif choice < 1 or choice > count:
+                await new_event.send(MessageChain().message("无效序号，结束会话"))
                 controller.stop()
-
+                return
             try:
-                await zili_select_waiter(event)
-            except TimeoutError:
-                await event.send(event.plain_result("选择超时，已结束会话"))
-            except Exception:
-                logger.error("资历选择发生异常", exc_info=True)
+                await runner(choice, new_event)
+            except Exception as e:
+                logger.error(f"执行命令错误: {e}")
+                await new_event.send(MessageChain().message(str(e) or "处理失败，请稍后重试"))
+            controller.stop()
 
-        except Exception as e:
-            logger.error(f"资历会话执行错误: {e}")
-            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试"))
+        try:
+            await choice_waiter(event)
+        except TimeoutError:
+            try:
+                await runner(1, event)
+            except Exception as e:
+                logger.error(f"默认选项执行错误: {e}")
+                await event.send(event.plain_result(str(e) or "处理失败，请稍后重试"))
+        except Exception:
+            logger.error("选择等待异常", exc_info=True)
+
+    async def _send_command_menu(
+        self,
+        event: AstrMessageEvent,
+        title: str,
+        ids: tuple[str, ...],
+        runner,
+    ):
+        lines = "\n".join(f"{index}. {self._cmd_display_name(item)}" for index, item in enumerate(ids, 1))
+        await self._send_choice_and_wait(event, f"{title}\n{lines}", len(ids), runner)
+
+    async def send_command_menu(
+        self,
+        event: AstrMessageEvent,
+        title: str,
+        ids: tuple[str, ...],
+        runner,
+    ):
+        await self._send_command_menu(event, title, ids, runner)
+
+    async def handler_plain_image_msg(self, event: AstrMessageEvent, action1, action2):
+        """两轮会话：先发文字序号列表，选择后返回正文与图片"""
+        data = await action1()
+        if data.get("code") != 200:
+            await event.send(event.plain_result(data.get("msg") or "未搜索到相关内容"))
+            return
+
+        items = data["data"]["list"]
+        count = max(0, len(items) - 1)
+        if count <= 0:
+            await event.send(event.plain_result("未搜索到相关内容"))
+            return
+
+        async def runner(num: int, reply_event: AstrMessageEvent):
+            detail = await action2(items[num])
+            if detail.get("code") != 200:
+                await reply_event.send(MessageChain().message(detail.get("msg") or "获取详细数据失败"))
+                return
+            chain = MessageChain()
+            chain.message(detail.get("data") or "")
+            if detail.get("temp"):
+                url = await self.html_render(detail["temp"], {}, options={})
+                chain.url_image(url)
+            await reply_event.send(chain)
+
+        await self._send_choice_and_wait(
+            event,
+            data.get("msg") or "请选择序号",
+            count,
+            runner,
+        )
+
+
+    async def handler_zili_msg(self, event: AstrMessageEvent, name: str, server: str):
+        """资历查询两轮会话：先出文字菜单，选择后渲染对应分布图"""
+        async def runner(choice: int, reply_event: AstrMessageEvent):
+            data = await self.jx3box.zili(name, server, choice)
+            if data.get("code") != 200:
+                await reply_event.send(MessageChain().message(data.get("msg", "获取资历数据失败")))
+                return
+
+            options = {
+                "quality": 100,
+                "device_scale_factor_level": "normal",
+                "full_page": True,
+                "omit_background": False,
+                "type": "jpeg"
+            }
+            body_length = estimate_body_length(data.get("temp") or "", data["data"], self.icons)
+            poem_line = await fetch_poem_line()
+            data["data"].update(build_decorated_payload(self.icons, body_length, poem_line))
+            url = await self.html_render(data["temp"], data["data"], options=options)
+            await reply_event.send(reply_event.image_result(url))
+
+        await self._send_choice_and_wait(
+            event,
+            self.ZILI_MENU_TEXT,
+            18,
+            runner,
+            allow_zero=True,
+        )
 
 
     async def  helps(self, event: AstrMessageEvent):
@@ -763,10 +789,6 @@ class MessageBuilder:
     async def  jigai(self, event: AstrMessageEvent,):
         """ 技改"""
         return await self.plain_msg(event, self.jx3api.jigai)
-
-    async def  fubeng(self, event: AstrMessageEvent, server:str, name:str):
-        """ 副本"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.fubengjilu(server,name))
 
     async def  diaoluo(self, event: AstrMessageEvent, name: str,  server: str = "", limit: str = "20",):
         """ 掉落 物品 服务器 数量 """

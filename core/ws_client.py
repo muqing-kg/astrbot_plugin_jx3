@@ -30,19 +30,6 @@ class JX3WSClient:
         self._stop = asyncio.Event()
         self._wanted = False
 
-    def set_token(self, token: str) -> None:
-        self.token = token or ""
-
-    async def set_wanted(self, wanted: bool) -> None:
-        wanted = bool(wanted)
-        if wanted == self._wanted:
-            return
-        self._wanted = wanted
-        if wanted:
-            await self.start()
-        else:
-            await self.stop()
-
     async def configure(self, token: str, wanted: bool) -> None:
         token = token or ""
         wanted = bool(wanted)

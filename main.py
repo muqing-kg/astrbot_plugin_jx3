@@ -35,6 +35,7 @@ from .core.session_policy import (
     hint_secret_saved,
     hint_umo_invalid,
     hint_unbound,
+    hint_command_usage,
     inject_server_args,
     parse_admin_command,
     remap_admin_parts,
@@ -260,7 +261,6 @@ class Jx3ApiPlugin(Star):
             "科举": self.jx3cmd.keju,
             "开服": self.jx3cmd.kaifu,
             "技改": self.jx3cmd.jigai,
-            "副本": self.jx3cmd.fubeng,
             "掉落": self.jx3cmd.diaoluo,
             "宏": self.jx3cmd.hong,
             "资历": self.jx3cmd.zili,
@@ -438,6 +438,99 @@ class Jx3ApiPlugin(Star):
                     raise ValueError(f"缺少参数: {p.name}")
         return await handler(*call_args)
 
+    async def _run_menu_choice(
+        self,
+        event: AstrMessageEvent,
+        choice: int,
+        ids: tuple[str, ...],
+        args: list[str],
+    ):
+        if choice < 1 or choice > len(ids):
+            await event.send(event.plain_result("无效序号，结束会话"))
+            return
+        result = await self._exec_menu_command(event, ids[choice - 1], list(args))
+        if result is not None:
+            await event.send(result)
+
+    async def _exec_menu_command(
+        self,
+        event: AstrMessageEvent,
+        cmd_id: str,
+        args: list[str],
+    ):
+        handler = self.command_map.get(cmd_id)
+        if not handler:
+            return event.plain_result(f"该功能暂不可用：{cmd_id}")
+
+        row = await self.sessions.ensure(self._event_umo(event), self._event_display_name(event))
+        bound = (row.get("server") or "").strip()
+        injected = inject_server_args(
+            cmd_id,
+            args,
+            bound,
+            resolver=lambda name: canonical_server(self.server_catalog, name),
+        )
+        if injected == UNBOUND_SERVER:
+            return event.plain_result(hint_unbound(self.command_catalog))
+        if injected == UNKNOWN_SERVER:
+            return event.plain_result(hint_unknown_server())
+        args = injected
+
+        if cmd_id in NEED_TOKEN:
+            token = self.sessions.resolve_token(row, self._global_token())
+            if token == CREDENTIAL_MISSING:
+                return event.plain_result(hint_need_token(self.command_catalog))
+        else:
+            token = self.sessions.resolve_token(row, self._global_token())
+            if token == CREDENTIAL_MISSING:
+                token = ""
+
+        if cmd_id in NEED_TICKET:
+            ticket = self.sessions.resolve_ticket(row, self._global_ticket())
+            if ticket == CREDENTIAL_MISSING:
+                return event.plain_result(hint_need_ticket(self.command_catalog))
+        else:
+            ticket = self.sessions.resolve_ticket(row, self._global_ticket())
+            if ticket == CREDENTIAL_MISSING:
+                ticket = ""
+
+        creds = set_request_credentials(token or None, ticket or None)
+        try:
+            return await self._call_with_auto_args(handler, event, args)
+        except Exception as e:
+            logger.exception(f"菜单子命令执行失败: {cmd_id}, error={e}")
+            return event.plain_result(format_command_error(cmd_id, e, self.command_catalog))
+        finally:
+            reset_request_credentials(creds)
+
+    async def _cmd_ranking(self, event: AstrMessageEvent, args: list[str]):
+        ids = self.jx3cmd.RANKING_IDS
+        async def runner(choice: int, reply_event: AstrMessageEvent):
+            await self._run_menu_choice(reply_event, choice, ids, [])
+        await self.jx3cmd.send_command_menu(event, "排行榜", ids, runner)
+
+    async def _cmd_zhangong(self, event: AstrMessageEvent, args: list[str]):
+        camp = (args[0] if args else "").strip()
+        if camp in {"恶人", "恶人谷"}:
+            ids = self.jx3cmd.ZHANGONG_EWE
+        elif camp in {"浩气", "浩气盟"}:
+            ids = self.jx3cmd.ZHANGONG_HAO
+        elif camp:
+            return event.plain_result(hint_command_usage("战功榜", self.command_catalog))
+        else:
+            ids = self.jx3cmd.ZHANGONG_ALL
+        async def runner(choice: int, reply_event: AstrMessageEvent):
+            await self._run_menu_choice(reply_event, choice, ids, [])
+        await self.jx3cmd.send_command_menu(event, "战功榜", ids, runner)
+
+    async def _cmd_card(self, event: AstrMessageEvent, args: list[str]):
+        if len(args) < 2:
+            return event.plain_result(hint_command_usage("名片", self.command_catalog))
+        ids = self.jx3cmd.CARD_IDS
+        async def runner(choice: int, reply_event: AstrMessageEvent):
+            await self._run_menu_choice(reply_event, choice, ids, list(args))
+        await self.jx3cmd.send_command_menu(event, "名片", ids, runner)
+
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def on_all_message(self, event: AstrMessageEvent):
         if not self.command_map:
@@ -461,6 +554,13 @@ class Jx3ApiPlugin(Star):
         trigger, *args = parts
         cmd = resolve_command(self.command_catalog, trigger)
         if not cmd:
+            return
+        if cmd in {"排行榜", "战功榜"}:
+            event.stop_event()
+            if cmd == "排行榜":
+                yield await self._cmd_ranking(event, args)
+            else:
+                yield await self._cmd_zhangong(event, args)
             return
         if cmd == "通知管理":
             event.stop_event()
@@ -514,6 +614,11 @@ class Jx3ApiPlugin(Star):
             ticket = self.sessions.resolve_ticket(row, self._global_ticket())
             if ticket == CREDENTIAL_MISSING:
                 ticket = ""
+
+        if cmd == "名片":
+            event.stop_event()
+            yield await self._cmd_card(event, args)
+            return
 
         creds = set_request_credentials(token or None, ticket or None)
         try:

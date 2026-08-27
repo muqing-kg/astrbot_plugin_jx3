@@ -8,18 +8,18 @@
   基于 AstrBot 的剑网三综合数据查询插件
 </p>
 
-`astrbot_plugin_jx3` 通过 JX3API 和 JX3BOX 查询《剑网3》游戏数据，并根据功能将结果发送为纯文本、图片、图文消息或两轮交互消息。插件同时提供开服、新闻、刷马、赤兔后台推送能力。
+`astrbot_plugin_jx3` 通过 JX3API 和 JX3BOX 查询《剑网3》游戏数据，并根据功能将结果发送为纯文本、图片、图文消息或两轮交互消息。插件通过 JX3API 事件通道和后台轮询提供主动推送能力。
 
 
 ## 功能特点
 
-- 100 余个中文触发词，覆盖活动、名剑、排行、交易、阵营、角色、奇遇、副本、家园、社区等场景。
+- 100 余个中文触发词，覆盖活动、名剑、排行、交易、阵营、角色、奇遇、家园、社区等场景。
 - 支持纯文本、远程图片、HTML/Jinja2 渲染图片和图文消息链。
-- 支持 `宏`、`资历` 两类 30 秒两轮交互。
-- 支持开服、新闻、刷马、赤兔四类定时轮询与会话推送。
-- 复用 `aiohttp.ClientSession`，统一处理 GET、POST、JSON、图片和分页请求。
+- 支持 `宏`、`资历`、`排行榜`、`战功榜`、`名片` 等多类两轮交互。
+- 支持 JX3API 事件通道与后台轮询，按会话开关和绑定区服独立推送。
+- 复用 `aiohttp.ClientSession`，统一处理 GET、POST、JSON 和图片请求。
 - JX3BOX 的 Node、Next2、CMS 请求统一封装，资历与交易行基础数据支持本地快照缓存和过期兜底。
-- 内置 46 个页面片段，通过公共布局与样式在本地组装为完整 HTML，并附带通用、门派/心法和奇遇图标资源。
+- 内置 45 个页面片段，通过公共布局与样式在本地组装为完整 HTML，并附带通用、门派/心法和奇遇图标资源。
 
 ## 数据来源
 
@@ -82,6 +82,9 @@ pip install -r data/plugins/astrbot_plugin_jx3/requirements.txt
 | `prefix.text` | `string` | `剑三` | 仅在启用插件前缀时生效 |
 | `jx3api_token` | `string` | 空 | 全局 JX3API Token。仅当会话勾选「使用全局 Token」时才会使用 |
 | `jx3api_ticket` | `string` | 空 | 全局推栏标识。默认全部会话使用；会话自定义后优先用自定义 |
+| `jx3api_ws_url` | `string` | `wss://socket.nicemoe.cn` | JX3API 事件通道地址，仅主动推送事件时连接 |
+| `jx3api_ws_token` | `string` | 空 | 事件通道 Token；留空时使用 `jx3api_token` |
+| `jx3api_ssl_verify` | `bool` | `true` | 是否校验接口 TLS 证书；自签名或本地代理异常时可关闭 |
 
 插件页面可查看每个群/私聊的绑定区服、机器人开关、Token/推栏是否已配置，以及是否使用全局 Token。主动推送开关仍由命令管理，可发送 `通知管理` 查看。页面不回显密钥原文。该页面仅供 AstrBot 后台主人使用，请勿暴露到公网。
 
@@ -90,11 +93,12 @@ pip install -r data/plugins/astrbot_plugin_jx3/requirements.txt
 JX3API Token 可从 [JX3API](https://www.jx3api.com) 购买。推栏 Ticket 通常来自推栏客户端的登录请求，属于敏感凭据。
 
 - 群聊中不要发送 Token 或推栏原文。
-- 先在目标群发送系统命令 `/sid` 复制 UMO，再私聊机器人：
+- 先在目标群发送系统命令 `sid` 复制 UMO，再私聊机器人：
   - `Token <UMO> <Token>`
   - `推栏 <UMO> <推栏标识>`
 - 付费指令优先使用该会话自己的 Token；没有专属 Token 且未勾选「使用全局 Token」时会提示去购买并配置。
 - 推栏默认使用全局配置；某会话自定义后只服务该会话。
+- Token、推栏按 JX3API 官方接口约定放入请求参数，事件通道 Token 按协议拼在 WebSocket 地址中，请仅通过 HTTPS/WSS 使用并保护请求日志。
 
 当前代码会同时传入 Token 和 Ticket 的指令有：
 
@@ -105,7 +109,7 @@ JX3API Token 可从 [JX3API](https://www.jx3api.com) 购买。推栏 Ticket 通�
 
 ## 使用方式
 
-默认走 AstrBot 前缀 `/`：
+默认使用 AstrBot 前缀：
 
 ```text
 绑定 梦江南
@@ -169,23 +173,23 @@ JX3API Token 可从 [JX3API](https://www.jx3api.com) 购买。推栏 Ticket 通�
 以下排行榜指令均使用 `指令 服务器` 格式，输出图片并需要 Token：
 
 ```text
-名士五十强
-老江湖五十强
-兵甲藏家五十强
-名师五十强
-阵营英雄五十强
-薪火相传五十强
-庐园广记一百强
-浩气神兵宝甲五十强
-恶人神兵宝甲五十强
-浩气爱心帮会五十强
-恶人爱心帮会五十强
-赛季恶人五十强
-赛季浩气五十强
-上周恶人五十强
-上周浩气五十强
-本周恶人五十强
-本周浩气五十强
+名士排行
+江湖排行
+兵甲排行
+名师排行
+阵营排行
+薪火排行
+家园排行
+浩气神兵排行
+恶人神兵排行
+浩气爱心排行
+恶人爱心排行
+赛季恶人战功榜
+赛季浩气战功榜
+上周恶人战功榜
+上周浩气战功榜
+本周恶人战功榜
+本周浩气战功榜
 ```
 
 ### 物价与交易
@@ -265,7 +269,7 @@ JX3API Token 可从 [JX3API](https://www.jx3api.com) 购买。推栏 Ticket 通�
 | `舔狗语录` | 随机语录；文本 | 无 |
 | `喝什么`、`吃什么`、`骚话`、`渣男语录` | 随机文案；文本 | 无 |
 
-### 百度贴吧、系统工具与副本
+### 百度贴吧与系统工具
 
 | 指令 | 说明与输出 | 凭据 |
 | --- | --- | --- |
@@ -274,7 +278,6 @@ JX3API Token 可从 [JX3API](https://www.jx3api.com) 购买。推栏 Ticket 通�
 | `科举 题目 [条数]` | 科举题目搜索，默认 5 条；文本 | 无 |
 | `开服 服务器` | 指定服务器开服状态；文本 | 无 |
 | `技改` | 最近技改记录；文本 | 无 |
-| `副本 服务器 角色` | 角色副本记录；图片 | Token |
 | `掉落 物品 [服务器] [数量]` | 副本掉落统计，默认 20 条；图片 | Token |
 
 ## 业务流程
@@ -315,7 +318,7 @@ flowchart LR
 异步初始化阶段会连接数据库并创建以下本地表：
 
 - `session_config`：每个群/私聊的区服绑定、推送开关和密钥。
-- `push_state`：按区服记录开服/新闻/刷马/赤兔的最新状态，避免重复推送。
+- `push_state`：记录主动通知与赤兔轮询的去重状态，避免重复推送。
 - `achievement_cache`：JSON 基础数据缓存及更新时间。
 
 随后连接随包的 `plugin_data.db`、启动已配置的后台任务，最后建立指令映射。插件停用时会关闭调度器、三个 HTTP Session 和两个 SQLite 连接。
@@ -337,7 +340,7 @@ flowchart LR
 三个数据服务按上游来源拆分：
 
 - `JX3APIService`：以 `https://www.jx3api.com` 为根地址，通过 GET 请求实现主体功能。
-- `AIJX3Service`：保留茶馆请求封装，当前查询已不再使用。
+- `AIJX3Service`：负责沙盘等剑侠茶馆请求。
 - `JX3BOXService`：通过统一请求入口访问 JX3BOX 的 Node、CMS 和 Next2 服务，负责宏、资历、交易行及刷马/赤兔推送消息。
 
 服务方法通常返回统一结构：
@@ -360,7 +363,7 @@ flowchart LR
 
 - 延迟创建并复用一个 `aiohttp.ClientSession`。
 - 默认总超时时间为 10 秒。
-- 支持 GET、JSON POST 和分页拉取。
+- 支持 GET、JSON POST。
 - 根据 `Content-Type` 自动返回 JSON 或二进制数据。
 - 兼容 JX3API 常见成功码 `200`、`"0"`、`0`、`1`。
 - 可通过 `out_key` 提取响应中的指定字段。
@@ -395,7 +398,7 @@ AstrBot 的渲染接口接收完整 HTML 字符串，因此插件不会依赖渲
 - `styles/tokens.css`：颜色、间距、圆角、字体和各页面内容宽度。
 - `styles/base.css`：固定图片画布的页面背景、外框和基础排版。
 - `styles/components.css`：统一维护数据表格、列状态、排行、统计卡片、可配置列数网格、技能/奇穴卡片、奇遇卡片、器物详情、标签和空数据等跨页面组件。
-- `styles/pages/*.css`：可选，仅保留成本计算、成就、副本记录等无法合理复用的复杂页面布局。当前 46 个页面中有 19 个需要专属 CSS。
+- `styles/pages/*.css`：仅给无法复用公共组件的复杂页面补充独立布局，当前 45 个页面中有 17 个需要专属 CSS。
 
 表格列数直接由模板中的 `<th>`、`<td>` 数量决定，不需要为四列、五列等情况分别创建样式。卡片网格通过 `--grid-columns` 配置列数，例如：
 
@@ -461,12 +464,12 @@ astrbot_plugin_jx3/
     ├── layouts/
     │   └── base.html        # 唯一的完整 HTML 文档骨架
     ├── pages/
-    │   └── *.html           # 46 个页面内容与 Jinja2 数据绑定
+    │   └── *.html           # 45 个页面内容与 Jinja2 数据绑定
     ├── styles/
     │   ├── tokens.css       # 设计变量与页面宽度
     │   ├── base.css         # 全局背景、外框和排版
     │   ├── components.css   # 表格、网格、卡片、状态等公共组件
-    │   └── pages/*.css      # 可选的复杂页面独有布局（当前 19 个）
+    │   └── pages/*.css      # 可选的复杂页面独有布局（当前 17 个）
     ├── img/                 # 通用图片资源
     ├── sect/                # 门派与心法图标
     └── serendipity/         # 奇遇图标
@@ -502,7 +505,7 @@ git diff --check
 2. 主动推送按会话开关和绑定区服发送，不再使用配置页里的 `kfts` / `xwts` / `smts` / `ctts`。
 3. 付费指令需要该会话 Token，或在插件页面勾选「使用全局 Token」。推栏默认走全局，会话自定义优先。
 4. 插件页面 `pages/dashboard` 以卡片列表展示已绑定区服的群/私聊，含区服、机器人开关和密钥配置状态，不回显 Token/推栏原文。
-5. `APIClient` 当前默认 `ssl_verify=False`。请求日志会脱敏 `token` 和 `ticket`。
+5. `APIClient` 默认校验 TLS 证书，可通过 `jx3api_ssl_verify` 配置关闭。请求日志会脱敏 `token` 和 `ticket`。
 
 ## 注意事项
 

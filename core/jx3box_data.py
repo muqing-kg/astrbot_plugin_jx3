@@ -46,7 +46,9 @@ JX3BOX_API_BASE_URLS = {
 class JX3BOXService:
     def __init__(self, config: AstrBotConfig, sqlite: AsyncSQLiteDB, cache_sqlite: Optional[AsyncSQLiteDB] = None):
         # 实例化 API Client
-        self._api: APIClient = APIClient()
+        self._api: APIClient = APIClient(
+            ssl_verify=bool(config.get("jx3api_ssl_verify", True))
+        )
         # 引用插件配置文件
         self._config = config
         # 引用sqlite
@@ -117,7 +119,7 @@ class JX3BOXService:
             return None
 
 
-    async def machangxiaoxi(self, srever: str, type: str, subtype: str) -> Dict[str, Any]:
+    async def machangxiaoxi(self, server: str, type: str, subtype: str) -> Dict[str, Any]:
         """马场消息 """
         return_data = self._init_return_data()
 
@@ -128,25 +130,33 @@ class JX3BOXService:
             params={
                 "pageIndex":1,
                 "pageSize":1,
-                "server":srever,
+                "server":server,
                 "type":type,
                 "subtype":subtype,
             },
         )
 
-        if data == None:
-            return None
-        else:
-            data_list = data["list"][0]
-            return_data["status"] = data_list["id"]
-            return_data["data"] = (
-                f"区服：{srever}\n"
-                f"{data_list.get('content')}\n"
-                f"时间：{data_list.get('created_at')}\n"
-            )
-            return_data["code"] = 200
-
+        if not isinstance(data, dict):
+            return_data["msg"] = "获取马场消息失败"
             return return_data
+        rows = data.get("list")
+        if not isinstance(rows, list) or not rows:
+            return_data["msg"] = "暂无最新马场消息"
+            return return_data
+        first = rows[0]
+        status = str(first.get("id") or "").strip()
+        if not status:
+            return_data["msg"] = "马场消息缺少记录编号"
+            return return_data
+        return_data["status"] = status
+        return_data["data"] = (
+            f"区服：{server}\n"
+            f"{first.get('content') or ''}\n"
+            f"时间：{first.get('created_at') or ''}\n"
+        )
+        return_data["code"] = 200
+
+        return return_data
 
 
 

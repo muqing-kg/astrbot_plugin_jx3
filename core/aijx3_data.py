@@ -11,7 +11,9 @@ from .template import load_template
 class AIJX3Service:
     def __init__(self, config: AstrBotConfig, sqlite: AsyncSQLiteDB, cache_sqlite: Optional[AsyncSQLiteDB] = None):
         # 实例化 API Client
-        self._api: APIClient = APIClient()
+        self._api: APIClient = APIClient(
+            ssl_verify=bool(config.get("jx3api_ssl_verify", True))
+        )
         # 引用插件配置文件
         self._config = config
         # 引用sqlite

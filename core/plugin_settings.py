@@ -60,9 +60,6 @@ class PluginSettings:
                 out[str(key)] = str(value)
         return out
 
-    async def set_command_overrides(self, overrides: dict[str, str]) -> None:
-        await self._set("command_overrides", json.dumps(overrides, ensure_ascii=False))
-
     async def set_server_aliases(self, aliases: dict[str, str]) -> None:
         await self._set("server_aliases", json.dumps(aliases, ensure_ascii=False))
 
@@ -78,5 +75,18 @@ class PluginSettings:
             return {}
         return {str(k): str(v) for k, v in data.items() if str(k) and str(v)}
 
-    async def set_command_descs(self, descs: dict[str, str]) -> None:
-        await self._set("command_descs", json.dumps(descs, ensure_ascii=False))
+    async def set_command_catalog(
+        self,
+        overrides: dict[str, str],
+        descs: dict[str, str],
+    ) -> None:
+        await self.sql.execute_many([
+            (
+                "INSERT OR REPLACE INTO plugin_settings (key, value) VALUES (?, ?)",
+                ("command_overrides", json.dumps(overrides, ensure_ascii=False)),
+            ),
+            (
+                "INSERT OR REPLACE INTO plugin_settings (key, value) VALUES (?, ?)",
+                ("command_descs", json.dumps(descs, ensure_ascii=False)),
+            ),
+        ])
