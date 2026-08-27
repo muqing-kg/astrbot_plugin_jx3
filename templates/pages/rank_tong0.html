@@ -36,7 +36,7 @@
                 <td class="data-cell--muted data-cell--medium data-cell--wrap">{{ item.castleName }}</td>
                 <td class="data-cell--center data-cell--nowrap data-cell--numeric">
                     {% if item.member_count %}
-                    <span class="member-count {{ item.member_class or '' }}">{{ item.member_count }}</span><span class="member-slash">/</span><span class="member-limit {{ item.member_limit_class or '' }}">{{ item.member_limit }}</span>
+                    <span class="member-count {{ item.member_class or '' }}"{% if item.member_count_style %} style="color: {{ item.member_count_style }}"{% endif %}>{{ item.member_count }}</span><span class="member-slash">/</span><span class="member-limit"{% if item.member_limit_style %} style="color: {{ item.member_limit_style }}"{% endif %}>{{ item.member_limit }}</span>
                     {% else %}-{% endif %}
                 </td>
                 <td class="data-cell--score">{{ item.titlePoint }}</td>

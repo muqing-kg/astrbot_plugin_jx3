@@ -283,44 +283,38 @@
     font-weight: 800;
 }
 
-.jx3-template .member-limit.member-limit-300,
-.jx3-template .member-count.member-limit-300 {
-    color: #b8863b;
-}
-
-.jx3-template .member-limit.member-limit-250,
-.jx3-template .member-count.member-limit-250 {
-    color: #2b5da6;
-}
-
-.jx3-template .member-limit.member-limit-50,
-.jx3-template .member-count.member-limit-50 {
-    color: #7b4fa0;
-}
-
-.jx3-template .member-count.member-near-full {
-    color: #d0563a;
-    font-weight: 800;
-}
-
 .jx3-template .member-count.member-full {
-    color: #b8863b;
     font-weight: 800;
 }
 
-.jx3-template .member-count.member-high {
-    color: #c45c7a;
-    font-weight: 700;
+.jx3-template .member-count.member-band-1 {
+    color: #c1442e;
+    font-weight: 800;
 }
 
-.jx3-template .member-count.member-mid {
-    color: #2b5da6;
-    font-weight: 700;
+.jx3-template .member-count.member-band-2 {
+    color: #1f7a6d;
+    font-weight: 800;
 }
 
-.jx3-template .member-count.member-low {
-    color: #8a93a0;
-    font-weight: 700;
+.jx3-template .member-count.member-band-3 {
+    color: #8d4e6f;
+    font-weight: 800;
+}
+
+.jx3-template .member-count.member-band-4 {
+    color: #5b7f3a;
+    font-weight: 800;
+}
+
+.jx3-template .member-count.member-band-5 {
+    color: #415a8f;
+    font-weight: 800;
+}
+
+.jx3-template .member-count.member-band-6 {
+    color: #c76a1f;
+    font-weight: 800;
 }
 
 .jx3-template .member-count {
