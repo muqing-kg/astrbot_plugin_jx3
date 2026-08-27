@@ -21,7 +21,7 @@
                     <span class="zl-item__stat">{{ item.done }} / {{ item.total }} · {{ item.percent_text }}</span>
                 </div>
                 <div class="progress zl-progress">
-                    <div class="progress-fill {{ item.bar_class }}" style="width: {{ item.percent }}%;"></div>
+                    <div class="progress-fill {{ item.bar_class }}" style="width: {{ item.percent }}%; background: {{ item.bar_style }};"></div>
                 </div>
             </div>
             {% endfor %}

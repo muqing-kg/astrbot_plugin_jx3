@@ -2,11 +2,11 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
+    padding: 14px 20px;
     border: 1px solid var(--jx3-border-soft);
     border-radius: var(--jx3-radius-md);
     box-shadow: var(--jx3-shadow-sm);
-    margin-bottom: 18px;
+    margin-bottom: 14px;
 }
 
 .baizhan-page .time {
@@ -26,18 +26,18 @@
 .baizhan-page .grid {
     display: grid;
     grid-template-columns: repeat(var(--grid-columns, 4), minmax(0, 1fr));
-    gap: 12px;
+    gap: 10px;
 }
 
 .baizhan-page .cell {
     display: grid;
-    grid-template-rows: 26px 30px 44px;
+    grid-template-rows: 24px 26px 34px;
     align-content: start;
     align-items: center;
     justify-items: center;
-    gap: 6px;
-    min-height: 150px;
-    padding: 10px 8px;
+    gap: 4px;
+    min-height: 116px;
+    padding: 8px 8px 6px;
     text-align: center;
     border: 1px solid var(--jx3-border-faint);
     border-radius: 14px;
@@ -58,14 +58,14 @@
     border-radius: 999px;
     background: rgba(92, 86, 102, 0.10);
     color: var(--jx3-text-secondary);
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 800;
     white-space: nowrap;
 }
 
 .baizhan-page .boss {
     color: #c22f2f;
-    font-size: 16px;
+    font-size: 14px;
     font-weight: 800;
     white-space: nowrap;
 }
@@ -74,7 +74,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: 44px;
+    min-height: 34px;
 }
 
 .baizhan-page .effect {
@@ -82,13 +82,13 @@
     align-items: center;
     justify-content: center;
     max-width: 100%;
-    padding: 3px 8px;
+    padding: 2px 6px;
     border-radius: 999px;
     background: rgba(196, 92, 122, 0.08);
     overflow: visible;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    line-height: 1.35;
+    line-height: 1.3;
     text-align: center;
     white-space: nowrap;
 }

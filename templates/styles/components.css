@@ -279,7 +279,27 @@
 }
 
 .jx3-template .member-limit {
+    color: var(--jx3-text-muted);
+    font-weight: 800;
+}
+
+.jx3-template .member-limit.member-limit-300,
+.jx3-template .member-count.member-limit-300 {
     color: #b8863b;
+}
+
+.jx3-template .member-limit.member-limit-250,
+.jx3-template .member-count.member-limit-250 {
+    color: #2b5da6;
+}
+
+.jx3-template .member-limit.member-limit-50,
+.jx3-template .member-count.member-limit-50 {
+    color: #7b4fa0;
+}
+
+.jx3-template .member-count.member-near-full {
+    color: #d0563a;
     font-weight: 800;
 }
 
