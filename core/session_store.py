@@ -131,26 +131,28 @@ class SessionStore:
             old_user_id = str(claim.get("claim_identity") or "").strip()
             if not old_user_id:
                 continue
-            await self.sql.insert(
-                "plugin_claimants",
-                {
-                    "user_id": old_user_id,
-                    "name": str(claim.get("claim_name") or "").strip(),
-                    "claimed_at": str(claim.get("claim_at") or "").strip() or _now(),
-                },
+            await self.sql.execute(
+                """
+                INSERT OR IGNORE INTO plugin_claimants (user_id, name, claimed_at)
+                VALUES (?, ?, ?)
+                """,
+                (
+                    old_user_id,
+                    str(claim.get("claim_name") or "").strip(),
+                    str(claim.get("claim_at") or "").strip() or _now(),
+                ),
             )
         if old_admin:
             old_user_id = str(old_admin.get("user_id") or "").strip()
             if old_user_id:
                 old_name = str(old_admin.get("name") or "").strip()
                 old_at = str(old_admin.get("claimed_at") or "").strip()
-                await self.sql.insert(
-                    "plugin_claimants",
-                    {
-                        "user_id": old_user_id,
-                        "name": old_name,
-                        "claimed_at": old_at or _now(),
-                    },
+                await self.sql.execute(
+                    """
+                    INSERT OR IGNORE INTO plugin_claimants (user_id, name, claimed_at)
+                    VALUES (?, ?, ?)
+                    """,
+                    (old_user_id, old_name, old_at or _now()),
                 )
             await self.sql.execute("DROP TABLE plugin_admin")
         await self.sql.execute(
