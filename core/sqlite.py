@@ -1,8 +1,12 @@
 # pyright: reportOptionalMemberAccess=false
 
 import asyncio
+import sqlite3
 import aiosqlite
 from typing import Any, Dict, List, Optional, Tuple
+
+LOCKED_RETRY_TIMES = 3
+LOCKED_RETRY_DELAY = 0.5
 
 
 class AsyncSQLiteDB:
@@ -41,8 +45,23 @@ class AsyncSQLiteDB:
 
     async def execute(self, sql: str, params: Tuple = ()):
         async with self._write_lock:
-            async with self.conn.execute(sql, params):
-                await self.conn.commit()
+            for attempt in range(LOCKED_RETRY_TIMES):
+                try:
+                    async with self.conn.execute(sql, params):
+                        await self.conn.commit()
+                    return
+                except sqlite3.OperationalError as exc:
+                    await self._safe_rollback()
+                    retryable = "database is locked" in str(exc) or "database is busy" in str(exc)
+                    if not retryable or attempt == LOCKED_RETRY_TIMES - 1:
+                        raise
+                    await asyncio.sleep(LOCKED_RETRY_DELAY)
+
+    async def _safe_rollback(self):
+        try:
+            await self.conn.rollback()
+        except Exception:
+            pass
 
     async def execute_many(self, statements: list[tuple[str, Tuple]]) -> None:
         """在同一事务内依次执行多条写语句，任一条失败则整体回滚。"""
