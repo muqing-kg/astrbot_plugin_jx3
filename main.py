@@ -311,6 +311,13 @@ class Jx3ApiPlugin(Star):
             raw = None
         return normalize_system_prefixes(raw)
 
+    @staticmethod
+    def _component_type(item) -> str:
+        raw_type = item.get("type") if isinstance(item, dict) else getattr(item, "type", None)
+        if not raw_type:
+            raw_type = type(item).__name__
+        return str(getattr(raw_type, "value", raw_type)).lower()
+
     def _mentioned_bot(self, event: AstrMessageEvent) -> bool:
         try:
             self_id = str(event.get_self_id() or "").strip()
@@ -339,12 +346,15 @@ class Jx3ApiPlugin(Star):
                 chains.append(components)
         for items in chains:
             for item in items:
-                if str(getattr(item, "type", type(item).__name__)).lower() not in {"at", "mention"}:
+                if self._component_type(item) not in {"at", "mention"}:
                     continue
-                for attr in ("qq", "uid", "user_id", "target_id", "id"):
-                    if str(getattr(item, attr, "") or "").strip() == self_id:
+                for attr in ("qq", "uid", "user_id", "target_id", "id", "wxid", "v3_username"):
+                    value = item.get(attr) if isinstance(item, dict) else getattr(item, attr, "")
+                    if str(value or "").strip() == self_id:
                         return True
-        pattern = rf"\[CQ:at[^\]]*?qq=({re.escape(self_id)})(?:[^0-9A-Za-z_-]|$)"
+        if self_id in self._at_list_from_raw(event):
+            return True
+        pattern = rf"\[CQ:at[^\]]*?(?:qq|wxid|uid|user_id|v3_username)=({re.escape(self_id)})(?:[^0-9A-Za-z_-]|$)"
         return bool(re.search(pattern, str(event.message_str or ""), re.IGNORECASE))
 
     def _event_umo(self, event: AstrMessageEvent) -> str:
@@ -375,11 +385,16 @@ class Jx3ApiPlugin(Star):
             pass
         return self._sender_id(event)
 
+    @staticmethod
+    def _valid_display_name(value: object) -> bool:
+        text = str(value or "").strip()
+        return bool(text and text.upper() not in {"N/A", "NULL", "NONE"})
+
     def _group_display_name(self, event: AstrMessageEvent) -> str:
         try:
             if hasattr(event, "get_group_name") and callable(event.get_group_name):
                 name = str(event.get_group_name() or "").strip()
-                if name:
+                if self._valid_display_name(name):
                     return name
         except Exception:
             pass
@@ -390,7 +405,7 @@ class Jx3ApiPlugin(Star):
                 if group:
                     for attr in ("group_name", "name", "nickname"):
                         value = getattr(group, attr, None)
-                        if value not in (None, ""):
+                        if self._valid_display_name(value):
                             return str(value).strip()
         except Exception:
             pass
@@ -457,9 +472,40 @@ class Jx3ApiPlugin(Star):
             self._sender_name(event),
         )
 
-    def _mentioned_target(self, event: AstrMessageEvent, target: str) -> tuple[str, str]:
+    def _mentioned_target(self, event: AstrMessageEvent) -> tuple[str, str]:
         user_id = ""
         name = ""
+        try:
+            self_id = str(event.get_self_id() or "").strip()
+        except Exception:
+            self_id = ""
+        id_keys = (
+            "qq", "uid", "user_id", "target_id", "id", "wxid", "to_wxid",
+            "v3_username", "username", "to_username", "user", "to_user",
+            "qid", "tiny_id",
+        )
+        name_keys = ("qq_nickname", "nickname", "name", "alias", "display_name", "card", "gcard")
+
+        def read_segment(item, keys):
+            sources = [item]
+            data = getattr(item, "data", None)
+            if isinstance(data, dict):
+                sources.append(data)
+            if isinstance(item, dict):
+                sources.append(item)
+            for source in sources:
+                for key in keys:
+                    if not isinstance(source, dict) and not hasattr(source, key):
+                        continue
+                    try:
+                        value = source.get(key) if isinstance(source, dict) else getattr(source, key, None)
+                    except Exception:
+                        value = None
+                    if value in (None, ""):
+                        continue
+                    return str(value).strip()
+            return ""
+
         chains = []
         for source in (
             getattr(event, "get_messages", None),
@@ -485,34 +531,126 @@ class Jx3ApiPlugin(Star):
                 chains.append(components)
         for items in chains:
             for item in items:
-                itype = str(getattr(item, "type", type(item).__name__)).lower()
+                itype = self._component_type(item)
                 if itype not in {"at", "mention"}:
                     continue
-                for attr in ("qq", "uid", "user_id", "target_id", "id"):
-                    value = getattr(item, attr, None)
-                    if value not in (None, ""):
-                        user_id = str(value).strip()
-                        break
-                for attr in ("qq_nickname", "name", "nickname"):
-                    value = getattr(item, attr, None)
-                    if value not in (None, ""):
-                        name = str(value).strip().lstrip("@").strip()
-                        break
-                if user_id or name:
+                user_id = read_segment(item, id_keys)
+                if user_id in {"all", self_id}:
+                    user_id = ""
+                    name = ""
+                    continue
+                if not user_id:
+                    skipped = {"type", "text", "content", "role", "sub_type", "domain"}
+                    pools = []
+                    data = getattr(item, "data", None)
+                    if isinstance(data, dict):
+                        pools.append(data)
+                    if isinstance(item, dict):
+                        pools.append(item)
+                    for pool in pools:
+                        for key, value in pool.items():
+                            if str(key).lower() in skipped or value in (None, ""):
+                                continue
+                            if isinstance(value, (int, float, str)):
+                                user_id = str(value).strip()
+                                break
+                        if user_id:
+                            break
+                item_name = read_segment(item, name_keys).lstrip("@").strip()
+                if item_name and not name:
+                    name = item_name
+                if user_id:
                     break
             if user_id or name:
                 break
         if not user_id:
             raw_text = str(event.message_str or "")
-            match = re.search(r"\[CQ:at[^\]]*?qq=([^,\]\s]+)", raw_text, re.IGNORECASE)
-            if match:
-                user_id = match.group(1)
-        raw = str(target or "").strip()
-        if raw.startswith("@"):
-            raw = raw[1:].strip()
-        if not user_id and not name and raw:
-            name = raw
+            for match in re.finditer(
+                r"\[CQ:at[^\]]*?(?:qq|wxid|uid|user_id|v3_username)=([^,\]\s]+)",
+                raw_text,
+                re.IGNORECASE,
+            ):
+                candidate = match.group(1)
+                if candidate not in {"all", self_id}:
+                    user_id = candidate
+                    break
+        if not user_id:
+            candidates = self._at_list_from_raw(event)
+            user_id = next((item for item in candidates if item not in {"all", self_id}), "")
         return user_id, name
+
+    def _at_list_from_raw(self, event: AstrMessageEvent) -> list[str]:
+        raw = getattr(getattr(event, "message_obj", None), "raw_message", None)
+        candidates = []
+
+        def append_at_text(value):
+            text = str(value or "").strip()
+            if not text:
+                return
+            matches = re.findall(r"<atuserlist>\s*(?:<!\[CDATA\[)?([^><\]]+?)(?:\]\]>)?\s*</atuserlist>", text, re.IGNORECASE)
+            if not matches:
+                matches = re.findall(r"\b(?:atUserList|atuserlist)\b\s*[:=]\s*([^\n\r,]+)", text, re.IGNORECASE)
+            for item in matches:
+                for target in re.split(r"[,，;；\s]+", item):
+                    target = target.strip().strip("'\"")
+                    if target:
+                        candidates.append(target)
+
+        def collect(value):
+            if isinstance(value, str):
+                append_at_text(value)
+                return
+            if not isinstance(value, (list, tuple, dict)):
+                return
+            def at_records(item):
+                if isinstance(item, dict):
+                    yield item
+                elif isinstance(item, (list, tuple)):
+                    for nested in item:
+                        yield from at_records(nested)
+
+            for leaf in at_records(value):
+                if isinstance(leaf, dict):
+                    for sub_key in ("wxid", "user_id", "qq", "username", "v3_username", "id", "uid"):
+                        inner = str(leaf.get(sub_key) or "").strip()
+                        if inner:
+                            candidates.append(inner)
+                            break
+                elif isinstance(leaf, str):
+                    append_at_text(leaf)
+                elif leaf not in (None, ""):
+                    candidates.append(str(leaf).strip())
+
+        if isinstance(raw, str):
+            try:
+                import json
+
+                raw = json.loads(raw)
+            except Exception:
+                collect(raw)
+                raw = None
+
+        def walk(value):
+            if isinstance(value, dict):
+                for key, item in value.items():
+                    if isinstance(item, str):
+                        append_at_text(item)
+                    elif isinstance(item, dict):
+                        walk(item)
+                    elif "at" in str(key).lower():
+                        collect(item)
+            elif isinstance(value, (list, tuple)):
+                for item in value:
+                    walk(item)
+
+        if isinstance(raw, (dict, list, tuple)):
+            walk(raw)
+
+        result = []
+        for candidate in candidates:
+            if candidate and candidate not in result:
+                result.append(candidate)
+        return result
 
     def _global_token(self) -> str:
         return str(self.conf.get("jx3api_token", "") or "").strip()
@@ -564,7 +702,7 @@ class Jx3ApiPlugin(Star):
                 return event.plain_result(hint_need_claim(self.command_catalog))
             umo = self._event_umo(event)
             if parsed.action == "authorize":
-                uid, name = self._mentioned_target(event, parsed.target)
+                uid, name = self._mentioned_target(event)
                 if not uid and not name:
                     return event.plain_result(hint_authorize_usage(self.command_catalog))
                 ok, msg = await self.sessions.add_manager(umo, uid, name)

@@ -318,7 +318,7 @@ class JX3BOXService:
         n = 1
         try:
             for m in data.get('list',[]):
-                msg += f"{n}、{m['author']}\t{m['post_title']}\n"
+                msg += f"{n}. {m['author']}\t{m['post_title']}\n"
                 pid_list.append(m["ID"])
                 n += 1
             

@@ -260,7 +260,15 @@ function sessionCard(row) {
 function renderCommands(payload) {
   const commands = payload.commands || [];
   commandListEl.innerHTML = `<div class="head"><span>命令</span><span>示例</span><span>描述</span><span></span></div>`;
+  let currentGroup = "";
   for (const row of commands) {
+    if (row.group && row.group !== currentGroup) {
+      currentGroup = row.group;
+      const head = document.createElement("div");
+      head.className = "group-head";
+      head.textContent = currentGroup;
+      commandListEl.appendChild(head);
+    }
     const el = document.createElement("div");
     el.className = "row";
     el.innerHTML = `
@@ -286,17 +294,12 @@ function renderCommands(payload) {
 }
 
 function renderPush(payload) {
-  pushListEl.innerHTML = `<div class="head"><span>命令 / 事件名</span><span>示例</span><span>说明</span><span></span></div>`;
-  const rowHtml = (value, placeholder) => `
-    <input data-k="value" value="${escapeHtml(value || "")}" placeholder="${escapeHtml(placeholder || "")}" />
-    <div class="cell-text"></div>
-    <div class="cell-text"></div>
-  `;
+  pushListEl.innerHTML = `<div class="head"><span>命令</span><span>示例</span><span>描述</span><span></span></div>`;
   for (const row of [payload.open, payload.close]) {
     const el = document.createElement("div");
     el.className = "row";
     el.innerHTML = `
-      ${rowHtml(row.command, "例如 打开")}
+      <input data-k="value" value="${escapeHtml(row.command || "")}" placeholder="${escapeHtml(row.id === "打开" ? "例如 打开" : "例如 关闭")}" />
       <div class="cell-text">${escapeHtml(row.example || "")}</div>
       <div class="cell-text">${row.id === "打开" ? "开启推送" : "关闭推送"}</div>
       <button data-act="save" type="button">保存</button>
@@ -326,7 +329,7 @@ function renderPush(payload) {
       el.innerHTML = `
         <input data-k="name" value="${escapeHtml(event.name || "")}" />
         <div class="cell-text">${escapeHtml(payload.open.command)} ${escapeHtml(event.name)}</div>
-        <div class="cell-text">${escapeHtml(event.kind)}</div>
+        <div class="cell-text">${escapeHtml(event.desc || event.kind)}</div>
         <button data-act="save" type="button">保存</button>
       `;
       el.querySelector('[data-act="save"]').addEventListener("click", async () => {
