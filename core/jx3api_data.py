@@ -36,6 +36,8 @@ class JX3APIService:
             logger.warning("未配置全局 JX3API Token，未勾选使用全局的会话将无法使用付费功能")
         if not self._global_ticket:
             logger.warning("未配置全局推栏标识，需要推栏的功能将依赖全局或会话自定义配置")
+        self.command_catalog: dict | None = None
+        self.push_names: dict[str, str] = {}
         
 
     @property
@@ -348,7 +350,7 @@ class JX3APIService:
             return_data["msg"] = "系统错误：模板文件不存在"
             return return_data
         catalog = getattr(self, "command_catalog", None)
-        return_data["data"] = {"rows": help_rows(catalog, exclude_groups={"会话设置"})}
+        return_data["data"] = {"rows": help_rows(catalog, exclude_ids={"打开", "关闭"})}
         return_data["code"] = 200
    
         return return_data
@@ -364,7 +366,7 @@ class JX3APIService:
             return_data["msg"] = "系统错误：模板文件不存在"
             return return_data
         from .session_policy import current_command_name
-        view = build_notice_view(display_name, server, enabled)
+        view = build_notice_view(display_name, server, enabled, getattr(self, "push_names", {}) or {})
         view["open_command"] = current_command_name(getattr(self, "command_catalog", None), "打开")
         view["close_command"] = current_command_name(getattr(self, "command_catalog", None), "关闭")
         return_data["data"] = view

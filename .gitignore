@@ -42,6 +42,7 @@ output/
 
 # 本地记忆与内部记录，不随项目分发
 .recallloom/
+.serena/
 
 # 本地测试、过程渲染与内部记录，不随项目分发
 tests/

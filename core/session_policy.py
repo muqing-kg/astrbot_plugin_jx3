@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .event_catalog import PUSH_TYPES
+from .event_catalog import push_arg_map
 
 UNBOUND_SERVER = "UNBOUND_SERVER"
 CREDENTIAL_MISSING = "CREDENTIAL_MISSING"
@@ -204,6 +204,7 @@ class AdminCommand:
     action: str = ""
     target: str = ""
     value: str = ""
+    label: str = ""
     error: str = ""
 
 
@@ -233,7 +234,11 @@ def remap_admin_parts(parts: list[str], catalog: dict | None) -> list[str]:
     return parts
 
 
-def parse_admin_command(parts: list[str], is_private: bool) -> AdminCommand:
+def parse_admin_command(
+    parts: list[str],
+    is_private: bool,
+    push_args: dict[str, str] | None = None,
+) -> AdminCommand:
     if not parts:
         return AdminCommand(error="empty")
     cmd = parts[0]
@@ -267,9 +272,15 @@ def parse_admin_command(parts: list[str], is_private: bool) -> AdminCommand:
             return AdminCommand(error="missing_server")
         return AdminCommand(action="bind", value=" ".join(parts[1:]).strip())
     if cmd in {"打开", "关闭"}:
-        if len(parts) < 2 or parts[1] not in PUSH_TYPES:
+        arg = str(parts[1]).strip() if len(parts) > 1 else ""
+        kind = (push_args if push_args is not None else push_arg_map({})).get(arg, "")
+        if not kind:
             return AdminCommand(error="missing_push_type")
-        return AdminCommand(action="open_push" if cmd == "打开" else "close_push", value=parts[1])
+        return AdminCommand(
+            action="open_push" if cmd == "打开" else "close_push",
+            value=kind,
+            label=arg,
+        )
     return AdminCommand(error="unknown")
 
 
@@ -304,12 +315,13 @@ def hint_push_need_bind(catalog: dict | None = None) -> str:
     )
 
 
-def hint_push_ok(kind: str, enabled: bool, catalog: dict | None = None) -> str:
+def hint_push_ok(kind: str, enabled: bool, catalog: dict | None = None, label: str = "") -> str:
     open_cmd = current_command_name(catalog, "打开")
     close_cmd = current_command_name(catalog, "关闭")
     notice = current_command_name(catalog, "通知管理")
     action = open_cmd if enabled else close_cmd
-    return f"已为当前会话{action}{kind}推送。发送 {notice} 可查看全部开关。"
+    name = label or kind
+    return f"已为当前会话{action}{name}推送。发送 {notice} 可查看全部开关。"
 
 
 def hint_need_token(catalog: dict | None = None) -> str:
@@ -360,21 +372,49 @@ def hint_umo_invalid() -> str:
     )
 
 
-def strip_command_prefix(text: str, enable: bool = False, prefix: str = "") -> list[str] | None:
+def normalize_system_prefixes(system_prefixes=None) -> list[str]:
+    prefixes = []
+    for item in system_prefixes or ("/",):
+        token = str(item or "").strip()
+        if token and token not in prefixes:
+            prefixes.append(token)
+    return prefixes
+
+
+def match_system_prefix(text: str, system_prefixes: list[str]) -> str:
+    best = ""
+    for token in system_prefixes:
+        if text.startswith(token) and len(token) > len(best):
+            best = token
+    return best
+
+
+def strip_command_prefix(
+    text: str,
+    enable: bool = False,
+    prefix: str = "",
+    system_prefixes=None,
+) -> list[str] | None:
     text = (text or "").strip()
     if not text:
         return None
+    prefixes = normalize_system_prefixes(system_prefixes)
+    plugin_prefix = (prefix or "").strip()
     if enable:
-        prefix = prefix or ""
-        if prefix and text.startswith(prefix):
-            text = text[len(prefix):].strip()
-        elif text.startswith("/"):
-            text = text[1:].strip()
-        else:
+        head = match_system_prefix(text, prefixes)
+        if not head:
             return None
-    elif text.startswith("/"):
-        text = text[1:].strip()
-    return text.split() if text else None
+        body = text[len(head):].strip()
+        if plugin_prefix:
+            if not body.startswith(plugin_prefix):
+                return None
+            body = body[len(plugin_prefix):].strip()
+        if not body:
+            return None
+        return body.split()
+    head = match_system_prefix(text, prefixes)
+    body = text[len(head):].strip() if head else text
+    return body.split() if body else None
 
 
 

@@ -473,8 +473,51 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
     return "\n".join(part for part in (kind, where) if part)
 
 
-def build_notice_view(display_name: str, server: str, enabled: set[str] | list[str] | None = None) -> dict[str, Any]:
+def normalize_push_overrides(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, str] = {}
+    for key, value in raw.items():
+        action = str(key).strip()
+        name = str(value or "").strip()
+        if action and name:
+            out[action] = name
+    return out
+
+
+def effective_push_items(overrides: dict[str, str] | None = None) -> list[dict[str, Any]]:
+    normalized = normalize_push_overrides(overrides)
+    items = []
+    for group in EVENT_GROUPS:
+        for item in group["items"]:
+            name = normalized.get(str(item["action"]), item["name"])
+            items.append({**item, "name": name})
+    return items
+
+
+def push_arg_map(overrides: dict[str, str] | None = None) -> dict[str, str]:
+    mapping: dict[str, str] = {}
+    for item in effective_push_items(overrides):
+        name = str(item["name"]).strip()
+        if name:
+            mapping.setdefault(name, str(item["kind"]))
+    return mapping
+
+
+def has_duplicate_push_names(overrides: dict[str, str] | None = None) -> bool:
+    normalized = normalize_push_overrides(overrides)
+    names = [str(item["name"]).strip() for item in effective_push_items(normalized)]
+    return len(names) != len(set(names))
+
+
+def build_notice_view(
+    display_name: str,
+    server: str,
+    enabled: set[str] | list[str] | None = None,
+    overrides: dict[str, str] | None = None,
+) -> dict[str, Any]:
     enabled_set = {str(item) for item in (enabled or [])}
+    normalized = normalize_push_overrides(overrides)
     groups = []
     for group in EVENT_GROUPS:
         items = []
@@ -483,9 +526,10 @@ def build_notice_view(display_name: str, server: str, enabled: set[str] | list[s
             on = item["kind"] in enabled_set
             if on:
                 enabled_count += 1
+            name = normalized.get(str(item["action"]), item["name"])
             items.append({
                 "action": item["action"],
-                "name": item["name"],
+                "name": name,
                 "kind": item["kind"],
                 "enabled": on,
             })

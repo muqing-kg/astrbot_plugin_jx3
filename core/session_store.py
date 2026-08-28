@@ -555,7 +555,7 @@ class SessionStore:
         umo = str(umo or "").strip()
         user_id = str(user_id or "").strip()
         if not umo or not user_id:
-            return False, "未识别到被授权人，请发送 授权管理 @成员。"
+            return False, "未识别到被授权人，请直接 @ 成员后发送 授权管理。"
         name = str(name or "").strip()
         claim = await self.get_session_identity(umo)
         identity = claim.get("identity") or ""

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from unicodedata import category
 from difflib import SequenceMatcher
 
 DEFAULT_COMMAND_ROWS = [
@@ -946,6 +947,10 @@ def _command_similarity(left: str, right: str) -> float:
     right = (right or "").strip()
     if not left or not right:
         return 0.0
+    if any(category(ch)[0] in {"P", "S"} for ch in left):
+        return 0.0
+    if len(left) == 1 or len(right) == 1:
+        return 0.0
     if left == right:
         return 1.0
     base = SequenceMatcher(None, left, right).ratio()
@@ -959,8 +964,10 @@ def _command_similarity(left: str, right: str) -> float:
         diff = sum(1 for a, b in zip(left, right) if a != b)
         if diff == 1:
             return max(base, 0.90)
-    if right.startswith(left):
+    if right.startswith(left) and len(right) > 2:
         return max(base, 0.66)
+    if len(right) == 1:
+        return 0.0
     return base
 
 
@@ -969,10 +976,15 @@ def suggest_command(catalog: dict | None, trigger: str) -> str | None:
     trigger = (trigger or "").strip()
     if not trigger:
         return None
+    if len(trigger) == 1:
+        return None
     candidates = []
     for command_id, row in catalog.items():
         name = str(row.get("command") or "")
         if not name:
+            continue
+        usage_head = str(row.get("command_tpl") or name).split("|")[0].strip()
+        if "[" not in usage_head:
             continue
         score = _command_similarity(trigger, name)
         if score > 0:
@@ -1045,6 +1057,7 @@ def public_command_rows(catalog: dict | None = None) -> list[dict]:
             "group": item["group"],
             "default_command": item["command"],
             "command": new,
+            "example": _replace_command_text(item["example_tpl"], old, new),
             "desc": desc,
         })
     return rows

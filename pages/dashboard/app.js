@@ -1,6 +1,7 @@
 const statusEl = document.getElementById("status");
 const cardsEl = document.getElementById("cards");
 const commandListEl = document.getElementById("commandList");
+const pushListEl = document.getElementById("pushList");
 const serverListEl = document.getElementById("serverList");
 const resetBtn = document.getElementById("resetBtn");
 let bridge = null;
@@ -258,14 +259,14 @@ function sessionCard(row) {
 
 function renderCommands(payload) {
   const commands = payload.commands || [];
-  commandListEl.innerHTML = `<div class="head"><span>功能</span><span>命令</span><span>描述</span><span></span></div>`;
+  commandListEl.innerHTML = `<div class="head"><span>命令</span><span>示例</span><span>描述</span><span></span></div>`;
   for (const row of commands) {
     const el = document.createElement("div");
     el.className = "row";
     el.innerHTML = `
-      <div class="id">${escapeHtml(row.id)}</div>
       <input data-k="command" value="${escapeHtml(row.command || "")}" />
-      <input data-k="desc" value="${escapeHtml(row.desc || "")}" />
+      <div class="cell-text">${escapeHtml(row.example || "")}</div>
+      <div class="cell-text">${escapeHtml(row.desc || "")}</div>
       <button data-act="save" type="button">保存</button>
     `;
     el.querySelector('[data-act="save"]').addEventListener("click", async () => {
@@ -273,7 +274,6 @@ function renderCommands(payload) {
         await bridge.apiPost("page/commands/save", {
           id: row.id,
           command: el.querySelector('[data-k="command"]').value.trim(),
-          desc: el.querySelector('[data-k="desc"]').value.trim(),
         });
         setStatus("已保存");
         await loadCommands();
@@ -282,6 +282,67 @@ function renderCommands(payload) {
       }
     });
     commandListEl.appendChild(el);
+  }
+}
+
+function renderPush(payload) {
+  pushListEl.innerHTML = `<div class="head"><span>命令 / 事件名</span><span>示例</span><span>说明</span><span></span></div>`;
+  const rowHtml = (value, placeholder) => `
+    <input data-k="value" value="${escapeHtml(value || "")}" placeholder="${escapeHtml(placeholder || "")}" />
+    <div class="cell-text"></div>
+    <div class="cell-text"></div>
+  `;
+  for (const row of [payload.open, payload.close]) {
+    const el = document.createElement("div");
+    el.className = "row";
+    el.innerHTML = `
+      ${rowHtml(row.command, "例如 打开")}
+      <div class="cell-text">${escapeHtml(row.example || "")}</div>
+      <div class="cell-text">${row.id === "打开" ? "开启推送" : "关闭推送"}</div>
+      <button data-act="save" type="button">保存</button>
+    `;
+    el.querySelector('[data-act="save"]').addEventListener("click", async () => {
+      try {
+        await bridge.apiPost("page/commands/save", {
+          id: row.id,
+          command: el.querySelector('[data-k="value"]').value.trim(),
+        });
+        setStatus("已保存");
+        await loadPush();
+      } catch (err) {
+        setStatus(err.message || "保存失败", true);
+      }
+    });
+    pushListEl.appendChild(el);
+  }
+  for (const group of payload.groups || []) {
+    const head = document.createElement("div");
+    head.className = "group-head";
+    head.textContent = group.name;
+    pushListEl.appendChild(head);
+    for (const event of group.events || []) {
+      const el = document.createElement("div");
+      el.className = "row";
+      el.innerHTML = `
+        <input data-k="name" value="${escapeHtml(event.name || "")}" />
+        <div class="cell-text">${escapeHtml(payload.open.command)} ${escapeHtml(event.name)}</div>
+        <div class="cell-text">${escapeHtml(event.kind)}</div>
+        <button data-act="save" type="button">保存</button>
+      `;
+      el.querySelector('[data-act="save"]').addEventListener("click", async () => {
+        try {
+          await bridge.apiPost("page/push-commands/save", {
+            action: event.action,
+            name: el.querySelector('[data-k="name"]').value.trim(),
+          });
+          setStatus("已保存");
+          await loadPush();
+        } catch (err) {
+          setStatus(err.message || "保存失败", true);
+        }
+      });
+      pushListEl.appendChild(el);
+    }
   }
 }
 
@@ -321,12 +382,17 @@ async function loadCommands() {
   renderCommands(await bridge.apiGet("page/commands"));
 }
 
+async function loadPush() {
+  renderPush(await bridge.apiGet("page/push-commands"));
+}
+
 async function loadServers() {
   renderServers(await bridge.apiGet("page/servers"));
 }
 
 async function loadCurrent() {
   if (currentView === "commands") return loadCommands();
+  if (currentView === "push") return loadPush();
   if (currentView === "servers") return loadServers();
   return loadSessions();
 }
@@ -353,6 +419,12 @@ resetBtn.addEventListener("click", async () => {
       await bridge.apiPost("page/commands/reset", {});
       setStatus("已恢复默认命令");
       await loadCommands();
+      return;
+    }
+    if (currentView === "push") {
+      await bridge.apiPost("page/push-commands/reset", {});
+      setStatus("已恢复默认推送命令");
+      await loadPush();
       return;
     }
     if (currentView === "servers") {

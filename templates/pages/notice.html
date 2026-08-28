@@ -1,7 +1,8 @@
 {# template-title: 通知管理 #}
 <div class="container notice-page">
     <div class="notice-tip">
-        开启：{{ open_command or "打开" }} 事件类型　关闭：{{ close_command or "关闭" }} 事件类型
+        <div>开启：{{ open_command or "打开" }} 事件类型　关闭：{{ close_command or "关闭" }} 事件类型</div>
+        <div>推送开关仅限管理员操作</div>
     </div>
     {% for group in groups %}
     <section class="notice-group">
