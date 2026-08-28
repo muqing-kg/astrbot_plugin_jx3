@@ -32,6 +32,8 @@ class SessionPageAPI:
             ("/page/sessions/use-global", self.set_use_global, ["POST"], "设置是否使用全局 Token"),
             ("/page/sessions/clear-secret", self.clear_secret, ["POST"], "清除会话密钥"),
             ("/page/sessions/bot", self.set_bot, ["POST"], "设置会话是否启用机器人"),
+            ("/page/sessions/claim", self.clear_claim, ["POST"], "取消认领资格"),
+            ("/page/sessions/managers", self.save_managers, ["POST"], "保存会话授权管理"),
             ("/page/commands", self.list_commands, ["GET"], "列出全局命令"),
             ("/page/commands/save", self.save_command, ["POST"], "保存全局命令"),
             ("/page/commands/reset", self.reset_commands, ["POST"], "恢复默认命令"),
@@ -51,15 +53,25 @@ class SessionPageAPI:
         rows = await self.plugin.sessions.list_bound()
         has_global_ticket = bool(self.plugin._global_ticket())
         has_global_token = bool(self.plugin._global_token())
+        sessions = []
+        for row in rows:
+            item = self.plugin.sessions.public_row(
+                row,
+                has_global_ticket=has_global_ticket,
+                has_global_token=has_global_token,
+                global_token=self.plugin._global_token(),
+                global_ticket=self.plugin._global_ticket(),
+            )
+            item["managers"] = [
+                {
+                    "id": str(manager.get("user_id") or ""),
+                    "name": str(manager.get("name") or manager.get("user_id") or ""),
+                }
+                for manager in await self.plugin.sessions.list_managers(row.get("umo") or "")
+            ]
+            sessions.append(item)
         return self.json_response({
-            "sessions": [
-                self.plugin.sessions.public_row(
-                    row,
-                    has_global_ticket=has_global_ticket,
-                    has_global_token=has_global_token,
-                )
-                for row in rows
-            ],
+            "sessions": sessions,
             "has_global_token": has_global_token,
             "has_global_ticket": has_global_ticket,
             "notice": "该页面仅供 AstrBot 后台主人使用，请勿暴露到公网。",
@@ -107,6 +119,18 @@ class SessionPageAPI:
         token = str(data.get("token") or "").strip()
         if not umo or not token:
             return self.error_response("缺少 umo 或 Token", status_code=400)
+        values = [part.strip() for part in token.replace("，", ",").split(",") if part.strip()]
+        if not values:
+            return self.error_response("Token 不能为空", status_code=400)
+        for index, value in enumerate(values, 1):
+            result = await self.plugin.jx3api.token_stats(value)
+            if result.get("code") != 200 or result.get("valid") is False:
+                detail = str(result.get("msg") or "Token 不可用")
+                message = self.plugin.jx3api._token_error_message(detail)
+                return self.error_response(
+                    f"第 {index} 个 Token 校验失败：{message}",
+                    status_code=400,
+                )
         await self.plugin.sessions.set_token(umo, token)
         return self.json_response({"ok": True})
 
@@ -116,6 +140,23 @@ class SessionPageAPI:
         ticket = str(data.get("ticket") or "").strip()
         if not umo or not ticket:
             return self.error_response("缺少 umo 或推栏标识", status_code=400)
+        values = [part.strip() for part in ticket.replace("，", ",").split(",") if part.strip()]
+        if not values:
+            return self.error_response("推栏标识不能为空", status_code=400)
+        row = await self.plugin.sessions.get(umo)
+        from .session_policy import CREDENTIAL_MISSING
+        probe_token = self.plugin.sessions.resolve_token(row or {}, self.plugin._global_token())
+        if probe_token == CREDENTIAL_MISSING:
+            probe_token = ""
+        elif "," in probe_token:
+            probe_token = probe_token.split(",", 1)[0].strip()
+        for index, value in enumerate(values, 1):
+            ok, msg = await self.plugin.jx3api.validate_ticket(value, probe_token)
+            if not ok:
+                return self.error_response(
+                    f"第 {index} 个推栏标识校验失败：{msg}",
+                    status_code=400,
+                )
         await self.plugin.sessions.set_ticket(umo, ticket)
         return self.json_response({"ok": True})
 
@@ -147,6 +188,39 @@ class SessionPageAPI:
             return self.error_response("缺少 umo", status_code=400)
         await self.plugin.sessions.set_bot_enabled(umo, enabled)
         return self.json_response({"ok": True})
+
+    async def clear_claim(self):
+        data = await self._payload()
+        identity = str(data.get("identity") or "").strip()
+        if not identity:
+            return self.error_response("缺少认领人身份", status_code=400)
+        await self.plugin.sessions.clear_claimant(identity)
+        return self.json_response({"ok": True})
+
+    async def save_managers(self):
+        data = await self._payload()
+        umo = str(data.get("umo") or "").strip()
+        managers_text = str(data.get("managers") or "").strip()
+        if not umo:
+            return self.error_response("缺少 umo", status_code=400)
+        row = await self.plugin.sessions.get(umo)
+        if not row:
+            return self.error_response("未找到该会话", status_code=400)
+        if row.get("is_private"):
+            return self.error_response("私聊会话不支持授权管理", status_code=400)
+        values = [
+            part.strip().lstrip("@")
+            for part in managers_text.replace("，", ",").split(",")
+            if part.strip()
+        ]
+        seen = []
+        for value in values:
+            if value not in seen:
+                seen.append(value)
+        ok, msg = await self.plugin.sessions.replace_managers(umo, seen)
+        if not ok:
+            return self.error_response(msg, status_code=400)
+        return self.json_response({"ok": True, "message": msg})
 
     async def list_commands(self):
         from .command_catalog import public_command_rows

@@ -324,6 +324,8 @@ class JX3APIService:
         text = str(camp or "").strip()
         if text in {"2", "恶人", "恶人谷"}:
             return 2
+        if text in {"1", "浩气", "浩气盟"}:
+            return 1
         return 1
 
     def _wanted_mode(self, mode: str) -> int:
@@ -542,8 +544,13 @@ class JX3APIService:
         )  
 
 
-    async def zhenyingevent(self,name: str,limit: str) -> Dict[str, Any]:
+    async def zhenyingevent(self, name: str, limit: str) -> Dict[str, Any]:
         """阵营事件"""
+        text = str(name or "").strip()
+        if text in {"2", "恶人", "恶人谷"}:
+            name = "恶人谷"
+        elif text in {"1", "浩气", "浩气盟"}:
+            name = "浩气盟"
         # 数据处理
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
             for item in data:
@@ -1158,9 +1165,10 @@ class JX3APIService:
                 return_data["msg"] = "未获取到名片图片"
                 return return_data
 
-            server_name = data.get("serverName")
-            role_name = data.get("roleName")
-            msg = f"{server_name}-{role_name}"
+            zone_name = data.get("zoneName") or ""
+            server_name = data.get("serverName") or ""
+            role_name = data.get("roleName") or ""
+            msg = " · ".join(part for part in (zone_name, server_name, role_name) if part)
 
             return_data["data"] = [
                 Comp.Plain(msg),
@@ -1178,32 +1186,31 @@ class JX3APIService:
     async def shuoyoumingpian(self, server: str, name: str) -> Dict[str, Any]:
         """名片历史"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            statuses = []
             images = []
             for m in data:
-                status = "当前展示" if m.get("showActive") else "未展示"
-                statuses.append(f"第{m.get('showIndex')}张 {status}")
                 url = m.get("showAvatar")
 
                 if not url:
                     logger.warning(f"第{m.get('showIndex')}张名片缺少图片URL，已跳过")
                     continue
 
-                images.append(Comp.Image.fromURL(url))
+                images.append(url)
 
             if not images:
                 return_data["msg"] = "未获取到有效的名片数据"
                 return return_data
 
-            chain = [Comp.Plain("丨".join(statuses))]
-            chain.extend(images)
-            return_data["data"] = chain
+            return_data["data"] = {
+                "images": images,
+                "server": server,
+                "role": name,
+            }
 
         return await self._request_api(
             path="/card/records",
             params={"server": server, "name": name, "token": self.token},
             processor=processor,
-            template=""
+            template="card_gallery.html"
         ) 
 
 
@@ -1998,12 +2005,11 @@ class JX3APIService:
             if opened_at:
                 opened_at = datetime.strptime(opened_at, "%Y-%m-%d %H:%M:%S").strftime("%m月%d日 %H:%M:%S") if len(opened_at) >= 19 else opened_at
             return_data["status"] = status_bool
-            return_data["data"] = (
-                f"{zone_label + '：' if zone_label else ''}{server} 「 {state} 」\n"
-                f"最新版本：{version}\n"
-                f"维护时间：{maintain}\n"
-                f"上次开服：{opened_at}"
-            )
+            lines = [f"{zone_label + '：' if zone_label else ''}{server} 「 {state} 」"]
+            for label, value in (("最新版本", version), ("维护时间", maintain), ("上次开服", opened_at)):
+                if value:
+                    lines.append(f"{label}：{value}")
+            return_data["data"] = "\n".join(lines)
 
         return await self._request_api(
             path="/server/status/check",
@@ -2158,12 +2164,12 @@ class JX3APIService:
         return await self._request_api("/rank/arena", params, processor, "data_list.html")
 
     async def wulinzhengba(self, server: str = "", camp: str = "浩气") -> Dict[str, Any]:
-        """武林争霸"""
+        """武林争霸赛"""
         camp_code = self._camp_code(camp)
         camp_name = "恶人谷" if camp_code == 2 else "浩气盟"
 
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            items = self._rank_items(data, inherit=False)
+            items = self._rank_items(data, inherit=False)[:50]
             rows = []
             for index, item in enumerate(items, 1):
                 rows.append([
@@ -2173,10 +2179,11 @@ class JX3APIService:
                     self._pick(item, "serverName", "server"),
                     self._pick(item, "score", "totalScore", "titlePoint", "value"),
                 ])
-            title = f"武林争霸 {camp_name}"
+            title = f"武林争霸赛 · {camp_name}"
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
             self._set_table(return_data, title, ["排名", "帮会", "帮主", "区服", "积分"], rows, subtitle, "暂无排行数据")
             if return_data.get("data"):
+                return_data["data"]["note"] = "排行榜仅展示前 50 名"
                 return_data["data"]["camp_name"] = camp_name
                 return_data["data"]["camp_class"] = "camp-eren" if camp_code == 2 else "camp-haoqi"
 
@@ -2342,35 +2349,6 @@ class JX3APIService:
 
         return await self._request_api("/trade/item/search", {"name": name, "token": self.token}, processor, "data_list.html")
 
-    async def qiyugonglue(self, name: str) -> Dict[str, Any]:
-        """奇遇攻略"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            payload = data if isinstance(data, dict) else {"name": name, "desc": str(data or "")}
-            rows = []
-            if isinstance(payload, dict):
-                for key, label in (
-                    ("name", "名称"),
-                    ("level", "等级"),
-                    ("type", "类型"),
-                    ("method", "触发"),
-                    ("desc", "说明"),
-                    ("note", "备注"),
-                    ("reward", "奖励"),
-                ):
-                    value = payload.get(key)
-                    if value not in (None, ""):
-                        rows.append([label, str(value)])
-                extras = payload.get("data") or payload.get("list")
-                if isinstance(extras, list):
-                    for item in extras:
-                        rows.append([
-                            self._pick(item, "name", "title", default="条目"),
-                            self._pick(item, "desc", "text", "value"),
-                        ])
-            self._set_table(return_data, f"{name} 奇遇攻略", ["项目", "内容"], rows, empty_msg="暂无攻略内容")
-
-        return await self._request_api("/event/strategy", {"name": name, "token": self.token}, processor, "data_list.html")
-
     async def peizhuang(self, name: str, tags: str = "") -> Dict[str, Any]:
         """配装搜索"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
@@ -2397,29 +2375,33 @@ class JX3APIService:
 
 
     async def token_stats(self, token: str) -> dict:
-
         """查询令牌用量。POST /token/stats"""
         result = self._init_return_data()
         token = (token or "").strip()
         if not token:
             result["msg"] = "未提供 Token"
+            result["valid"] = False
             return result
         data = await self._api.post("https://www.jx3api.com/token/stats", data={"token": token}, out_key=None)
         if not data:
             result["msg"] = "令牌无效或查询失败"
+            result["valid"] = False
             return result
         if isinstance(data, dict) and data.get("_error"):
             result["msg"] = f"JX3API 令牌不可用：{data['_error']}"
+            result["valid"] = False
             return result
         payload = data.get("data") if isinstance(data, dict) and "data" in data else data
         if not isinstance(payload, dict):
             result["msg"] = "令牌无效或查询失败"
+            result["valid"] = False
             return result
         level = payload.get("level")
         used = payload.get("used")
         remaining = payload.get("remaining")
         expire_at = payload.get("expireAt")
         valid = payload.get("valid")
+        result["valid"] = True if valid is None else bool(valid)
         lines = ["JX3API 令牌状态"]
         if valid is not None:
             lines.append("状态：" + ("有效" if valid else "已失效"))
@@ -2444,3 +2426,51 @@ class JX3APIService:
         result["code"] = 200
         result["data"] = "\n".join(lines)
         return result
+
+    async def view_managers(self, display_name: str, rows: list[dict]) -> Dict[str, Any]:
+        """授权管理图片。"""
+        return_data = self._init_return_data()
+        try:
+            return_data["temp"] = await load_template("data_list.html")
+        except FileNotFoundError:
+            logger.error("加载授权管理模板失败")
+            return_data["msg"] = "系统错误：模板文件不存在"
+            return return_data
+        if not rows:
+            return_data["msg"] = "当前没有已授权的插件管理员。"
+            return return_data
+        table_rows = [
+            [
+                str(item.get("rank") or index),
+                str(item.get("role") or "管理员"),
+                str(item.get("name") or "未设置昵称"),
+                str(item.get("identity") or "未获取到身份信息"),
+            ]
+            for index, item in enumerate(rows, 1)
+        ]
+        return_data["data"] = self._table_data(
+            "授权管理",
+            ["序号", "身份", "昵称", "身份信息"],
+            table_rows,
+            subtitle=display_name or "插件管理员",
+            note="认领人不可被删除；授权管理员可管理通知开关与查询令牌。",
+        )
+        return_data["code"] = 200
+        return return_data
+
+    async def validate_ticket(self, ticket: str, token: str = "") -> tuple[bool, str]:
+        """对推栏标识做一次真实接口调用校验。"""
+        ticket = (ticket or "").strip()
+        if not ticket:
+            return False, "未提供推栏标识，请更换后再试。"
+        if "," in ticket or "，" in ticket:
+            return False, "推栏标识需要逐个校验，请一次提交一个。"
+        token = (token or "").strip()
+        if not token:
+            return False, "校验推栏标识需要 JX3API Token，请先配置可用 Token 后再设置推栏。"
+        data = await self._base_request("/school/skills", {"name": "毒经", "token": token, "ticket": ticket})
+        if isinstance(data, dict) and data.get("_error"):
+            return False, "推栏标识校验失败，可能是标识已过期或无效，请更换后再试。"
+        if not data:
+            return False, "推栏标识校验失败，请检查网络后更换重试。"
+        return True, "推栏标识校验通过"

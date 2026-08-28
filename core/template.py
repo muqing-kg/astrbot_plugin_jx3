@@ -31,6 +31,7 @@ _PAGE_KICKER = {
     "bangzhanjilu": "WAR DECL.",
     "chengbeng": "CRAFT COST",
     "chengjiu": "ACHIEVEMENT",
+    "card_gallery": "CARD GALLERY",
     "data_list": "DATA LIST",
     "diaoluo": "LOOT LOG",
     "dilujilu": "DILU LOG",

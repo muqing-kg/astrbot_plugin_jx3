@@ -182,12 +182,19 @@ class MessageBuilder:
         options: dict | None = None,
     ) -> str:
         """渲染 HTML"""
-        return await html_renderer.render_custom_template(
-            tmpl,
-            data,
-            return_url=return_url,
-            options=options,
-        )
+        for attempt in range(2):
+            try:
+                return await html_renderer.render_custom_template(
+                    tmpl,
+                    data,
+                    return_url=return_url,
+                    options=options,
+                )
+            except Exception as e:
+                logger.warning(f"HTML 渲染失败，准备重试: {e}")
+                if attempt == 1:
+                    raise
+        raise RuntimeError("渲染失败")
     
 
     async def plain_msg(self, event: AstrMessageEvent, action):
@@ -200,7 +207,7 @@ class MessageBuilder:
                 await event.send(event.plain_result(data["msg"])) 
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试")) 
+            await event.send(event.plain_result("处理失败，请稍后再试"))
 
 
     async def T2I_image_msg(self, event: AstrMessageEvent, action):
@@ -231,7 +238,7 @@ class MessageBuilder:
 
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试")) 
+            await event.send(event.plain_result("渲染图片失败，请稍后再试"))
 
 
     async def image_msg(self, event: AstrMessageEvent, action):
@@ -245,7 +252,7 @@ class MessageBuilder:
 
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试")) 
+            await event.send(event.plain_result("渲染图片失败，请稍后再试"))
 
 
     async def plain_chain(self, event: AstrMessageEvent, action):
@@ -258,7 +265,7 @@ class MessageBuilder:
                 await event.send(event.plain_result(data["msg"])) 
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result(str(e) or "渲染失败，请稍后重试")) 
+            await event.send(event.plain_result("渲染图片失败，请稍后再试"))
 
 
     @property
@@ -281,6 +288,7 @@ class MessageBuilder:
         timeout: int = 10,
     ):
         text = str(menu_text).rstrip()
+        resolved = False
         if "发送序号即可" not in text:
             text += "\n\n发送序号即可，10 秒后自动选 1"
         await event.send(event.plain_result(text))
@@ -307,21 +315,24 @@ class MessageBuilder:
                 await new_event.send(MessageChain().message("无效序号，结束会话"))
                 controller.stop()
                 return
+            resolved = True
             try:
                 await runner(choice, new_event)
             except Exception as e:
                 logger.error(f"执行命令错误: {e}")
-                await new_event.send(MessageChain().message(str(e) or "处理失败，请稍后重试"))
+                await new_event.send(MessageChain().message("处理失败，请稍后再试"))
             controller.stop()
 
         try:
             await choice_waiter(event)
         except TimeoutError:
+            if resolved:
+                return
             try:
                 await runner(1, event)
             except Exception as e:
                 logger.error(f"默认选项执行错误: {e}")
-                await event.send(event.plain_result(str(e) or "处理失败，请稍后重试"))
+                await event.send(event.plain_result("处理失败，请稍后再试"))
         except Exception:
             logger.error("选择等待异常", exc_info=True)
 
@@ -365,7 +376,14 @@ class MessageBuilder:
             chain = MessageChain()
             chain.message(detail.get("data") or "")
             if detail.get("temp"):
-                url = await self.html_render(detail["temp"], {}, options={})
+                from html import escape
+                text = escape(str(detail.get("temp") or ""), quote=True)
+                text = text.replace("{", "&#123;").replace("}", "&#125;").replace("\n", "<br>")
+                url = await self.html_render(
+                    f"<div style='font-family: sans-serif; padding: 12px;'>{text}</div>",
+                    {},
+                    options={},
+                )
                 chain.url_image(url)
             await reply_event.send(chain)
 
@@ -562,7 +580,7 @@ class MessageBuilder:
         return await self.T2I_image_msg(event, lambda: self.jx3api.kuafumingjian(server, mode))
 
     async def  wulinzhengba(self, event: AstrMessageEvent, server: str = "", camp: str = "浩气"):
-        """ 武林争霸 [服务器] [阵营] """
+        """ 武林争霸赛 [服务器] [阵营] """
         return await self.T2I_image_msg(event, lambda: self.jx3api.wulinzhengba(server, camp))
 
     async def  bukuai(self, event: AstrMessageEvent, server: str = ""):
@@ -627,7 +645,7 @@ class MessageBuilder:
 
     async def  shuoyoumingpian(self, event: AstrMessageEvent, server: str, name: str, ):
         """ 全名片 服务器 角色 """
-        return await self.plain_chain(event, lambda: self.jx3api.shuoyoumingpian(server,name)) 
+        return await self.T2I_image_msg(event, lambda: self.jx3api.shuoyoumingpian(server,name))
 
     async def  shuijimingpian(self, event: AstrMessageEvent,server: str, force: str = "", body: str = "", ):
         """ 随机秀 服务器 门派 体型 """

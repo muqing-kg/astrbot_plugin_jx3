@@ -139,11 +139,11 @@ def inject_server_args(cmd: str, args: list[str], bound: str, resolver=None) -> 
         while core and _is_optional_tail(cmd, core[-1]):
             tail.insert(0, core.pop())
         if not core:
-            return tail
+            return ["", tail[0]] if tail else []
         official = canonicalize_server_token(core[0], resolver)
-        if not official:
-            return UNKNOWN_SERVER
-        return [official] + core[1:] + tail
+        if official:
+            return [official] + core[1:] + tail
+        return core + tail
 
     if cmd == "拍卖":
         if args:
@@ -166,21 +166,25 @@ def inject_server_args(cmd: str, args: list[str], bound: str, resolver=None) -> 
             return [bound] + core + tail
         explicit = core[0]
         official = canonicalize_server_token(explicit, resolver)
-        if not official:
-            return UNKNOWN_SERVER
-        return [official] + core[1:] + tail
+        if official:
+            return [official] + core[1:] + tail
+        if bound:
+            return [bound] + core + tail
+        return UNKNOWN_SERVER
 
     if cmd in SERVER_SECOND_COMMANDS:
+        if not args:
+            return args
         if len(args) >= 2:
             official = canonicalize_server_token(args[1], resolver)
-            if not official:
-                return UNKNOWN_SERVER
-            return [args[0], official] + args[2:]
+            if official:
+                return [args[0], official] + args[2:]
+            if bound:
+                return [args[0], bound] + args[1:]
+            return UNBOUND_SERVER
         if not bound:
             return UNBOUND_SERVER
-        if len(args) == 1:
-            return [args[0], bound]
-        return UNBOUND_SERVER
+        return [args[0], bound]
 
     if cmd == "818":
         if not args:
@@ -203,7 +207,7 @@ class AdminCommand:
     error: str = ""
 
 
-ADMIN_COMMAND_IDS = ("Token", "推栏", "认领", "查询令牌", "绑定", "打开", "关闭")
+ADMIN_COMMAND_IDS = ("Token", "推栏", "认领", "查询令牌", "绑定", "打开", "关闭", "授权管理", "查看管理", "删除管理")
 
 
 def remap_admin_parts(parts: list[str], catalog: dict | None) -> list[str]:
@@ -241,9 +245,23 @@ def parse_admin_command(parts: list[str], is_private: bool) -> AdminCommand:
         action = "set_token" if cmd.lower() == "token" else "set_ticket"
         return AdminCommand(action=action, target=parts[1], value=" ".join(parts[2:]).strip())
     if cmd == "认领":
+        if not is_private:
+            return AdminCommand(error="claim_private_only")
         return AdminCommand(action="claim", value=" ".join(parts[1:]).strip())
     if cmd == "查询令牌":
         return AdminCommand(action="token_stats")
+    if cmd in {"授权管理", "查看管理", "删除管理"}:
+        if is_private:
+            return AdminCommand(error="group_manage_only")
+        if cmd == "授权管理":
+            if len(parts) < 2:
+                return AdminCommand(error="missing_authorize_target")
+            return AdminCommand(action="authorize", target=" ".join(parts[1:]).strip())
+        if cmd == "查看管理":
+            return AdminCommand(action="list_admins")
+        if len(parts) < 2:
+            return AdminCommand(error="missing_manager_index")
+        return AdminCommand(action="deauthorize", value=parts[1].strip())
     if cmd == "绑定":
         if len(parts) < 2:
             return AdminCommand(error="missing_server")
@@ -364,15 +382,43 @@ def hint_claim_ok(name: str) -> str:
     return f"已认领剑网3机器人。当前插件管理员：{name or '已记录'}"
 
 
-def hint_claim_taken(name: str) -> str:
-    return f"该机器人已被认领。当前插件管理员：{name or '已记录'}"
+def hint_private_only_claim(catalog: dict | None = None) -> str:
+    claim = current_command_name(catalog, "认领")
+    return f"{claim} 剑网3机器人 只能在私聊中发送。"
+
+
+def hint_group_only_manage(catalog: dict | None = None) -> str:
+    manager = current_command_name(catalog, "授权管理")
+    viewer = current_command_name(catalog, "查看管理")
+    remover = current_command_name(catalog, "删除管理")
+    return f"{manager}、{viewer}、{remover} 只能在群聊中发送。"
 
 
 def hint_need_claim(catalog: dict | None = None) -> str:
     claim = current_command_name(catalog, "认领")
+    bind = current_command_name(catalog, "绑定")
     return (
-        "绑定区服、打开推送、配置 Token/推栏仅限插件管理员。\n"
-        f"请先由 AstrBot 管理员或认领人发送：{claim} 剑网3机器人"
+        "该操作仅限 AstrBot 管理员或本会话认领人。\n"
+        f"请先在私聊发送：{claim} 剑网3机器人\n"
+        f"每个会话的认领人是第一个绑定成功的人；{bind} 区服名成功后才能成为该群认领人。"
+    )
+
+
+def hint_authorize_usage(catalog: dict | None = None) -> str:
+    authorize = current_command_name(catalog, "授权管理")
+    return f"用法：{authorize} @成员\n请直接 @ 需要授权的成员。"
+
+
+def hint_deauthorize_usage(catalog: dict | None = None) -> str:
+    deauthorize = current_command_name(catalog, "删除管理")
+    return f"用法：{deauthorize} 序号\n例如：{deauthorize} 2"
+
+
+def hint_list_admins_empty(catalog: dict | None = None) -> str:
+    claim = current_command_name(catalog, "认领")
+    return (
+        "当前还没有插件管理员。\n"
+        f"请先由 AstrBot 管理员发送：{claim} 剑网3机器人"
     )
 
 
