@@ -152,7 +152,7 @@ button.ghost {
 .list { display: grid; gap: 8px; }
 .list .row {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr) 88px;
+  grid-template-columns: 220px minmax(180px, 1.1fr) minmax(260px, 1.6fr) 96px;
   gap: 10px;
   align-items: center;
   background: var(--surface);
@@ -171,7 +171,7 @@ button.ghost {
 }
 .head {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr) 88px;
+  grid-template-columns: 220px minmax(180px, 1.1fr) minmax(260px, 1.6fr) 96px;
   gap: 10px;
   color: var(--muted);
   font-size: 12px;

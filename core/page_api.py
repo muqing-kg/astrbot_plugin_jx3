@@ -273,7 +273,7 @@ class SessionPageAPI:
         return self.json_response({"ok": True})
 
     async def list_push_commands(self):
-        from .event_catalog import EVENT_GROUPS, normalize_push_overrides
+        from .event_catalog import EVENT_DESCRIPTIONS, EVENT_GROUPS, normalize_push_overrides
         overrides = normalize_push_overrides(getattr(self.plugin, "push_name_overrides", {}) or {})
         open_name = str((self.plugin.command_catalog.get("打开") or {}).get("command") or "打开")
         close_name = str((self.plugin.command_catalog.get("关闭") or {}).get("command") or "关闭")
@@ -295,6 +295,7 @@ class SessionPageAPI:
                     "kind": item["kind"],
                     "name": overrides.get(str(item["action"]), item["name"]),
                     "default": item["name"],
+                    "desc": EVENT_DESCRIPTIONS.get(item["action"], item["kind"]),
                 })
             groups.append({"name": group["name"], "events": events})
         return self.json_response({

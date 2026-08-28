@@ -339,7 +339,7 @@ class JX3APIService:
     # --- 业务功能函数 ---
     async def helps(self) -> Dict[str, Any]:
         """帮助"""
-        from .command_catalog import help_rows
+        from .command_catalog import HELP_EXCLUDED_COMMAND_IDS, help_rows
         return_data = self._init_return_data()
         
         # 加载模板
@@ -350,7 +350,7 @@ class JX3APIService:
             return_data["msg"] = "系统错误：模板文件不存在"
             return return_data
         catalog = getattr(self, "command_catalog", None)
-        return_data["data"] = {"rows": help_rows(catalog, exclude_ids={"打开", "关闭"})}
+        return_data["data"] = {"rows": help_rows(catalog, exclude_ids=HELP_EXCLUDED_COMMAND_IDS)}
         return_data["code"] = 200
    
         return return_data
@@ -2443,7 +2443,7 @@ class JX3APIService:
             return return_data
         table_rows = [
             [
-                str(item.get("rank") or index),
+                f"{item.get('rank') or index}.",
                 str(item.get("role") or "管理员"),
                 str(item.get("name") or "未设置昵称"),
                 str(item.get("identity") or "未获取到身份信息"),
