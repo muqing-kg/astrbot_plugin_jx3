@@ -1,4 +1,5 @@
 import inspect
+import re
 from pathlib import Path
 from typing import cast
 
@@ -46,10 +47,13 @@ from .core.session_policy import (
     current_command_name,
     format_command_error,
     hint_unknown_server,
+    normalize_system_prefixes,
+    match_system_prefix,
     strip_command_prefix,
 )
 from .core.credentials import reset_request_credentials, set_request_credentials
 from .core.page_api import SessionPageAPI
+from .core.event_catalog import push_arg_map
 from .core.command_catalog import apply_command_overrides, resolve_command, suggest_command
 from .core.server_catalog import apply_alias_overrides, canonical_server
 from .core.plugin_settings import PluginSettings
@@ -66,6 +70,7 @@ class Jx3ApiPlugin(Star):
         super().__init__(context)
         self.conf = config
         self.prefix = self.conf.get("prefix", {}) or {}
+        self.system_prefixes = self._load_system_prefixes()
         if self.prefix.get("enable"):
             logger.info(f"已启用指令前缀功能，前缀为：{self.prefix.get('text')}")
         else:
@@ -90,6 +95,8 @@ class Jx3ApiPlugin(Star):
                 if command_id in self.command_catalog and desc:
                     self.command_catalog[command_id]["desc"] = desc
             self.server_catalog = apply_alias_overrides(await self.settings.server_aliases())
+            self.push_name_overrides = await self.settings.push_name_overrides()
+            self.jx3api.push_names = dict(self.push_name_overrides)
             self.jx3api.command_catalog = self.command_catalog
             await self.jx3at.init_tasks()
             try:
@@ -272,12 +279,71 @@ class Jx3ApiPlugin(Star):
         }
 
     def parse_message(self, text: str) -> list[str] | None:
-        return strip_command_prefix(text, bool(self.prefix.get("enable")), self.prefix.get("text") or "")
+        return strip_command_prefix(
+            text,
+            bool(self.prefix.get("enable")),
+            self.prefix.get("text") or "",
+            self.system_prefixes,
+        )
 
     def _looks_like_command(self, text: str) -> bool:
-        if bool(self.prefix.get("enable")) or (self.prefix.get("text") or "").strip():
-            return True
-        return str(text or "").strip().startswith("/")
+        text = str(text or "").strip()
+        if not text:
+            return False
+        head = match_system_prefix(text, self.system_prefixes)
+        if not head:
+            return False
+        body = text[len(head):].strip()
+        if not body:
+            return False
+        plugin_prefix = (self.prefix.get("text") or "").strip()
+        if plugin_prefix:
+            return body.startswith(plugin_prefix)
+        return True
+
+    def _load_system_prefixes(self) -> list[str]:
+        try:
+            config = getattr(self.context, "astrbot_config", None) or {}
+            raw = config.get("wake_prefix")
+        except Exception:
+            raw = None
+        return normalize_system_prefixes(raw)
+
+    def _mentioned_bot(self, event: AstrMessageEvent) -> bool:
+        try:
+            self_id = str(event.get_self_id() or "").strip()
+        except Exception:
+            self_id = ""
+        if not self_id:
+            return False
+        chains = []
+        for source in (
+            getattr(event, "get_messages", None),
+            getattr(event, "get_message", None),
+        ):
+            try:
+                value = source() if callable(source) else None
+            except Exception:
+                value = None
+            if value is None:
+                continue
+            for nested in (value, getattr(value, "chain", None), getattr(value, "components", None)):
+                if isinstance(nested, (list, tuple)):
+                    chains.append(nested)
+        message_obj = getattr(event, "message_obj", None)
+        if message_obj is not None:
+            components = getattr(message_obj, "message", None)
+            if isinstance(components, (list, tuple)):
+                chains.append(components)
+        for items in chains:
+            for item in items:
+                if str(getattr(item, "type", type(item).__name__)).lower() not in {"at", "mention"}:
+                    continue
+                for attr in ("qq", "uid", "user_id", "target_id", "id"):
+                    if str(getattr(item, attr, "") or "").strip() == self_id:
+                        return True
+        pattern = rf"\[CQ:at[^\]]*?qq=({re.escape(self_id)})(?:[^0-9A-Za-z_-]|$)"
+        return bool(re.search(pattern, str(event.message_str or ""), re.IGNORECASE))
 
     def _event_umo(self, event: AstrMessageEvent) -> str:
         try:
@@ -392,31 +458,53 @@ class Jx3ApiPlugin(Star):
     def _mentioned_target(self, event: AstrMessageEvent, target: str) -> tuple[str, str]:
         user_id = ""
         name = ""
-        try:
-            chain = event.get_message()
-            items = (
-                getattr(chain, "chain", None)
-                or getattr(chain, "components", None)
-                or getattr(chain, "message", None)
-                or []
-            )
+        chains = []
+        for source in (
+            getattr(event, "get_messages", None),
+            getattr(event, "get_message", None),
+        ):
+            try:
+                value = source() if callable(source) else None
+            except Exception:
+                value = None
+            if value is None:
+                continue
+            for nested in (
+                value,
+                getattr(value, "chain", None),
+                getattr(value, "components", None),
+            ):
+                if isinstance(nested, (list, tuple)):
+                    chains.append(nested)
+        message_obj = getattr(event, "message_obj", None)
+        if message_obj is not None:
+            components = getattr(message_obj, "message", None)
+            if isinstance(components, (list, tuple)):
+                chains.append(components)
+        for items in chains:
             for item in items:
-                if str(getattr(item, "type", "")).lower() not in {"at", "mention"}:
+                itype = str(getattr(item, "type", type(item).__name__)).lower()
+                if itype not in {"at", "mention"}:
                     continue
                 for attr in ("qq", "uid", "user_id", "target_id", "id"):
                     value = getattr(item, attr, None)
                     if value not in (None, ""):
                         user_id = str(value).strip()
                         break
-                for attr in ("name", "nickname"):
+                for attr in ("qq_nickname", "name", "nickname"):
                     value = getattr(item, attr, None)
                     if value not in (None, ""):
                         name = str(value).strip().lstrip("@").strip()
                         break
                 if user_id or name:
                     break
-        except Exception:
-            pass
+            if user_id or name:
+                break
+        if not user_id:
+            raw_text = str(event.message_str or "")
+            match = re.search(r"\[CQ:at[^\]]*?qq=([^,\]\s]+)", raw_text, re.IGNORECASE)
+            if match:
+                user_id = match.group(1)
         raw = str(target or "").strip()
         if raw.startswith("@"):
             raw = raw[1:].strip()
@@ -434,6 +522,7 @@ class Jx3ApiPlugin(Star):
         parsed = parse_admin_command(
             remap_admin_parts(parts, self.command_catalog),
             is_private=self._is_private(event),
+            push_args=push_arg_map(getattr(self, "push_name_overrides", {}) or {}),
         )
         if parsed.error == GROUP_SECRET_FORBIDDEN:
             return event.plain_result(hint_group_secret())
@@ -448,7 +537,7 @@ class Jx3ApiPlugin(Star):
             open_cmd = current_command_name(self.command_catalog, "打开")
             close_cmd = current_command_name(self.command_catalog, "关闭")
             notice = current_command_name(self.command_catalog, "通知管理")
-            return event.plain_result(f"用法：{open_cmd} 新闻 或 {close_cmd} 新闻\n发送 {notice} 查看全部事件类型")
+            return event.plain_result(f"用法：{open_cmd} 事件类型 或 {close_cmd} 事件类型\n发送 {notice} 查看全部事件类型")
         if parsed.error == "missing_secret_args":
             token_cmd = current_command_name(self.command_catalog, "Token")
             ticket_cmd = current_command_name(self.command_catalog, "推栏")
@@ -547,7 +636,12 @@ class Jx3ApiPlugin(Star):
             if not ok:
                 return event.plain_result(hint_push_need_bind(self.command_catalog))
             await self.jx3at.refresh_jobs()
-            return event.plain_result(hint_push_ok(parsed.value, parsed.action == "open_push", self.command_catalog))
+            return event.plain_result(hint_push_ok(
+                parsed.value,
+                parsed.action == "open_push",
+                self.command_catalog,
+                label=parsed.label,
+            ))
 
         if parsed.action in {"set_token", "set_ticket"}:
             target = parsed.target.strip()
@@ -703,7 +797,7 @@ class Jx3ApiPlugin(Star):
         await self.jx3cmd.send_command_menu(event, "战功榜", ids, runner)
 
     async def _cmd_card(self, event: AstrMessageEvent, args: list[str]):
-        if len(args) < 2:
+        if not args:
             return event.plain_result(hint_command_usage("名片", self.command_catalog))
         ids = self.jx3cmd.CARD_IDS
         async def runner(choice: int, reply_event: AstrMessageEvent):
@@ -713,6 +807,8 @@ class Jx3ApiPlugin(Star):
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def on_all_message(self, event: AstrMessageEvent):
         if not self.command_map:
+            return
+        if self._mentioned_bot(event):
             return
         parts = self.parse_message(event.message_str)
         if not parts:

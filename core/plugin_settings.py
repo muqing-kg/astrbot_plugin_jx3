@@ -63,6 +63,27 @@ class PluginSettings:
     async def set_server_aliases(self, aliases: dict[str, str]) -> None:
         await self._set("server_aliases", json.dumps(aliases, ensure_ascii=False))
 
+    async def push_name_overrides(self) -> dict[str, str]:
+        raw = await self._get("push_name_overrides")
+        if not raw:
+            return {}
+        try:
+            data = json.loads(raw)
+        except Exception:
+            return {}
+        if not isinstance(data, dict):
+            return {}
+        out = {}
+        for key, value in data.items():
+            action = str(key).strip()
+            name = str(value or "").strip()
+            if action and name:
+                out[action] = name
+        return out
+
+    async def set_push_names(self, overrides: dict[str, str]) -> None:
+        await self._set("push_name_overrides", json.dumps(overrides, ensure_ascii=False))
+
     async def command_descs(self) -> dict[str, str]:
         raw = await self._get("command_descs")
         if not raw:

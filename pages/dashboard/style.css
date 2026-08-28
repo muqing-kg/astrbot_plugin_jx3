@@ -133,6 +133,7 @@ button.ghost {
 .row-actions button {
   min-height: 40px;
   width: 100%;
+  white-space: nowrap;
 }
 .toggle {
   display: flex;
@@ -160,6 +161,14 @@ button.ghost {
   padding: 10px 12px;
 }
 .list .row .id { color: var(--muted); font-size: 12px; }
+.cell-text { color: var(--muted); font-size: 13px; min-width: 0; overflow-wrap: anywhere; }
+.group-head {
+  margin-top: 12px;
+  padding: 0 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
 .head {
   display: grid;
   grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr) 88px;

@@ -37,6 +37,9 @@ class SessionPageAPI:
             ("/page/commands", self.list_commands, ["GET"], "列出全局命令"),
             ("/page/commands/save", self.save_command, ["POST"], "保存全局命令"),
             ("/page/commands/reset", self.reset_commands, ["POST"], "恢复默认命令"),
+            ("/page/push-commands", self.list_push_commands, ["GET"], "列出主动推送命令"),
+            ("/page/push-commands/save", self.save_push_name, ["POST"], "保存推送事件名"),
+            ("/page/push-commands/reset", self.reset_push_names, ["POST"], "恢复默认推送事件名"),
             ("/page/servers", self.list_servers, ["GET"], "列出区服别名"),
             ("/page/servers/save", self.save_server, ["POST"], "保存区服别名"),
             ("/page/servers/reset", self.reset_servers, ["POST"], "恢复默认区服别名"),
@@ -224,8 +227,12 @@ class SessionPageAPI:
 
     async def list_commands(self):
         from .command_catalog import public_command_rows
+        rows = [
+            row for row in public_command_rows(self.plugin.command_catalog)
+            if row["id"] not in {"打开", "关闭"}
+        ]
         return self.json_response({
-            "commands": public_command_rows(self.plugin.command_catalog),
+            "commands": rows,
             "notice": "命令修改全局生效。改名后只认新命令，不再认旧命令。",
         })
 
@@ -263,6 +270,71 @@ class SessionPageAPI:
         await self.plugin.settings.set_command_catalog({}, {})
         self.plugin.command_catalog = apply_command_overrides({})
         self.plugin.jx3api.command_catalog = self.plugin.command_catalog
+        return self.json_response({"ok": True})
+
+    async def list_push_commands(self):
+        from .event_catalog import EVENT_GROUPS, normalize_push_overrides
+        overrides = normalize_push_overrides(getattr(self.plugin, "push_name_overrides", {}) or {})
+        open_name = str((self.plugin.command_catalog.get("打开") or {}).get("command") or "打开")
+        close_name = str((self.plugin.command_catalog.get("关闭") or {}).get("command") or "关闭")
+
+        def command_row(command_id: str) -> dict[str, str]:
+            name = open_name if command_id == "打开" else close_name
+            return {
+                "id": command_id,
+                "command": name,
+                "example": f"{name} 事件类型",
+            }
+
+        groups = []
+        for group in EVENT_GROUPS:
+            events = []
+            for item in group["items"]:
+                events.append({
+                    "action": str(item["action"]),
+                    "kind": item["kind"],
+                    "name": overrides.get(str(item["action"]), item["name"]),
+                    "default": item["name"],
+                })
+            groups.append({"name": group["name"], "events": events})
+        return self.json_response({
+            "open": command_row("打开"),
+            "close": command_row("关闭"),
+            "groups": groups,
+            "notice": "主动推送命令与事件名修改后全局生效，只认新名称。",
+        })
+
+    async def save_push_name(self):
+        from .event_catalog import (
+            effective_push_items,
+            has_duplicate_push_names,
+            normalize_push_overrides,
+        )
+        data = await self._payload()
+        action = str(data.get("action") or "").strip()
+        name = str(data.get("name") or "").strip()
+        if not action or not name:
+            return self.error_response("缺少事件或名称", status_code=400)
+        valid = {str(item["action"]) for item in effective_push_items()}
+        if action not in valid:
+            return self.error_response("未找到该事件", status_code=400)
+        overrides = normalize_push_overrides(getattr(self.plugin, "push_name_overrides", {}) or {})
+        default_names = {str(item["action"]): str(item["name"]) for item in effective_push_items()}
+        if name == default_names.get(action, ""):
+            overrides.pop(action, None)
+        else:
+            overrides[action] = name
+        if has_duplicate_push_names(overrides):
+            return self.error_response("该事件名与其他事件重名，请更换。", status_code=400)
+        await self.plugin.settings.set_push_names(overrides)
+        self.plugin.push_name_overrides = dict(overrides)
+        self.plugin.jx3api.push_names = dict(overrides)
+        return self.json_response({"ok": True})
+
+    async def reset_push_names(self):
+        await self.plugin.settings.set_push_names({})
+        self.plugin.push_name_overrides = {}
+        self.plugin.jx3api.push_names = {}
         return self.json_response({"ok": True})
 
     async def list_servers(self):

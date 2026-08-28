@@ -231,6 +231,11 @@ class MessageBuilder:
                         data["data"]["page_quote"] = str(quote["data"]).strip()
                 if not data["data"].get("page_meta"):
                     data["data"]["page_meta"] = build_page_meta(data.get("temp") or "", data["data"])
+                note = str(data["data"].get("note") or "").strip()
+                if note:
+                    meta = str(data["data"].get("page_meta") or "").strip()
+                    if note not in meta:
+                        data["data"]["page_meta"] = " · ".join(part for part in (meta, note) if part)
                 url = await self.html_render(data["temp"], data["data"], options=options)
                 await event.send(event.image_result(url)) 
             else:
@@ -296,6 +301,7 @@ class MessageBuilder:
 
         @session_waiter(timeout=timeout)
         async def choice_waiter(controller: SessionController, new_event: AstrMessageEvent):
+            nonlocal resolved
             if new_event.get_sender_id() != user_id:
                 return
             msg = new_event.get_message_str().strip()
