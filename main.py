@@ -112,18 +112,20 @@ class Jx3ApiPlugin(Star):
         logger.info("jx3api 异步插件初始化完成")
 
     async def terminate(self):
-        if self.jx3at:
-            await self.jx3at.destroy()
-        if self.jx3api:
-            await self.jx3api.close()
-        if self.aijx3:
-            await self.aijx3.close()
-        if self.jx3box:
-            await self.jx3box.close()
-        if self.local_sql_db:
-            await self.local_sql_db.close()
-        if self.plugin_sql_db:
-            await self.plugin_sql_db.close()
+        for closer in (
+            self.jx3at.destroy if self.jx3at else None,
+            self.jx3api.close if self.jx3api else None,
+            self.aijx3.close if self.aijx3 else None,
+            self.jx3box.close if self.jx3box else None,
+            self.local_sql_db.close if self.local_sql_db else None,
+            self.plugin_sql_db.close if self.plugin_sql_db else None,
+        ):
+            if closer is None:
+                continue
+            try:
+                await closer()
+            except Exception:
+                logger.exception("插件资源释放失败")
         logger.info("jx3api插件已卸载/停用")
 
     def get_data_path(self):
