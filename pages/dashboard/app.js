@@ -93,7 +93,10 @@ function renderSessions(payload) {
   const sessions = payload.sessions || [];
   cardsEl.innerHTML = "";
   if (!sessions.length) {
-    cardsEl.innerHTML = '<div class="empty">暂无已绑定区服的群/私聊。先在对应会话发送 绑定 区服名。</div>';
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "暂无已绑定区服的群/私聊。先在对应会话发送 绑定 区服名。";
+    cardsEl.appendChild(empty);
     return;
   }
   for (const row of sessions) {
@@ -111,6 +114,7 @@ function sessionCard(row) {
         <p class="umo">${escapeHtml(row.umo || "")}</p>
       </div>
       <div class="pills">
+        ${pill("认领人 " + (row.claim_name || row.claim_identity || "未认领"), Boolean(row.claim_identity))}
         ${pill(row.server || "未绑定区服", Boolean(row.server))}
         ${pill("Token " + (row.token_status || "未配置"), Boolean(row.has_token))}
         ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
@@ -141,7 +145,7 @@ function sessionCard(row) {
       <div class="row">
         <label class="field">
           <span>JX3API Token</span>
-          <input data-k="token" type="password" placeholder="填写后保存，不回显原文" />
+          <input data-k="token" value="${escapeHtml(row.token_value || "")}" placeholder="多个用逗号分隔" />
         </label>
         <div class="row-actions">
           <button data-act="token" type="button">保存 Token</button>
@@ -151,13 +155,35 @@ function sessionCard(row) {
       <div class="row">
         <label class="field">
           <span>推栏标识</span>
-          <input data-k="ticket" type="password" placeholder="填写后保存，不回显原文" />
+          <input data-k="ticket" value="${escapeHtml(row.ticket_value || "")}" placeholder="多个用逗号分隔" />
         </label>
         <div class="row-actions">
           <button data-act="ticket" type="button">保存推栏</button>
           <button data-act="clear-ticket" class="ghost" type="button">清除推栏</button>
         </div>
       </div>
+      ${row.is_private ? "" : `
+      <div class="row">
+        <label class="field">
+          <span>授权管理</span>
+          <input data-k="managers" value="${escapeHtml((row.managers || []).map(m => m.name || m).join(","))}" placeholder="仅展示或移除已有授权，新增请群聊发送 授权管理 @成员" />
+        </label>
+        <div class="row-actions">
+          <button data-act="save-managers" type="button">保存管理</button>
+        </div>
+      </div>
+      `}
+      ${row.claim_identity ? `
+      <div class="row">
+        <label class="field">
+          <span>认领人</span>
+          <span class="static-text">${escapeHtml(row.claim_name || row.claim_identity)}</span>
+        </label>
+        <div class="row-actions">
+          <button data-act="clear-claim" class="ghost" type="button">取消认领资格</button>
+        </div>
+      </div>
+      ` : ""}
     </div>
   `;
 
@@ -178,6 +204,8 @@ function sessionCard(row) {
     const server = card.querySelector('[data-k="server"]').value.trim();
     const token = card.querySelector('[data-k="token"]').value.trim();
     const ticket = card.querySelector('[data-k="ticket"]').value.trim();
+    const managerEl = card.querySelector('[data-k="managers"]');
+    const managers = managerEl ? managerEl.value.trim() : "";
     if (act === "bind") {
       if (!row.umo || !server) return setStatus("请填写区服", true);
       await run(() => bridge.apiPost("page/sessions/bind", { umo: row.umo, server }));
@@ -187,6 +215,11 @@ function sessionCard(row) {
     } else if (act === "ticket") {
       if (!row.umo || !ticket) return setStatus("请填写推栏标识", true);
       await run(() => bridge.apiPost("page/sessions/ticket", { umo: row.umo, ticket }));
+    } else if (act === "save-managers") {
+      if (!row.umo) return setStatus("缺少 UMO", true);
+      await run(() => bridge.apiPost("page/sessions/managers", { umo: row.umo, managers }));
+    } else if (act === "clear-claim") {
+      await run(() => bridge.apiPost("page/sessions/claim", { identity: row.claim_identity }));
     } else if (act === "clear-server") {
       await run(() => bridge.apiPost("page/sessions/clear-server", { umo: row.umo }));
     } else if (act === "clear-token") {

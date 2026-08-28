@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from difflib import SequenceMatcher
+
 DEFAULT_COMMAND_ROWS = [
     {
         'id': '日常',
@@ -404,10 +406,10 @@ DEFAULT_COMMAND_ROWS = [
     {
         'id': '武林争霸',
         'group': '排行榜单',
-        'command': '武林争霸',
-        'command_tpl': '武林争霸 [服务器] [阵营]',
-        'example_tpl': '武林争霸 飞龙在天',
-        'desc': '排行榜单 / 武林争霸',
+        'command': '武林争霸赛',
+        'command_tpl': '武林争霸赛 [服务器] [阵营]',
+        'example_tpl': '武林争霸赛 飞龙在天',
+        'desc': '排行榜单 / 武林争霸赛',
     },
     {
         'id': '捕快荣誉榜',
@@ -530,6 +532,14 @@ DEFAULT_COMMAND_ROWS = [
         'desc': '排行榜单 / 恶人爱心排行',
     },
     {
+        'id': '试炼之地',
+        'group': '排行榜单',
+        'command': '试炼之地排行',
+        'command_tpl': '试炼之地排行 [服务器] [心法]',
+        'example_tpl': '试炼之地排行 飞龙在天 剑纯',
+        'desc': '排行榜单 / 试炼之地排行',
+    },
+    {
         'id': '赛季恶人战功榜',
         'group': '排行榜单',
         'command': '赛季恶人战功榜',
@@ -592,14 +602,6 @@ DEFAULT_COMMAND_ROWS = [
         'command_tpl': '战功榜 [阵营]',
         'example_tpl': '战功榜 恶人',
         'desc': '排行榜单 / 战功榜',
-    },
-    {
-        'id': '试炼之地',
-        'group': '排行榜单',
-        'command': '试炼之地',
-        'command_tpl': '试炼之地 [服务器] [心法]',
-        'example_tpl': '试炼之地 飞龙在天 剑纯',
-        'desc': '排行榜单 / 试炼之地',
     },
     {
         'id': '百战',
@@ -752,6 +754,30 @@ DEFAULT_COMMAND_ROWS = [
         'command_tpl': '查询令牌',
         'example_tpl': '查询令牌',
         'desc': '会话设置 / 查询令牌',
+    },
+    {
+        'id': '授权管理',
+        'group': '会话设置',
+        'command': '授权管理',
+        'command_tpl': '授权管理 [@成员]',
+        'example_tpl': '授权管理 @唐小珂',
+        'desc': '会话设置 / 授权管理',
+    },
+    {
+        'id': '查看管理',
+        'group': '会话设置',
+        'command': '查看管理',
+        'command_tpl': '查看管理',
+        'example_tpl': '查看管理',
+        'desc': '会话设置 / 查看管理',
+    },
+    {
+        'id': '删除管理',
+        'group': '会话设置',
+        'command': '删除管理',
+        'command_tpl': '删除管理 [序号]',
+        'example_tpl': '删除管理 2',
+        'desc': '会话设置 / 删除管理',
     },
     {
         'id': '通知管理',
@@ -915,6 +941,54 @@ def resolve_command(catalog: dict, trigger: str) -> str | None:
     return None
 
 
+def _command_similarity(left: str, right: str) -> float:
+    left = (left or "").strip()
+    right = (right or "").strip()
+    if not left or not right:
+        return 0.0
+    if left == right:
+        return 1.0
+    base = SequenceMatcher(None, left, right).ratio()
+    if abs(len(left) - len(right)) == 1:
+        shorter = left if len(left) < len(right) else right
+        longer = right if len(right) > len(left) else left
+        for index in range(len(longer)):
+            if longer[:index] + longer[index + 1:] == shorter:
+                return max(base, 0.86)
+    if len(left) == len(right):
+        diff = sum(1 for a, b in zip(left, right) if a != b)
+        if diff == 1:
+            return max(base, 0.90)
+    if right.startswith(left):
+        return max(base, 0.66)
+    return base
+
+
+def suggest_command(catalog: dict | None, trigger: str) -> str | None:
+    catalog = catalog or DEFAULT_COMMANDS
+    trigger = (trigger or "").strip()
+    if not trigger:
+        return None
+    candidates = []
+    for command_id, row in catalog.items():
+        name = str(row.get("command") or "")
+        if not name:
+            continue
+        score = _command_similarity(trigger, name)
+        if score > 0:
+            candidates.append((score, name, command_id))
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: (-item[0], len(item[1])))
+    best = candidates[0]
+    if best[0] < 0.7:
+        return None
+    second = candidates[1] if len(candidates) > 1 else (0.0, "", "")
+    if best[0] - second[0] < 0.08:
+        return None
+    return best[2]
+
+
 def _replace_command_text(text: str, old: str, new: str) -> str:
     if not text:
         return text
@@ -949,7 +1023,7 @@ def help_rows(
             "group": item["group"],
             "command": _replace_command_text(item["command_tpl"], old, new),
             "example": _replace_command_text(item["example_tpl"], old, new),
-            "desc": str(row.get("desc") or item["desc"]),
+            "desc": _replace_command_text(str(row.get("desc") or item["desc"]), old, new),
         })
     return rows
 
@@ -964,6 +1038,8 @@ def public_command_rows(catalog: dict | None = None) -> list[dict]:
         desc = str(row.get("desc") or "")
         if not desc or desc == f"{item['group']} / {item['id']}":
             desc = _replace_command_text(str(item.get("command_tpl") or item["id"]), old, new)
+        else:
+            desc = _replace_command_text(desc, old, new)
         rows.append({
             "id": item["id"],
             "group": item["group"],

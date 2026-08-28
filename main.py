@@ -22,12 +22,16 @@ from .core.session_policy import (
     UNBOUND_SERVER,
     UNKNOWN_SERVER,
     CLAIM_PHRASE,
+    hint_authorize_usage,
     hint_bind_ok,
     hint_claim_ok,
     hint_claim_phrase,
-    hint_claim_taken,
+    hint_deauthorize_usage,
+    hint_group_only_manage,
     hint_group_secret,
+    hint_list_admins_empty,
     hint_need_claim,
+    hint_private_only_claim,
     hint_need_ticket,
     hint_need_token,
     hint_push_need_bind,
@@ -46,7 +50,7 @@ from .core.session_policy import (
 )
 from .core.credentials import reset_request_credentials, set_request_credentials
 from .core.page_api import SessionPageAPI
-from .core.command_catalog import apply_command_overrides, resolve_command
+from .core.command_catalog import apply_command_overrides, resolve_command, suggest_command
 from .core.server_catalog import apply_alias_overrides, canonical_server
 from .core.plugin_settings import PluginSettings
 
@@ -54,7 +58,7 @@ from .core.plugin_settings import PluginSettings
 @register("astrbot_plugin_jx3",
           "muqing-kg",
           "聚合剑网三游戏数据，提供查询、图片渲染和后台推送。",
-          "3.3.6",
+          "3.3.8",
           "https://github.com/muqing-kg/astrbot_plugin_jx3"
 )
 class Jx3ApiPlugin(Star):
@@ -270,18 +274,69 @@ class Jx3ApiPlugin(Star):
     def parse_message(self, text: str) -> list[str] | None:
         return strip_command_prefix(text, bool(self.prefix.get("enable")), self.prefix.get("text") or "")
 
+    def _looks_like_command(self, text: str) -> bool:
+        if bool(self.prefix.get("enable")) or (self.prefix.get("text") or "").strip():
+            return True
+        return str(text or "").strip().startswith("/")
+
     def _event_umo(self, event: AstrMessageEvent) -> str:
         try:
             return str(event.unified_msg_origin or "").strip()
         except Exception:
             return ""
 
+    def _sender_name(self, event: AstrMessageEvent) -> str:
+        try:
+            if hasattr(event, "get_sender_name") and callable(event.get_sender_name):
+                name = str(event.get_sender_name() or "").strip()
+                if name:
+                    return name
+        except Exception:
+            pass
+        try:
+            message_obj = getattr(event, "message_obj", None)
+            if message_obj:
+                for owner in (getattr(message_obj, "user", None), getattr(message_obj, "sender", None)):
+                    if owner is None:
+                        continue
+                    for attr in ("nickname", "card", "name", "user_name"):
+                        value = getattr(owner, attr, None)
+                        if value not in (None, ""):
+                            return str(value).strip()
+        except Exception:
+            pass
+        return self._sender_id(event)
+
+    def _group_display_name(self, event: AstrMessageEvent) -> str:
+        try:
+            if hasattr(event, "get_group_name") and callable(event.get_group_name):
+                name = str(event.get_group_name() or "").strip()
+                if name:
+                    return name
+        except Exception:
+            pass
+        try:
+            message_obj = getattr(event, "message_obj", None)
+            if message_obj:
+                group = getattr(message_obj, "group", None)
+                if group:
+                    for attr in ("group_name", "name", "nickname"):
+                        value = getattr(group, attr, None)
+                        if value not in (None, ""):
+                            return str(value).strip()
+        except Exception:
+            pass
+        return ""
+
     def _event_display_name(self, event: AstrMessageEvent) -> str:
         try:
             group_id = str(event.get_group_id() or "").strip()
             if group_id:
-                return f"群 {group_id}"
+                return self._group_display_name(event) or f"群 {group_id}"
             sender = str(event.get_sender_id() or "").strip()
+            name = self._sender_name(event)
+            if name and name != sender:
+                return name
             return f"私聊 {sender}" if sender else ""
         except Exception:
             return ""
@@ -309,10 +364,65 @@ class Jx3ApiPlugin(Star):
         except Exception:
             return False
 
-    async def _is_plugin_admin(self, event: AstrMessageEvent) -> bool:
+    async def _is_owner_admin(self, event: AstrMessageEvent) -> bool:
         if self._is_astrbot_admin(event):
             return True
         return await self.sessions.is_claimed_admin(self._sender_id(event))
+
+    async def _is_session_owner_admin(self, event: AstrMessageEvent, umo: str = "") -> bool:
+        if self._is_astrbot_admin(event):
+            return True
+        umo = umo or self._event_umo(event)
+        return await self.sessions.is_session_owner(
+            umo,
+            self._sender_id(event),
+            self._sender_name(event),
+        )
+
+    async def _is_plugin_admin(self, event: AstrMessageEvent, umo: str = "") -> bool:
+        if self._is_astrbot_admin(event):
+            return True
+        umo = umo or self._event_umo(event)
+        return await self.sessions.is_manager(
+            umo,
+            self._sender_id(event),
+            self._sender_name(event),
+        )
+
+    def _mentioned_target(self, event: AstrMessageEvent, target: str) -> tuple[str, str]:
+        user_id = ""
+        name = ""
+        try:
+            chain = event.get_message()
+            items = (
+                getattr(chain, "chain", None)
+                or getattr(chain, "components", None)
+                or getattr(chain, "message", None)
+                or []
+            )
+            for item in items:
+                if str(getattr(item, "type", "")).lower() not in {"at", "mention"}:
+                    continue
+                for attr in ("qq", "uid", "user_id", "target_id", "id"):
+                    value = getattr(item, attr, None)
+                    if value not in (None, ""):
+                        user_id = str(value).strip()
+                        break
+                for attr in ("name", "nickname"):
+                    value = getattr(item, attr, None)
+                    if value not in (None, ""):
+                        name = str(value).strip().lstrip("@").strip()
+                        break
+                if user_id or name:
+                    break
+        except Exception:
+            pass
+        raw = str(target or "").strip()
+        if raw.startswith("@"):
+            raw = raw[1:].strip()
+        if not user_id and not name and raw:
+            name = raw
+        return user_id, name
 
     def _global_token(self) -> str:
         return str(self.conf.get("jx3api_token", "") or "").strip()
@@ -321,9 +431,16 @@ class Jx3ApiPlugin(Star):
         return str(self.conf.get("jx3api_ticket", "") or "").strip()
 
     async def _handle_admin_command(self, event: AstrMessageEvent, parts: list[str]):
-        parsed = parse_admin_command(remap_admin_parts(parts, self.command_catalog), is_private=self._is_private(event))
+        parsed = parse_admin_command(
+            remap_admin_parts(parts, self.command_catalog),
+            is_private=self._is_private(event),
+        )
         if parsed.error == GROUP_SECRET_FORBIDDEN:
             return event.plain_result(hint_group_secret())
+        if parsed.error == "claim_private_only":
+            return event.plain_result(hint_private_only_claim(self.command_catalog))
+        if parsed.error == "group_manage_only":
+            return event.plain_result(hint_group_only_manage(self.command_catalog))
         if parsed.error == "missing_server":
             bind = current_command_name(self.command_catalog, "绑定")
             return event.plain_result(f"用法：{bind} 区服名\n例如：{bind} 梦江南")
@@ -336,36 +453,60 @@ class Jx3ApiPlugin(Star):
             token_cmd = current_command_name(self.command_catalog, "Token")
             ticket_cmd = current_command_name(self.command_catalog, "推栏")
             return event.plain_result(f"用法：{token_cmd} <UMO> <Token> 或 {ticket_cmd} <UMO> <推栏标识>")
+        if parsed.error == "missing_authorize_target":
+            return event.plain_result(hint_authorize_usage(self.command_catalog))
+        if parsed.error == "missing_manager_index":
+            return event.plain_result(hint_deauthorize_usage(self.command_catalog))
         if parsed.error:
             return None
 
         if parsed.action == "claim":
             if parsed.value != CLAIM_PHRASE:
                 return event.plain_result(hint_claim_phrase(self.command_catalog))
-            if not (self._is_astrbot_admin(event) or not ((await self.sessions.get_admin()) or {}).get("user_id")):
-                # 已有认领人时，仅 AstrBot 管理员或本人可重复认领
-                if not await self._is_plugin_admin(event):
-                    admin = await self.sessions.get_admin()
-                    return event.plain_result(hint_claim_taken((admin or {}).get("name") or ""))
-            ok, name = await self.sessions.claim_admin(self._sender_id(event), event.get_sender_name() if hasattr(event, "get_sender_name") else "")
+            ok, name = await self.sessions.claim_admin(self._sender_id(event), self._sender_name(event))
             if not ok:
-                return event.plain_result(hint_claim_taken(name))
+                return event.plain_result(hint_claim_phrase(self.command_catalog))
             return event.plain_result(hint_claim_ok(name))
 
-        if parsed.action == "token_stats":
-            if not await self._is_plugin_admin(event):
+        if parsed.action in {"authorize", "deauthorize", "list_admins"}:
+            if not await self._is_session_owner_admin(event):
                 return event.plain_result(hint_need_claim(self.command_catalog))
             umo = self._event_umo(event)
+            if parsed.action == "authorize":
+                uid, name = self._mentioned_target(event, parsed.target)
+                if not uid and not name:
+                    return event.plain_result(hint_authorize_usage(self.command_catalog))
+                ok, msg = await self.sessions.add_manager(umo, uid, name)
+                if not ok:
+                    return event.plain_result(msg)
+                viewer = current_command_name(self.command_catalog, "查看管理")
+                return event.plain_result(f"已授权管理员：{name or uid}\n发送 {viewer} 可查看当前管理员列表。")
+            if parsed.action == "deauthorize":
+                ok, msg = await self.sessions.remove_manager(umo, parsed.value)
+                return event.plain_result(msg)
+            snapshot = await self.sessions.manager_snapshot(umo)
+            if not snapshot:
+                return event.plain_result(hint_list_admins_empty(self.command_catalog))
+            return await self.jx3cmd.T2I_image_msg(
+                event,
+                lambda: self.jx3api.view_managers(self._event_display_name(event), snapshot),
+            )
+
+        if parsed.action == "token_stats":
+            umo = self._event_umo(event)
+            if not await self._is_plugin_admin(event, umo=umo):
+                return event.plain_result(hint_need_claim(self.command_catalog))
             row = await self.sessions.get(umo)
             session_token = ((row or {}).get("token") or "").strip()
             global_token = self._global_token()
+            use_global = bool((row or {}).get("use_global_token"))
             blocks = []
             if session_token:
                 data = await self.jx3api.token_stats(session_token)
                 title = "【该群 Token】" if not self._is_private(event) else "【该会话 Token】"
                 body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
                 blocks.append(title + "\n" + body)
-            if global_token and global_token != session_token:
+            if use_global and global_token and global_token != session_token:
                 data = await self.jx3api.token_stats(global_token)
                 body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
                 blocks.append("【全局 Token】\n" + body)
@@ -374,20 +515,34 @@ class Jx3ApiPlugin(Star):
             return event.plain_result("\n\n".join(blocks))
 
         if parsed.action == "bind":
-            if not await self._is_plugin_admin(event):
+            if not await self._is_owner_admin(event):
                 return event.plain_result(hint_need_claim(self.command_catalog))
             umo = self._event_umo(event)
             official = canonical_server(self.server_catalog, parsed.value)
             if not official:
                 return event.plain_result("未识别的区服。请使用正式区服名或已配置的别名。")
-            await self.sessions.bind_server(umo, official, self._event_display_name(event))
+            await self.sessions.bind_server(
+                umo,
+                official,
+                self._event_display_name(event),
+                is_private=self._is_private(event),
+            )
+            await self.sessions.set_session_claim(
+                umo,
+                self._sender_id(event),
+                self._sender_name(event),
+            )
             return event.plain_result(hint_bind_ok(official))
 
         if parsed.action in {"open_push", "close_push"}:
-            if not await self._is_plugin_admin(event):
-                return event.plain_result(hint_need_claim(self.command_catalog))
             umo = self._event_umo(event)
-            await self.sessions.ensure(umo, self._event_display_name(event))
+            if not await self._is_plugin_admin(event, umo=umo):
+                return event.plain_result(hint_need_claim(self.command_catalog))
+            await self.sessions.ensure(
+                umo,
+                self._event_display_name(event),
+                is_private=self._is_private(event),
+            )
             ok, msg = await self.sessions.set_push(umo, parsed.value, parsed.action == "open_push")
             if not ok:
                 return event.plain_result(hint_push_need_bind(self.command_catalog))
@@ -395,17 +550,37 @@ class Jx3ApiPlugin(Star):
             return event.plain_result(hint_push_ok(parsed.value, parsed.action == "open_push", self.command_catalog))
 
         if parsed.action in {"set_token", "set_ticket"}:
-            if not await self._is_plugin_admin(event):
-                return event.plain_result(hint_need_claim(self.command_catalog))
             target = parsed.target.strip()
             row = await self.sessions.get(target)
             if not row:
                 return event.plain_result(hint_umo_invalid())
+            values = [part.strip() for part in parsed.value.replace("，", ",").split(",") if part.strip()]
+            if not values:
+                label = "Token" if parsed.action == "set_token" else "推栏标识"
+                return event.plain_result(f"请填写需要保存的 {label}。")
             if parsed.action == "set_token":
+                for index, value in enumerate(values, 1):
+                    data = await self.jx3api.token_stats(value)
+                    if data.get("code") != 200 or data.get("valid") is False:
+                        detail = str(data.get("msg") or "Token 不可用")
+                        if "过期" in detail:
+                            detail = "JX3API Token 已过期，请更换后再试。"
+                        elif any(key in detail for key in ("次数", "余额", "额度", "不足", "用尽")):
+                            detail = "JX3API Token 次数已用尽，请更换或续费后再试。"
+                        return event.plain_result(f"第 {index} 个 Token 校验失败：{detail}")
                 await self.sessions.set_token(target, parsed.value)
-                return event.plain_result(hint_secret_saved("token", target))
+                return event.plain_result(hint_secret_saved("token", target) + "\n已通过 JX3API 校验。")
+            probe_token = self.sessions.resolve_token(row, self._global_token())
+            if probe_token == CREDENTIAL_MISSING:
+                probe_token = ""
+            elif "," in probe_token:
+                probe_token = probe_token.split(",", 1)[0].strip()
+            for index, value in enumerate(values, 1):
+                ok, msg = await self.jx3api.validate_ticket(value, probe_token)
+                if not ok:
+                    return event.plain_result(f"第 {index} 个推栏标识校验失败：{msg}")
             await self.sessions.set_ticket(target, parsed.value)
-            return event.plain_result(hint_secret_saved("ticket", target))
+            return event.plain_result(hint_secret_saved("ticket", target) + "\n已通过真实接口校验。")
         return None
 
     async def _call_with_auto_args(self, handler, event: AstrMessageEvent, args: list[str]):
@@ -462,7 +637,11 @@ class Jx3ApiPlugin(Star):
         if not handler:
             return event.plain_result(f"该功能暂不可用：{cmd_id}")
 
-        row = await self.sessions.ensure(self._event_umo(event), self._event_display_name(event))
+        row = await self.sessions.ensure(
+            self._event_umo(event),
+            self._event_display_name(event),
+            is_private=self._is_private(event),
+        )
         bound = (row.get("server") or "").strip()
         injected = inject_server_args(
             cmd_id,
@@ -540,7 +719,11 @@ class Jx3ApiPlugin(Star):
             return
 
         umo = self._event_umo(event)
-        row = await self.sessions.ensure(umo, self._event_display_name(event))
+        row = await self.sessions.ensure(
+            umo,
+            self._event_display_name(event),
+            is_private=self._is_private(event),
+        )
         claim_cmd = ((self.command_catalog.get("认领") or {}).get("command") or "认领")
         if not self.sessions.is_bot_enabled(row) and parts[0] != claim_cmd:
             return
@@ -554,6 +737,12 @@ class Jx3ApiPlugin(Star):
         trigger, *args = parts
         cmd = resolve_command(self.command_catalog, trigger)
         if not cmd:
+            if self._looks_like_command(event.message_str):
+                suggested = suggest_command(self.command_catalog, trigger)
+                if suggested:
+                    event.stop_event()
+                    yield event.plain_result(hint_command_usage(suggested, self.command_catalog))
+                    return
             return
         if cmd in {"排行榜", "战功榜"}:
             event.stop_event()

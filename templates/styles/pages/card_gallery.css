@@ -1,0 +1,20 @@
+.card-gallery {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 8px 0;
+}
+
+.card-gallery__item {
+    margin: 0;
+    display: flex;
+    justify-content: center;
+}
+
+.card-gallery__image {
+    display: block;
+    width: min(100%, 520px);
+    height: auto;
+    border-radius: 14px;
+    box-shadow: 0 4px 16px rgba(196, 92, 122, 0.1);
+}

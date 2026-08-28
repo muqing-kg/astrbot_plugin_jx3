@@ -1,0 +1,9 @@
+{# template-title: 全部名片 #}
+
+<div class="card-gallery">
+    {% for image in images %}
+    <figure class="card-gallery__item">
+        <img class="card-gallery__image" src="{{ image }}" alt="">
+    </figure>
+    {% endfor %}
+</div>

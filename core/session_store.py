@@ -14,6 +14,16 @@ from .session_policy import (
 )
 from .sqlite import AsyncSQLiteDB
 
+
+def _join_credentials(values) -> str:
+    parts = []
+    for value in values:
+        text = str(value or "").strip()
+        if text and text not in parts:
+            parts.append(text)
+    return ",".join(parts)
+
+
 __all__ = [
     "CREDENTIAL_MISSING",
     "NEED_TICKET",
@@ -59,6 +69,10 @@ class SessionStore:
                 push_xuanzhan INTEGER DEFAULT 0,
                 push_judian INTEGER DEFAULT 0,
                 push_weibo INTEGER DEFAULT 0,
+                is_private INTEGER DEFAULT 0,
+                claim_identity TEXT DEFAULT '',
+                claim_name TEXT DEFAULT '',
+                claim_at TEXT DEFAULT '',
                 bot_enabled INTEGER DEFAULT 1,
                 updated_at TEXT DEFAULT ''
             )
@@ -81,6 +95,10 @@ class SessionStore:
             "push_xuanzhan INTEGER DEFAULT 0",
             "push_judian INTEGER DEFAULT 0",
             "push_weibo INTEGER DEFAULT 0",
+            "is_private INTEGER DEFAULT 0",
+            "claim_identity TEXT DEFAULT ''",
+            "claim_name TEXT DEFAULT ''",
+            "claim_at TEXT DEFAULT ''",
         ]
         for column in extra_columns:
             try:
@@ -91,18 +109,59 @@ class SessionStore:
                 pass
         await self.sql.execute(
             """
-            CREATE TABLE IF NOT EXISTS plugin_admin (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                user_id TEXT DEFAULT '',
+            CREATE TABLE IF NOT EXISTS plugin_claimants (
+                user_id TEXT PRIMARY KEY,
                 name TEXT DEFAULT '',
                 claimed_at TEXT DEFAULT ''
             )
             """
         )
+        try:
+            old_admin = await self.sql.select_one("plugin_admin", "id=?", (1,))
+        except Exception:
+            old_admin = None
+        try:
+            old_claims = await self.sql.fetch_all(
+                "SELECT claim_identity, claim_name, claim_at FROM session_config "
+                "WHERE TRIM(claim_identity) <> '' AND TRIM(claim_identity) <> 'ASTRBOT_ADMIN' GROUP BY claim_identity"
+            )
+        except Exception:
+            old_claims = []
+        for claim in old_claims:
+            old_user_id = str(claim.get("claim_identity") or "").strip()
+            if not old_user_id:
+                continue
+            await self.sql.insert(
+                "plugin_claimants",
+                {
+                    "user_id": old_user_id,
+                    "name": str(claim.get("claim_name") or "").strip(),
+                    "claimed_at": str(claim.get("claim_at") or "").strip() or _now(),
+                },
+            )
+        if old_admin:
+            old_user_id = str(old_admin.get("user_id") or "").strip()
+            if old_user_id:
+                old_name = str(old_admin.get("name") or "").strip()
+                old_at = str(old_admin.get("claimed_at") or "").strip()
+                await self.sql.insert(
+                    "plugin_claimants",
+                    {
+                        "user_id": old_user_id,
+                        "name": old_name,
+                        "claimed_at": old_at or _now(),
+                    },
+                )
+            await self.sql.execute("DROP TABLE plugin_admin")
         await self.sql.execute(
             """
-            INSERT OR IGNORE INTO plugin_admin (id, user_id, name, claimed_at)
-            VALUES (1, '', '', '')
+            CREATE TABLE IF NOT EXISTS session_managers (
+                umo TEXT NOT NULL,
+                user_id TEXT NOT NULL,
+                name TEXT DEFAULT '',
+                created_at TEXT DEFAULT '',
+                PRIMARY KEY (umo, user_id)
+            )
             """
         )
         await self.sql.execute(
@@ -116,23 +175,30 @@ class SessionStore:
             """
         )
 
-    async def ensure(self, umo: str, display_name: str = "") -> dict[str, Any]:
+    async def ensure(self, umo: str, display_name: str = "", is_private: bool = False) -> dict[str, Any]:
         row = await self.get(umo)
         if row:
+            updates = {}
             if display_name and row.get("display_name") != display_name:
+                updates["display_name"] = display_name
+            if bool(row.get("is_private")) != bool(is_private):
+                updates["is_private"] = 1 if is_private else 0
+            if updates:
+                updates["updated_at"] = _now()
                 await self.sql.update(
                     "session_config",
-                    {"display_name": display_name, "updated_at": _now()},
+                    updates,
                     "umo=?",
                     (umo,),
                 )
-                row["display_name"] = display_name
+                row.update(updates)
             return row
         await self.sql.insert(
             "session_config",
             {
                 "umo": umo,
                 "display_name": display_name,
+                "is_private": 1 if is_private else 0,
                 "server": "",
                 "token": "",
                 "ticket": "",
@@ -159,8 +225,8 @@ class SessionStore:
         rows = await self.list_all()
         return [row for row in rows if (row.get("server") or "").strip()]
 
-    async def bind_server(self, umo: str, server: str, display_name: str = "") -> dict[str, Any]:
-        await self.ensure(umo, display_name)
+    async def bind_server(self, umo: str, server: str, display_name: str = "", is_private: bool = False) -> dict[str, Any]:
+        await self.ensure(umo, display_name, is_private)
         resolver = getattr(self, "resolve_server", None)
         if callable(resolver):
             official = resolver(server)
@@ -333,29 +399,52 @@ class SessionStore:
             {"kind": kind, "server": server, "status": str(status)},
         )
 
-    def public_row(self, row: dict[str, Any], has_global_ticket: bool = False, has_global_token: bool = False) -> dict[str, Any]:
-        has_own_token = bool((row.get("token") or "").strip())
+    def public_row(
+        self,
+        row: dict[str, Any],
+        has_global_ticket: bool = False,
+        has_global_token: bool = False,
+        global_token: str = "",
+        global_ticket: str = "",
+    ) -> dict[str, Any]:
+        own_token = (row.get("token") or "").strip()
+        own_ticket = (row.get("ticket") or "").strip()
+        global_token = (global_token or "").strip()
+        global_ticket = (global_ticket or "").strip()
+        has_own_token = bool(own_token)
+        token_global_available = bool(global_token) or has_global_token
+        ticket_global_available = bool(global_ticket) or has_global_ticket
         use_global_token = bool(row.get("use_global_token"))
+        if use_global_token:
+            token_value = _join_credentials([own_token, global_token])
+        else:
+            token_value = own_token
         if has_own_token:
-            token_status = mask_secret(row.get("token") or "")
-        elif use_global_token and has_global_token:
+            token_status = mask_secret(own_token)
+        elif use_global_token and token_global_available:
             token_status = "使用全局"
         elif use_global_token:
             token_status = "全局未配置"
         else:
             token_status = "未配置"
-        has_own_ticket = bool((row.get("ticket") or "").strip())
-        ticket_status = mask_secret(row.get("ticket") or "")
-        if not has_own_ticket and has_global_ticket:
+        has_own_ticket = bool(own_ticket)
+        ticket_value = _join_credentials([own_ticket, global_ticket])
+        if has_own_ticket:
+            ticket_status = mask_secret(own_ticket)
+        elif ticket_global_available:
             ticket_status = "使用全局"
+        else:
+            ticket_status = "未配置"
         return {
             "umo": row.get("umo", ""),
             "display_name": row.get("display_name", ""),
             "server": row.get("server", ""),
             "token_status": token_status,
             "ticket_status": ticket_status,
-            "has_token": has_own_token or (use_global_token and has_global_token),
-            "has_ticket": has_own_ticket or has_global_ticket,
+            "token_value": token_value,
+            "ticket_value": ticket_value,
+            "has_token": has_own_token or (use_global_token and token_global_available),
+            "has_ticket": has_own_ticket or ticket_global_available,
             "use_global_token": use_global_token,
             "bot_enabled": self.is_bot_enabled(row),
             "push_kaifu": bool(row.get("push_kaifu")),
@@ -363,29 +452,217 @@ class SessionStore:
             "push_shuma": bool(row.get("push_shuma")),
             "push_chitu": bool(row.get("push_chitu")),
             "pushes": {kind: bool(row.get(field)) for kind, field in PUSH_FIELD.items()},
+            "is_private": bool(row.get("is_private")),
+            "claim_identity": row.get("claim_identity", ""),
+            "claim_name": row.get("claim_name", ""),
+            "managers": [],
         }
 
-    async def get_admin(self) -> dict[str, Any] | None:
-        return await self.sql.select_one("plugin_admin", "id=?", (1,))
-
     async def claim_admin(self, user_id: str, name: str = "") -> tuple[bool, str]:
-        row = await self.get_admin()
-        current = ((row or {}).get("user_id") or "").strip()
-        if current and current != user_id:
-            return False, (row or {}).get("name") or current
-        await self.sql.update(
-            "plugin_admin",
+        user_id = str(user_id or "").strip()
+        if not user_id:
+            return False, "未识别到用户身份。"
+        name = str(name or "").strip()
+        row = await self.sql.select_one("plugin_claimants", "user_id=?", (user_id,))
+        if row:
+            if name:
+                await self.sql.update(
+                    "plugin_claimants",
+                    {"name": name, "claimed_at": _now()},
+                    "user_id=?",
+                    (user_id,),
+                )
+            return True, name or str(row.get("name") or "") or user_id
+        await self.sql.insert(
+            "plugin_claimants",
             {"user_id": user_id, "name": name, "claimed_at": _now()},
-            "id=?",
-            (1,),
         )
         return True, name or user_id
 
     async def is_claimed_admin(self, user_id: str) -> bool:
-        row = await self.get_admin()
-        current = ((row or {}).get("user_id") or "").strip()
-        return bool(current) and current == str(user_id or "").strip()
+        user_id = str(user_id or "").strip()
+        if not user_id:
+            return False
+        return bool(await self.sql.select_one("plugin_claimants", "user_id=?", (user_id,)))
 
+    async def get_session_identity(self, umo: str) -> dict[str, Any]:
+        row = await self.get(umo) or {}
+        return {
+            "identity": str(row.get("claim_identity") or "").strip(),
+            "name": str(row.get("claim_name") or "").strip(),
+            "at": str(row.get("claim_at") or "").strip(),
+        }
+
+    async def set_session_claim(self, umo: str, identity: str, name: str = "") -> dict[str, Any]:
+        await self.ensure(umo)
+        identity = str(identity or "").strip()
+        if not identity:
+            return await self.get(umo)
+        row = await self.get(umo) or {}
+        if str(row.get("claim_identity") or "").strip():
+            return row
+        await self.sql.update(
+            "session_config",
+            {
+                "claim_identity": identity,
+                "claim_name": str(name or "").strip(),
+                "claim_at": _now(),
+                "updated_at": _now(),
+            },
+            "umo=?",
+            (umo,),
+        )
+        await self.claim_admin(identity, name)
+        return await self.get(umo)
+
+    async def clear_claimant(self, identity: str) -> None:
+        identity = str(identity or "").strip()
+        if not identity:
+            return
+        await self.sql.execute("DELETE FROM plugin_claimants WHERE user_id=?", (identity,))
+        await self.sql.update(
+            "session_config",
+            {
+                "claim_identity": "",
+                "claim_name": "",
+                "claim_at": "",
+                "updated_at": _now(),
+            },
+            "claim_identity=?",
+            (identity,),
+        )
+
+    async def is_session_owner(self, umo: str, user_id: str, name: str = "") -> bool:
+        claim = await self.get_session_identity(umo)
+        identity = claim.get("identity") or ""
+        if not identity:
+            return False
+        user_id = str(user_id or "").strip()
+        if identity == user_id:
+            return True
+        return False
+
+    async def list_managers(self, umo: str) -> list[dict[str, Any]]:
+        if not umo:
+            return []
+        return await self.sql.select_all(
+            "session_managers",
+            "umo=? ORDER BY created_at ASC, user_id ASC",
+            (umo,),
+        )
+
+    async def add_manager(self, umo: str, user_id: str, name: str = "") -> tuple[bool, str]:
+        umo = str(umo or "").strip()
+        user_id = str(user_id or "").strip()
+        if not umo or not user_id:
+            return False, "未识别到被授权人，请发送 授权管理 @成员。"
+        name = str(name or "").strip()
+        claim = await self.get_session_identity(umo)
+        identity = claim.get("identity") or ""
+        if identity and user_id == identity:
+            return False, "认领人已是本会话管理员，无需重复授权。"
+        for row in await self.list_managers(umo):
+            row_id = str(row.get("user_id") or "").strip()
+            if user_id == row_id:
+                return False, "该用户已是本会话授权管理员。"
+        await self.sql.insert(
+            "session_managers",
+            {"umo": umo, "user_id": user_id, "name": name, "created_at": _now()},
+        )
+        return True, name or user_id
+
+    async def remove_manager(self, umo: str, index: int) -> tuple[bool, str]:
+        try:
+            index = int(index)
+        except (TypeError, ValueError):
+            return False, "请发送: 「 删除管理 序号 」"
+        claim = await self.get_session_identity(umo)
+        rows = await self.list_managers(umo)
+        offset = 0
+        if claim.get("identity"):
+            if index <= 1:
+                return False, "认领人不可被删除。"
+            offset = 1
+        target = index - 1 - offset
+        if target < 0 or target >= len(rows):
+            return False, "序号不存在，请先发送查看管理确认序号。"
+        row = rows[target]
+        label = str(row.get("name") or row.get("user_id") or "已授权管理员")
+        await self.sql.execute(
+            "DELETE FROM session_managers WHERE umo=? AND user_id=?",
+            (umo, str(row.get("user_id") or "")),
+        )
+        return True, f"已删除管理员：{label}"
+
+    async def replace_managers(self, umo: str, values: list[str]) -> tuple[bool, str]:
+        umo = str(umo or "").strip()
+        claim = await self.get_session_identity(umo)
+        identity = claim.get("identity") or ""
+        claim_name = claim.get("name") or ""
+        current = await self.list_managers(umo)
+        by_id = {str(row.get("user_id") or "").strip(): row for row in current}
+        by_name = {str(row.get("name") or "").strip(): row for row in current}
+        desired_ids: list[str] = []
+        unknown: list[str] = []
+        for value in values or []:
+            text = str(value or "").strip().lstrip("@").strip()
+            if not text:
+                continue
+            if identity and text in (identity, claim_name):
+                continue
+            row = by_id.get(text) or by_name.get(text)
+            if not row:
+                unknown.append(text)
+                continue
+            row_id = str(row.get("user_id") or "").strip()
+            if row_id and row_id not in desired_ids:
+                desired_ids.append(row_id)
+        if unknown:
+            return False, (
+                "无法识别的成员身份：" + "、".join(unknown) + "。\n"
+                "新增授权请发送 授权管理 @成员，页面只用于保留或移除已有授权。"
+            )
+        for row in current:
+            row_id = str(row.get("user_id") or "").strip()
+            if row_id not in desired_ids:
+                await self.sql.execute(
+                    "DELETE FROM session_managers WHERE umo=? AND user_id=?",
+                    (umo, row_id),
+                )
+        remain = await self.list_managers(umo)
+        labels = [str(row.get("name") or row.get("user_id") or "") for row in remain]
+        if labels:
+            return True, "已更新授权管理：" + "、".join(labels)
+        return True, "已更新授权管理（当前为空）"
+
+    async def is_manager(self, umo: str, user_id: str, name: str = "") -> bool:
+        user_id = str(user_id or "").strip()
+        if await self.is_session_owner(umo, user_id, name):
+            return True
+        for row in await self.list_managers(umo):
+            row_id = str(row.get("user_id") or "").strip()
+            if user_id and user_id == row_id:
+                return True
+        return False
+
+    async def manager_snapshot(self, umo: str) -> list[dict[str, Any]]:
+        rows = []
+        claim = await self.get_session_identity(umo)
+        if claim.get("identity"):
+            rows.append({
+                "rank": 1,
+                "name": claim.get("name") or "",
+                "identity": claim.get("identity") or "",
+                "role": "认领人",
+            })
+        for index, row in enumerate(await self.list_managers(umo), len(rows) + 1):
+            rows.append({
+                "rank": index,
+                "name": row.get("name") or "",
+                "identity": row.get("user_id") or "",
+                "role": "管理员",
+            })
+        return rows
     def enabled_kinds(self, row: dict[str, Any] | None) -> set[str]:
         if not row:
             return set()
