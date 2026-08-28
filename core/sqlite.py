@@ -24,8 +24,12 @@ class AsyncSQLiteDB:
         await self.close()
 
     async def connect(self):
-        self.conn = await aiosqlite.connect(self.db_path)
+        self.conn = await aiosqlite.connect(self.db_path, timeout=15.0)
         self.conn.row_factory = aiosqlite.Row
+        await self.conn.execute("PRAGMA journal_mode=WAL")
+        await self.conn.execute("PRAGMA synchronous=NORMAL")
+        await self.conn.execute("PRAGMA busy_timeout=15000")
+        await self.conn.commit()
 
     async def close(self):
         if self.conn:
