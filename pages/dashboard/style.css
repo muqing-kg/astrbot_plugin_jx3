@@ -71,6 +71,11 @@ button.danger {
   color: #a63b46;
   border: 1px solid #e3c3c8;
 }
+button.danger[data-armed="true"] {
+  background: #a63b46;
+  color: #fff;
+  border-color: #a63b46;
+}
 .status {
   margin: 0 0 12px;
   color: var(--ok);
