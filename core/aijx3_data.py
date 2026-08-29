@@ -103,21 +103,3 @@ class AIJX3Service:
         return_data["code"] = 200
         return return_data
 
-
-    async def shapan(self, server: str ) -> Dict[str, Any]:
-        """区服沙盘"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            pic_url = data.get("picUrl")
-            if pic_url:
-                return_data["data"] = pic_url
-            else:
-                return_data["msg"] = "接口未返回图片URL"
-                return return_data
-            
-        return await self._request_api(
-            path="/api2/aijx3-jxcg/game/get-sand-table-img",
-            params={"serverName": server},
-            processor=processor,
-            template=""
-        ) 
-        

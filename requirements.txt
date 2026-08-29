@@ -1,5 +1,5 @@
-matplotlib
 aiofiles
 aiosqlite
 aiohttp
 apscheduler
+jinja2

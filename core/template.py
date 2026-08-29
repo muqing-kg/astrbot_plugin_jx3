@@ -1,9 +1,6 @@
 import asyncio
-import hashlib
 import re
-from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import aiofiles
 
@@ -35,7 +32,6 @@ _PAGE_KICKER = {
     "data_list": "DATA LIST",
     "diaoluo": "LOOT LOG",
     "dilujilu": "DILU LOG",
-    "guanaishouling": "PASS BOSS",
     "huajia": "FLOWER PRICE",
     "jiaoyihang": "TRADING POST",
     "jineng": "SKILLS",
@@ -65,35 +61,11 @@ _PAGE_KICKER = {
     "yanhuan": "FIREWORKS",
     "zhanji": "ARENA RECORD",
     "zhengyingpaimai": "CAMP AUCTION",
-    "zhenyingevent": "CAMP EVENT",
     "zhuangshi": "HOMESTEAD",
     "zhueevent": "WANTED",
     "zili": "ACHIEVEMENT",
     "zilipaixing": "ACHV. RANK",
 }
-
-_QUOTES_PATH = Path(__file__).parent.parent / "templates" / "daily_quotes.txt"
-_DEFAULT_QUOTES = [
-    "江湖路远，且行且看。",
-    "今日事了，明日再战。",
-    "剑未出鞘，心先安定。",
-]
-
-
-def _daily_quote(seed: str) -> str:
-    try:
-        lines = [
-            line.strip()
-            for line in _QUOTES_PATH.read_text(encoding="utf-8").splitlines()
-            if line.strip()
-        ]
-    except OSError:
-        lines = []
-    quotes = lines or _DEFAULT_QUOTES
-    day = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d")
-    digest = hashlib.sha1(f"{day}:{seed}".encode("utf-8")).hexdigest()
-    return quotes[int(digest[:8], 16) % len(quotes)]
-
 
 def _page_kicker(page_id: str) -> str:
     return _PAGE_KICKER.get(page_id, "QUERY")
@@ -116,6 +88,12 @@ class TemplateRepository:
         if name.name != template_name or name.suffix.lower() != ".html":
             raise ValueError(f"非法模板名称: {template_name}")
         return self.root / "pages" / name.name
+
+    def _standalone_path(self, template_name: str) -> Path:
+        name = Path(template_name)
+        if name.parts != ("standalone", name.name) or name.suffix.lower() != ".html":
+            raise ValueError(f"非法独立模板名称: {template_name}")
+        return self.root / "standalone" / name.name
 
     @staticmethod
     def _select_component_styles(source: str, requested: set[str]) -> str:
@@ -148,15 +126,17 @@ class TemplateRepository:
             if cached is not None:
                 return cached
 
-            page_path = self._page_path(template_name)
-            if not page_path.exists():
-                # 兼容迁移期间尚未拆分的旧模板。
-                legacy_path = self.root / template_name
-                if not legacy_path.exists():
-                    raise FileNotFoundError(f"模板文件不存在: {page_path}")
-                template = await self._read(legacy_path)
+            if template_name.startswith("standalone/"):
+                standalone_path = self._standalone_path(template_name)
+                if not standalone_path.exists():
+                    raise FileNotFoundError(f"模板文件不存在: {standalone_path}")
+                template = await self._read(standalone_path)
                 self._cache[template_name] = template
                 return template
+
+            page_path = self._page_path(template_name)
+            if not page_path.exists():
+                raise FileNotFoundError(f"模板文件不存在: {page_path}")
 
             if self._shared_assets is None:
                 self._shared_assets = tuple(

@@ -70,8 +70,7 @@
 }
 
 .jx3-template--diaoluo,
-.jx3-template--qiyuhuizong,
-.jx3-template--zhenyingevent {
+.jx3-template--qiyuhuizong {
     --jx3-page-width: 1080px;
 }
 
@@ -91,8 +90,7 @@
 }
 
 .jx3-template--bangzhanjilu,
-.jx3-template--chengjiu,
-.jx3-template--guanaishouling {
+.jx3-template--chengjiu {
     --jx3-page-width: 1180px;
 }
 

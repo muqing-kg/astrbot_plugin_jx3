@@ -1,5 +1,4 @@
 import inspect
-import re
 from pathlib import Path
 from typing import cast
 
@@ -52,6 +51,7 @@ from .core.session_policy import (
     strip_command_prefix,
 )
 from .core.credentials import reset_request_credentials, set_request_credentials
+from .core.mentions import mentioned_target, message_text_without_bot_mentions
 from .core.page_api import SessionPageAPI
 from .core.event_catalog import push_arg_map
 from .core.command_catalog import apply_command_overrides, resolve_command, suggest_command
@@ -62,7 +62,7 @@ from .core.plugin_settings import PluginSettings
 @register("astrbot_plugin_jx3",
           "muqing-kg",
           "聚合剑网三游戏数据，提供查询、图片渲染和后台推送。",
-          "3.3.8",
+          "3.3.9",
           "https://github.com/muqing-kg/astrbot_plugin_jx3"
 )
 class Jx3ApiPlugin(Star):
@@ -90,10 +90,6 @@ class Jx3ApiPlugin(Star):
             await self.sessions.init()
             await self.settings.init()
             self.command_catalog = apply_command_overrides(await self.settings.command_overrides())
-            descs = await self.settings.command_descs()
-            for command_id, desc in descs.items():
-                if command_id in self.command_catalog and desc:
-                    self.command_catalog[command_id]["desc"] = desc
             self.server_catalog = apply_alias_overrides(await self.settings.server_aliases())
             self.push_name_overrides = await self.settings.push_name_overrides()
             self.jx3api.push_names = dict(self.push_name_overrides)
@@ -188,10 +184,8 @@ class Jx3ApiPlugin(Star):
             "披风会": self.jx3cmd.pifenghui,
             "云从社": self.jx3cmd.yunchongshe,
             "楚天社": self.jx3cmd.chutianshe,
-            "关隘首领": self.jx3cmd.guanaishouling,
             "赤兔": self.jx3cmd.benrichitu,
             "本周赤兔": self.jx3cmd.benzhouchitu,
-            "阵营事件": self.jx3cmd.zhenyingevent,
             "烟花": self.jx3cmd.yanhuachaxun,
             "刷马": self.jx3cmd.shuma,
             "马场": self.jx3cmd.machang,
@@ -215,16 +209,16 @@ class Jx3ApiPlugin(Star):
             "上周浩气战功榜": self.jx3cmd.shangzhouhaoqiwushiqiang,
             "本周恶人战功榜": self.jx3cmd.benzhouerenwushiqiang,
             "本周浩气战功榜": self.jx3cmd.benzhouhaoqiwushiqiang,
-            "试炼之地": self.jx3cmd.shilianpaixing,
+            "试炼之地排行": self.jx3cmd.shilianpaixing,
             "跨服名剑榜": self.jx3cmd.kuafumingjian,
-            "武林争霸": self.jx3cmd.wulinzhengba,
+            "武林争霸赛": self.jx3cmd.wulinzhengba,
             "捕快荣誉榜": self.jx3cmd.bukuai,
             "江湖浪客榜": self.jx3cmd.langke,
             "决斗挑战榜": self.jx3cmd.juedou,
             "资历分布": self.jx3cmd.zilifenbu,
             "外观搜索": self.jx3cmd.waiguansousuo,
-            "拍卖": self.jx3cmd.zhengyingpaimai,
-            "的卢": self.jx3cmd.dilujilu,
+            "阵营拍卖": self.jx3cmd.zhengyingpaimai,
+            "的卢拍卖": self.jx3cmd.dilujilu,
             "金价": self.jx3cmd.jinjia,
             "物价": self.jx3cmd.wujia,
             "配方": self.jx3cmd.chengbeng,
@@ -269,8 +263,6 @@ class Jx3ApiPlugin(Star):
             "吃什么": self.jx3cmd.chishengme,
             "骚话": self.jx3cmd.shaohua,
             "渣男语录": self.jx3cmd.zhananyulu,
-            "贴吧物价": self.jx3cmd.tiebawujia,
-            "818": self.jx3cmd.bagua,
             "科举": self.jx3cmd.keju,
             "开服": self.jx3cmd.kaifu,
             "技改": self.jx3cmd.jigai,
@@ -310,52 +302,6 @@ class Jx3ApiPlugin(Star):
         except Exception:
             raw = None
         return normalize_system_prefixes(raw)
-
-    @staticmethod
-    def _component_type(item) -> str:
-        raw_type = item.get("type") if isinstance(item, dict) else getattr(item, "type", None)
-        if not raw_type:
-            raw_type = type(item).__name__
-        return str(getattr(raw_type, "value", raw_type)).lower()
-
-    def _mentioned_bot(self, event: AstrMessageEvent) -> bool:
-        try:
-            self_id = str(event.get_self_id() or "").strip()
-        except Exception:
-            self_id = ""
-        if not self_id:
-            return False
-        chains = []
-        for source in (
-            getattr(event, "get_messages", None),
-            getattr(event, "get_message", None),
-        ):
-            try:
-                value = source() if callable(source) else None
-            except Exception:
-                value = None
-            if value is None:
-                continue
-            for nested in (value, getattr(value, "chain", None), getattr(value, "components", None)):
-                if isinstance(nested, (list, tuple)):
-                    chains.append(nested)
-        message_obj = getattr(event, "message_obj", None)
-        if message_obj is not None:
-            components = getattr(message_obj, "message", None)
-            if isinstance(components, (list, tuple)):
-                chains.append(components)
-        for items in chains:
-            for item in items:
-                if self._component_type(item) not in {"at", "mention"}:
-                    continue
-                for attr in ("qq", "uid", "user_id", "target_id", "id", "wxid", "v3_username"):
-                    value = item.get(attr) if isinstance(item, dict) else getattr(item, attr, "")
-                    if str(value or "").strip() == self_id:
-                        return True
-        if self_id in self._at_list_from_raw(event):
-            return True
-        pattern = rf"\[CQ:at[^\]]*?(?:qq|wxid|uid|user_id|v3_username)=({re.escape(self_id)})(?:[^0-9A-Za-z_-]|$)"
-        return bool(re.search(pattern, str(event.message_str or ""), re.IGNORECASE))
 
     def _event_umo(self, event: AstrMessageEvent) -> str:
         try:
@@ -472,186 +418,6 @@ class Jx3ApiPlugin(Star):
             self._sender_name(event),
         )
 
-    def _mentioned_target(self, event: AstrMessageEvent) -> tuple[str, str]:
-        user_id = ""
-        name = ""
-        try:
-            self_id = str(event.get_self_id() or "").strip()
-        except Exception:
-            self_id = ""
-        id_keys = (
-            "qq", "uid", "user_id", "target_id", "id", "wxid", "to_wxid",
-            "v3_username", "username", "to_username", "user", "to_user",
-            "qid", "tiny_id",
-        )
-        name_keys = ("qq_nickname", "nickname", "name", "alias", "display_name", "card", "gcard")
-
-        def read_segment(item, keys):
-            sources = [item]
-            data = getattr(item, "data", None)
-            if isinstance(data, dict):
-                sources.append(data)
-            if isinstance(item, dict):
-                sources.append(item)
-            for source in sources:
-                for key in keys:
-                    if not isinstance(source, dict) and not hasattr(source, key):
-                        continue
-                    try:
-                        value = source.get(key) if isinstance(source, dict) else getattr(source, key, None)
-                    except Exception:
-                        value = None
-                    if value in (None, ""):
-                        continue
-                    return str(value).strip()
-            return ""
-
-        chains = []
-        for source in (
-            getattr(event, "get_messages", None),
-            getattr(event, "get_message", None),
-        ):
-            try:
-                value = source() if callable(source) else None
-            except Exception:
-                value = None
-            if value is None:
-                continue
-            for nested in (
-                value,
-                getattr(value, "chain", None),
-                getattr(value, "components", None),
-            ):
-                if isinstance(nested, (list, tuple)):
-                    chains.append(nested)
-        message_obj = getattr(event, "message_obj", None)
-        if message_obj is not None:
-            components = getattr(message_obj, "message", None)
-            if isinstance(components, (list, tuple)):
-                chains.append(components)
-        for items in chains:
-            for item in items:
-                itype = self._component_type(item)
-                if itype not in {"at", "mention"}:
-                    continue
-                user_id = read_segment(item, id_keys)
-                if user_id in {"all", self_id}:
-                    user_id = ""
-                    name = ""
-                    continue
-                if not user_id:
-                    skipped = {"type", "text", "content", "role", "sub_type", "domain"}
-                    pools = []
-                    data = getattr(item, "data", None)
-                    if isinstance(data, dict):
-                        pools.append(data)
-                    if isinstance(item, dict):
-                        pools.append(item)
-                    for pool in pools:
-                        for key, value in pool.items():
-                            if str(key).lower() in skipped or value in (None, ""):
-                                continue
-                            if isinstance(value, (int, float, str)):
-                                user_id = str(value).strip()
-                                break
-                        if user_id:
-                            break
-                item_name = read_segment(item, name_keys).lstrip("@").strip()
-                if item_name and not name:
-                    name = item_name
-                if user_id:
-                    break
-            if user_id or name:
-                break
-        if not user_id:
-            raw_text = str(event.message_str or "")
-            for match in re.finditer(
-                r"\[CQ:at[^\]]*?(?:qq|wxid|uid|user_id|v3_username)=([^,\]\s]+)",
-                raw_text,
-                re.IGNORECASE,
-            ):
-                candidate = match.group(1)
-                if candidate not in {"all", self_id}:
-                    user_id = candidate
-                    break
-        if not user_id:
-            candidates = self._at_list_from_raw(event)
-            user_id = next((item for item in candidates if item not in {"all", self_id}), "")
-        return user_id, name
-
-    def _at_list_from_raw(self, event: AstrMessageEvent) -> list[str]:
-        raw = getattr(getattr(event, "message_obj", None), "raw_message", None)
-        candidates = []
-
-        def append_at_text(value):
-            text = str(value or "").strip()
-            if not text:
-                return
-            matches = re.findall(r"<atuserlist>\s*(?:<!\[CDATA\[)?([^><\]]+?)(?:\]\]>)?\s*</atuserlist>", text, re.IGNORECASE)
-            if not matches:
-                matches = re.findall(r"\b(?:atUserList|atuserlist)\b\s*[:=]\s*([^\n\r,]+)", text, re.IGNORECASE)
-            for item in matches:
-                for target in re.split(r"[,，;；\s]+", item):
-                    target = target.strip().strip("'\"")
-                    if target:
-                        candidates.append(target)
-
-        def collect(value):
-            if isinstance(value, str):
-                append_at_text(value)
-                return
-            if not isinstance(value, (list, tuple, dict)):
-                return
-            def at_records(item):
-                if isinstance(item, dict):
-                    yield item
-                elif isinstance(item, (list, tuple)):
-                    for nested in item:
-                        yield from at_records(nested)
-
-            for leaf in at_records(value):
-                if isinstance(leaf, dict):
-                    for sub_key in ("wxid", "user_id", "qq", "username", "v3_username", "id", "uid"):
-                        inner = str(leaf.get(sub_key) or "").strip()
-                        if inner:
-                            candidates.append(inner)
-                            break
-                elif isinstance(leaf, str):
-                    append_at_text(leaf)
-                elif leaf not in (None, ""):
-                    candidates.append(str(leaf).strip())
-
-        if isinstance(raw, str):
-            try:
-                import json
-
-                raw = json.loads(raw)
-            except Exception:
-                collect(raw)
-                raw = None
-
-        def walk(value):
-            if isinstance(value, dict):
-                for key, item in value.items():
-                    if isinstance(item, str):
-                        append_at_text(item)
-                    elif isinstance(item, dict):
-                        walk(item)
-                    elif "at" in str(key).lower():
-                        collect(item)
-            elif isinstance(value, (list, tuple)):
-                for item in value:
-                    walk(item)
-
-        if isinstance(raw, (dict, list, tuple)):
-            walk(raw)
-
-        result = []
-        for candidate in candidates:
-            if candidate and candidate not in result:
-                result.append(candidate)
-        return result
-
     def _global_token(self) -> str:
         return str(self.conf.get("jx3api_token", "") or "").strip()
 
@@ -702,7 +468,7 @@ class Jx3ApiPlugin(Star):
                 return event.plain_result(hint_need_claim(self.command_catalog))
             umo = self._event_umo(event)
             if parsed.action == "authorize":
-                uid, name = self._mentioned_target(event)
+                uid, name = mentioned_target(event)
                 if not uid and not name:
                     return event.plain_result(hint_authorize_usage(self.command_catalog))
                 ok, msg = await self.sessions.add_manager(umo, uid, name)
@@ -948,9 +714,7 @@ class Jx3ApiPlugin(Star):
     async def on_all_message(self, event: AstrMessageEvent):
         if not self.command_map:
             return
-        if self._mentioned_bot(event):
-            return
-        parts = self.parse_message(event.message_str)
+        parts = self.parse_message(message_text_without_bot_mentions(event))
         if not parts:
             return
 

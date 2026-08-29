@@ -20,7 +20,6 @@ PAGE_META_NONE = {
     "helps.html",
     "xiaoyao.html",
     "baizhan.html",
-    "guanaishouling.html",
     "xingxiashijian.html",
     "mingjiantongji.html",
     "mingjianpaihang.html",
@@ -121,11 +120,11 @@ def build_page_meta(template: str, payload: dict) -> str:
 class MessageBuilder:
     """回复消息构建"""
     RANKING_IDS = (
-        "名剑排行", "名剑统计", "跨服名剑榜", "武林争霸", "捕快荣誉榜",
+        "名剑排行", "名剑统计", "跨服名剑榜", "武林争霸赛", "捕快荣誉榜",
         "江湖浪客榜", "决斗挑战榜", "资历排行", "名士排行", "江湖排行",
         "兵甲排行", "名师排行", "阵营排行", "薪火排行", "家园排行",
         "浩气神兵排行", "恶人神兵排行", "浩气爱心排行", "恶人爱心排行",
-        "试炼之地",
+        "试炼之地排行",
     )
     ZHANGONG_ALL = (
         "本周恶人战功榜", "上周恶人战功榜", "赛季恶人战功榜",
@@ -255,6 +254,26 @@ class MessageBuilder:
             else:
                 await event.send(event.plain_result(data["msg"])) 
 
+        except Exception as e:
+            logger.error(f"功能函数执行错误: {e}")
+            await event.send(event.plain_result("渲染图片失败，请稍后再试"))
+
+    async def raw_image_msg(self, event: AstrMessageEvent, action):
+        """渲染不套公共装饰层的独立图片。"""
+        data = await action()
+        try:
+            if data["code"] == 200:
+                options = {
+                    "quality": 100,
+                    "device_scale_factor_level": "normal",
+                    "full_page": True,
+                    "omit_background": False,
+                    "type": "png"
+                }
+                url = await self.html_render(data["temp"], data["data"], options=options)
+                await event.send(event.image_result(url))
+            else:
+                await event.send(event.plain_result(data["msg"]))
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
             await event.send(event.plain_result("渲染图片失败，请稍后再试"))
@@ -469,10 +488,6 @@ class MessageBuilder:
         """ 楚天社 """
         return await self.T2I_image_msg(event, lambda: self.jx3api.xingxiashijian("楚天社"))
 
-    async def  guanaishouling(self, event: AstrMessageEvent):
-        """ 关隘首领"""
-        return await self.T2I_image_msg(event, self.jx3api.guanaishouling)
-
     async def  benrichitu(self, event: AstrMessageEvent):
         """ 本日赤兔"""
         return await self.plain_msg(event, self.jx3api.benrichitu)
@@ -480,10 +495,6 @@ class MessageBuilder:
     async def  benzhouchitu(self, event: AstrMessageEvent):
         """ 本周赤兔"""
         return await self.plain_msg(event, self.jx3api.benzhouchitu)
-
-    async def  zhenyingevent(self, event: AstrMessageEvent, name:str = ""):
-        """ 阵营事件 阵营"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.zhenyingevent(name,50))
 
     async def  yanhuachaxun(self, event: AstrMessageEvent,server: str = "",name: str = "" ):
         """ 烟花 服务器 角色"""
@@ -585,7 +596,7 @@ class MessageBuilder:
         """ 跨服名剑 [服务器] [模式] """
         return await self.T2I_image_msg(event, lambda: self.jx3api.kuafumingjian(server, mode))
 
-    async def  wulinzhengba(self, event: AstrMessageEvent, server: str = "", camp: str = "浩气"):
+    async def  wulinzhengba(self, event: AstrMessageEvent, server: str = "", camp: str = "恶人"):
         """ 武林争霸赛 [服务器] [阵营] """
         return await self.T2I_image_msg(event, lambda: self.jx3api.wulinzhengba(server, camp))
 
@@ -610,11 +621,11 @@ class MessageBuilder:
         return await self.T2I_image_msg(event, lambda: self.jx3api.waiguansousuo(name))
 
     async def  zhengyingpaimai(self, event: AstrMessageEvent,server: str , name: str = "", limit: int = 50 ):
-        """ 阵营拍卖 物品名称 服务器"""
+        """ 阵营拍卖 [服务器] [物品] [数量] """
         return await self.T2I_image_msg(event, lambda: self.jx3api.zhengyingpaimai(server, name, limit))
 
     async def  dilujilu(self, event: AstrMessageEvent,server: str ):
-        """ 的卢 服务器"""
+        """ 的卢拍卖 [服务器] """
         return await self.T2I_image_msg(event, lambda: self.jx3api.dilujilu(server))
 
     async def  jinjia(self, event: AstrMessageEvent,server: str , limit:str = "15"):
@@ -639,7 +650,7 @@ class MessageBuilder:
 
     async def  shapan(self, event: AstrMessageEvent,server: str = ""):
         """ 沙盘 服务器"""
-        return await self.image_msg(event, lambda: self.aijx3.shapan(server))
+        return await self.raw_image_msg(event, lambda: self.jx3api.shapan(server))
 
     async def  zhueevent(self, event: AstrMessageEvent, server: str):
         """ 诛恶事件 服务器"""
@@ -793,14 +804,6 @@ class MessageBuilder:
     async def  zhananyulu(self, event: AstrMessageEvent,):
         """ 渣男语录"""
         return await self.plain_msg(event, self.jx3api.zhananyulu)
-
-    async def  tiebawujia(self, event: AstrMessageEvent, name: str, server: str = "", limit: str = "5", ):
-        """ 贴吧物价 名称 服务器 数量 """
-        return await self.plain_msg(event, lambda: self.jx3api.tiebawujia(name, server, limit))
-
-    async def  bagua(self, event: AstrMessageEvent, server:str = "", limit:str = 10):
-        """ 818 """
-        return await self.plain_msg(event, lambda: self.jx3api.bagua(818,server,limit))
 
     async def  keju(self, event: AstrMessageEvent,subject: str, limit: int = 5):
         """ 科举 题目 条数"""

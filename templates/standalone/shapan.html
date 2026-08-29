@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="">
+
+<head>
+    <title>沙盘</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+
+<style>
+.background_img {
+    margin: 0;
+    max-width: 100%
+
+}
+
+.sand_icon {
+    position: absolute;
+    max-width: 100%;
+    text-align: center;
+    z-index: 3;
+}
+
+.u-name {
+    color: #fffcd0;
+    font-size: 12px;
+    line-height: 18px;
+    width: 1em;
+    text-shadow: 1px 1px #000,
+                -1px -1px #000,
+                1px -1px #000,
+                -1px 1px #000;
+}
+
+@font-face{
+    font-family: STXINGKA;
+    src:url('{{ font }}');
+}
+
+.server {
+    font-family: STXINGKA;
+    width: 1em;
+    position: absolute;
+    max-width: 100%;
+    left: 87%;
+    transform: translate(-50%,0);
+    top: 100px;
+    z-index: 1;
+}
+
+.updateTime {
+    font-family: STXINGKA;
+    position: absolute;
+    writing-mode:vertical-rl;
+    max-width: 100%;
+    left: 85%;
+    transform: translate(-50%,0);
+    top: 230px;
+    z-index: 1;
+}
+
+.resetTime {
+    position: absolute;
+    max-width: 100%;
+    left: 51%;
+    transform: translate(-50%,0);
+    top: 74px;
+    font-size: 16px;
+    color: rgba(240, 248, 255, 0.856);
+    z-index: 3;
+}
+
+.server .text {
+    width: 1em;
+    font-weight: 800;
+    font-size: 45px;
+    position: relative;
+    text-shadow: 2px 2px 5px black;
+}
+.updateTime .text {
+    font-weight: 600;
+    writing-mode:vertical-rl;
+    font-size: 25px;
+    position: relative;
+    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.603);
+}
+
+.text::after {
+    content: attr(text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    background-image: linear-gradient(to bottom, #ffeebc, #ce893b);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: none;
+}
+
+</style>
+</head>
+
+<body>
+    <div class="container">
+        <div id="main" style="position: absolute;width: 1297px;">
+            <div class="server">
+                <h1 class="text" text="{{server}}">{{server}}</h1>
+            </div>
+            <div class="updateTime">
+                <h1 class="text" text="{{updateTime}}">{{updateTime}}</h1>
+            </div>
+            {% if resetTime %}
+            <div>
+                <div class="resetTime">
+                    <span>沙盘重置：{{resetTime}}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%;left: 496px;top: 61px;width: 329px;height: 56px;z-index:1" src="{{ assets['沙盘倒计时.png'] }}" alt="">
+            </div>
+            {% endif %}
+            <div>
+                <img style="position: absolute;max-width: 100%; left: 122px;top: 189px;width: 708px;height: 478px;z-index:1" src="{{ assets['阵营防线.png'] }}" alt="">
+            </div>
+            <div>
+                <img style="position: absolute;max-width: 100%; left: 225px;top: 58px;" src="{{ assets['恶_恶人谷.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%; left: 287px;top: 105px;" src="{{ assets['图标_恶_恶人谷.png'] }}" alt="">
+                <span class="u-name" style="left: 367px;top: 105px;z-index:3;position: absolute;">恶人谷</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 432px;top: 147px;text-align: center;z-index: 3">
+                    {% if castles['凛风堡'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['凛风堡'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['凛风堡'].camp_prefix ~ '_凛风堡.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['凛风堡'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 300px;top: 110px;" src="{{ assets[castles['凛风堡'].camp_prefix ~ '_凛风堡.png'] }}" alt="">
+                <span class="u-name" style="left: 392px;top: 177px;z-index:3;position: absolute;">凛风堡</span>
+                <span class="u-name" style="left: 412px;top: 177px;z-index:3;position: absolute;">{{ castles['凛风堡'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 283px;top: 258px;text-align: center;z-index: 3;" >
+                    {% if castles['神池岭'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['神池岭'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['神池岭'].camp_prefix ~ '_02.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['神池岭'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%;left: 262px;top: 248px;" src="{{ assets[castles['神池岭'].camp_prefix ~ '_神池岭.png'] }}" alt="">
+                <span class="u-name" style="left: 323px;top: 278px;z-index:3;position: absolute;">神池岭</span>
+                <span class="u-name" style="left: 343px;top: 278px;z-index:3;position: absolute;">{{ castles['神池岭'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 230px;top: 338px">
+                    {% if castles['烈日岗'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['烈日岗'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['烈日岗'].camp_prefix ~ '_01.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['烈日岗'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%;left: 167px;top: 310px;" src="{{ assets[castles['烈日岗'].camp_prefix ~ '_烈日岗.png'] }}" alt="">
+                <span class="u-name" style="left: 276px;top: 358px;z-index:3;position: absolute;">烈日岗</span>
+                <span class="u-name" style="left: 296px;top: 358px;z-index:3;position: absolute;">{{ castles['烈日岗'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 475px;top: 225px">
+                    {% if castles['扶风郡'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['扶风郡'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['扶风郡'].camp_prefix ~ '_01.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['扶风郡'].ride_piece }}</span>
+                    <br>
+                    <span class="u-name" style="left: 7px;z-index:3;position: absolute;">扶风郡</span>
+                    <span class="u-name" style="left: 27px;z-index:3;position: absolute;">{{ castles['扶风郡'].tong_name }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 443px;top: 227px;" src="{{ assets[castles['扶风郡'].camp_prefix ~ '_扶风郡.png'] }}" alt="">
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 445px;top: 304px">
+                    {% if castles['世外坡'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['世外坡'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['世外坡'].camp_prefix ~ '_05.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['世外坡'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 383px;top: 274px;" src="{{ assets[castles['世外坡'].camp_prefix ~ '_世外坡.png'] }}" alt="">
+                <span class="u-name" style="left: 408px;top: 344px;z-index:3;position: absolute;">世外坡</span>
+                <span class="u-name" style="left: 428px;top: 344px;z-index:3;position: absolute;">{{ castles['世外坡'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 530px;top: 164px">
+                    {% if castles['飞沙关'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['飞沙关'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['飞沙关'].camp_prefix ~ '_01.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['飞沙关'].ride_piece }}</span>
+                    <br>
+                    <span class="u-name" style="left: 7px;z-index:3;position: absolute;">飞沙关</span>
+                    <span class="u-name" style="left: 27px;z-index:3;position: absolute;">{{ castles['飞沙关'].tong_name }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%;left: 507px;top: 181px;" src="{{ assets[castles['飞沙关'].camp_prefix ~ '_飞沙关.png'] }}" alt="">
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 597px;top: 158px">
+                    {% if castles['龙门镇'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['龙门镇'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['龙门镇'].camp_prefix ~ '_02.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['龙门镇'].ride_piece }}</span>
+                    <br>
+                    <span class="u-name" style="left: 7px;z-index:3;position: absolute;">龙门镇</span>
+                    <span class="u-name" style="left: 27px;z-index:3;position: absolute;">{{ castles['龙门镇'].tong_name }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 540px;top: 162px;" src="{{ assets[castles['龙门镇'].camp_prefix ~ '_龙门镇.png'] }}" alt="">
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 222px;top: 545px">
+                    {% if castles['凤鸣堡'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['凤鸣堡'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['凤鸣堡'].camp_prefix ~ '_04.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['凤鸣堡'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%;left: 178px;top: 530px;" src="{{ assets[castles['凤鸣堡'].camp_prefix ~ '_凤鸣堡.png'] }}" alt="">
+                <span class="u-name" style="left: 262px;top: 565px;z-index:3;position: absolute;">凤鸣堡</span>
+                <span class="u-name" style="left: 282px;top: 565px;z-index:3;position: absolute;">{{ castles['凤鸣堡'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 275px;top: 446px">
+                    {% if castles['惊虬谷'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['惊虬谷'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['惊虬谷'].camp_prefix ~ '_01.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['惊虬谷'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%;left: 166px;top: 422px;" src="{{ assets[castles['惊虬谷'].camp_prefix ~ '_惊虬谷.png'] }}" alt="">
+                    <span class="u-name" style="left: 315px;top: 466px;z-index:3;position: absolute;">惊虬谷</span>
+                    <span class="u-name" style="left: 335px;top: 466px;z-index:3;position: absolute;">{{ castles['惊虬谷'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 494px;top: 442px">
+                    {% if castles['日月崖'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['日月崖'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['日月崖'].camp_prefix ~ '_02.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['日月崖'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 406px;top: 394px;" src="{{ assets[castles['日月崖'].camp_prefix ~ '_日月崖.png'] }}" alt="">
+                    <span class="u-name" style="left: 534px;top: 462px;z-index:3;position: absolute;">日月崖</span>
+                    <span class="u-name" style="left: 554px;top: 462px;z-index:3;position: absolute;">{{ castles['日月崖'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 469px;top: 523px">
+                    {% if castles['卧龙坡'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['卧龙坡'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['卧龙坡'].camp_prefix ~ '_03.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['卧龙坡'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 375px;top: 508px;" src="{{ assets[castles['卧龙坡'].camp_prefix ~ '_卧龙坡.png'] }}" alt="">
+                    <span class="u-name" style="left: 509px;top: 543px;z-index:3;position: absolute;">卧龙坡</span>
+                    <span class="u-name" style="left: 529px;top: 543px;z-index:3;position: absolute;">{{ castles['卧龙坡'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 651px;top: 200px">
+                    {% if castles['啖杏林'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['啖杏林'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['啖杏林'].camp_prefix ~ '_01.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['啖杏林'].ride_piece }}</span>
+                    <br>
+                    <span class="u-name" style="left: 7px;z-index:3;position: absolute;">啖杏林</span>
+                    <span class="u-name" style="left: 27px;z-index:3;position: absolute;">{{ castles['啖杏林'].tong_name }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 643px;top: 196px;" src="{{ assets[castles['啖杏林'].camp_prefix ~ '_啖杏林.png'] }}" alt="">
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 713px;top: 254px">
+                    {% if castles['枫湖寨'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['枫湖寨'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['枫湖寨'].camp_prefix ~ '_03.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['枫湖寨'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 636px;top: 246px;" src="{{ assets[castles['枫湖寨'].camp_prefix ~ '_枫湖寨.png'] }}" alt="">
+                    <span class="u-name" style="left: 748px;top: 264px;z-index:3;position: absolute;">枫湖寨</span>
+                    <span class="u-name" style="left: 768px;top: 264px;z-index:3;position: absolute;">{{ castles['枫湖寨'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 630px;top: 406px">
+                    {% if castles['不空关'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['不空关'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['不空关'].camp_prefix ~ '_04.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['不空关'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 536px;top: 405px;" src="{{ assets[castles['不空关'].camp_prefix ~ '_不空关.png'] }}" alt="">
+                <span class="u-name" style="left: 670px;top: 426px;z-index:3;position: absolute;">不空关</span>
+                <span class="u-name" style="left: 690px;top: 426px;z-index:3;position: absolute;">{{ castles['不空关'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 597px;top: 475px">
+                    {% if castles['激流坞'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['激流坞'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['激流坞'].camp_prefix ~ '_01.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['激流坞'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 575px;top: 467px;" src="{{ assets[castles['激流坞'].camp_prefix ~ '_激流坞.png'] }}" alt="">
+                <span class="u-name" style="left: 637px;top: 495px;z-index:3;position: absolute;">激流坞</span>
+                <span class="u-name" style="left: 657px;top: 495px;z-index:3;position: absolute;">{{ castles['激流坞'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 330px;top: 717px">
+                    {% if castles['澜沧城'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['澜沧城'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['澜沧城'].camp_prefix ~ '_03.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['澜沧城'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 274px;top: 654px;" src="{{ assets[castles['澜沧城'].camp_prefix ~ '_澜沧城.png'] }}" alt="">
+                <span class="u-name" style="left: 370px;top: 737px;z-index:3;position: absolute;">澜沧城</span>
+                <span class="u-name" style="left: 390px;top: 737px;z-index:3;position: absolute;">{{ castles['澜沧城'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 256px;top: 646px">
+                    {% if castles['霜戈堡'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['霜戈堡'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['霜戈堡'].camp_prefix ~ '_01.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['霜戈堡'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 205px;top: 630px;" src="{{ assets[castles['霜戈堡'].camp_prefix ~ '_霜戈堡.png'] }}" alt="">
+                <span class="u-name" style="left: 296px;top: 666px;z-index:3;position: absolute;">霜戈堡</span>
+                <span class="u-name" style="left: 316px;top: 666px;z-index:3;position: absolute;">{{ castles['霜戈堡'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 823px;top: 160px">
+                    {% if castles['金门关'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['金门关'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['金门关'].camp_prefix ~ '_04.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['金门关'].ride_piece }}</span>
+                    <br>
+                    <span class="u-name" style="left: 7px;z-index:3;position: absolute;">金门关</span>
+                    <span class="u-name" style="left: 27px;z-index:3;position: absolute;">{{ castles['金门关'].tong_name }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 773px;top: 168px;" src="{{ assets[castles['金门关'].camp_prefix ~ '_金门关.png'] }}" alt="">
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 901px;top: 188px">
+                    {% if castles['青云坞'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['青云坞'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['青云坞'].camp_prefix ~ '_01.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['青云坞'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 867px;top: 189px;" src="{{ assets[castles['青云坞'].camp_prefix ~ '_青云坞.png'] }}" alt="">
+                <span class="u-name" style="left: 941px;top: 208px;z-index:3;position: absolute;">青云坞</span>
+                <span class="u-name" style="left: 961px;top: 208px;z-index:3;position: absolute;">{{ castles['青云坞'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 773px;top: 455px">
+                    {% if castles['逐鹿坪'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['逐鹿坪'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['逐鹿坪'].camp_prefix ~ '_03.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['逐鹿坪'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 712px;top: 427px;" src="{{ assets[castles['逐鹿坪'].camp_prefix ~ '_逐鹿坪.png'] }}" alt="">
+                <span class="u-name" style="left: 813px;top: 475px;z-index:3;position: absolute;">逐鹿坪</span>
+                <span class="u-name" style="left: 833px;top: 475px;z-index:3;position: absolute;">{{ castles['逐鹿坪'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 702px;top: 526px">
+                    {% if castles['盘龙坞'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['盘龙坞'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['盘龙坞'].camp_prefix ~ '_05.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['盘龙坞'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 641px;top: 511px;" src="{{ assets[castles['盘龙坞'].camp_prefix ~ '_盘龙坞.png'] }}" alt="">
+                <span class="u-name" style="left: 742px;top: 556px;z-index:3;position: absolute;">盘龙坞</span>
+                <span class="u-name" style="left: 762px;top: 556px;z-index:3;position: absolute;">{{ castles['盘龙坞'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 530px;top: 721px">
+                    {% if castles['千岩关'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['千岩关'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['千岩关'].camp_prefix ~ '_01.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['千岩关'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%;left: 453px;top: 611px;width: 288px;height: 196px;" src="{{ assets[castles['千岩关'].camp_prefix ~ '_千岩关.png'] }}" alt="">
+                    <span class="u-name" style="left: 570px;top: 681px;z-index:3;position: absolute;">千岩关</span>
+                    <span class="u-name" style="left: 590px;top: 681px;z-index:3;position: absolute;">{{ castles['千岩关'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 487px;top: 630px">
+                    {% if castles['大理山城'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['大理山城'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['大理山城'].camp_prefix ~ '_04.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['大理山城'].ride_piece }}</span>
+                    <br>
+                    <span class="u-name" style="left: 7px;z-index:3;position: absolute;">大理山城</span>
+                    <span class="u-name" style="left: 27px;z-index:3;position: absolute;">{{ castles['大理山城'].tong_name }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%;left: 453px;top: 634px;width: 171px;height: 101px;" src="{{ assets[castles['大理山城'].camp_prefix ~ '_大理山城.png'] }}" alt="">
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 828px;top: 375px">
+                    {% if castles['秋雨堡'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['秋雨堡'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['秋雨堡'].camp_prefix ~ '_01.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['秋雨堡'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 761px;top: 359px;" src="{{ assets[castles['秋雨堡'].camp_prefix ~ '_秋雨堡.png'] }}" alt="">
+                <span class="u-name" style="left: 868px;top: 395px;z-index:3;position: absolute;">秋雨堡</span>
+                <span class="u-name" style="left: 888px;top: 395px;z-index:3;position: absolute;">{{ castles['秋雨堡'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 849px;top: 304px">
+                    {% if castles['红莲岗'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['红莲岗'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['红莲岗'].camp_prefix ~ '_02.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['红莲岗'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%; left: 745px;top: 300px;" src="{{ assets[castles['红莲岗'].camp_prefix ~ '_红莲岗.png'] }}" alt="">
+                <span class="u-name" style="left: 889px;top: 324px;z-index:3;position: absolute;">红莲岗</span>
+                <span class="u-name" style="left: 909px;top: 324px;z-index:3;position: absolute;">{{ castles['红莲岗'].tong_name }}</span>
+            </div>
+            <div>
+                <div class="sand_icon" style="left: 842px;top: 569px">
+                    {% if castles['武王城'].defensive %}
+                    <img style="max-width: 28px; position: absolute; left: 8px; top: -5px;" src="{{ assets['防御' ~ castles['武王城'].defensive ~ '.png'] }}" alt="">
+                    {% endif %}
+                    <br>
+                    <img src="{{ assets['图标_' ~ castles['武王城'].camp_prefix ~ '_武王城.png'] }}" alt="">
+                    <br>
+                    <span class="u-name">{{ castles['武王城'].ride_piece }}</span>
+                </div>
+                <img style="position: absolute;max-width: 100%;left: 701px;top: 466px;width: 251px;height: 272px;" src="{{ assets[castles['武王城'].camp_prefix ~ '_武王城.png'] }}" alt="">
+                <span class="u-name" style="left: 902px;top: 589px;z-index:3;position: absolute;">武王城</span>
+                <span class="u-name" style="left: 922px;top: 589px;z-index:3;position: absolute;">{{ castles['武王城'].tong_name }}</span>
+            </div>
+            <div>
+                <img style="position: absolute;max-width: 100%; left: 815px;top: 552px;" src="{{ assets['浩_浩气盟.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 887px;top: 661px;" src="{{ assets['图标_浩_浩气盟.png'] }}" alt="">
+                <span class="u-name" style="left: 957px;top: 671px;z-index:3;position: absolute;">浩气盟</span>
+            </div>
+            <div>
+                <img style="position: absolute;max-width: 100%;left: 478px;top: 140px;" src="{{ assets['昆仑.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 431px;top: 283px;" src="{{ assets['马嵬驿.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 312px;top: 348px;" src="{{ assets['融天岭.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 576px;top: 171px;" src="{{ assets['龙门荒漠.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 236px;top: 472px;" src="{{ assets['黑龙沼.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 462px;top: 478px;" src="{{ assets['白龙口.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 701px;top: 217px;" src="{{ assets['枫华谷战乱.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 587px;top: 424px;" src="{{ assets['瞿塘峡.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 371px;top: 667px;" src="{{ assets['无量山.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 879px;top: 211px;" src="{{ assets['金水镇.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 626px;top: 645px;" src="{{ assets['苍山洱海.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 749px;top: 486px;" src="{{ assets['巴陵县.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 815px;top: 349px;" src="{{ assets['洛道.png'] }}" alt="">
+                <img style="position: absolute;max-width: 100%;left: 810px;top: 571px;" src="{{ assets['南屏山.png'] }}" alt="">
+            </div>
+            <img class="background_img" src="{{ assets['background.png'] }}" alt="">
+        </div>
+    </div>
+</body>
+
+</html>

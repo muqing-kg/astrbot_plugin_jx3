@@ -9,6 +9,13 @@ class PluginSettings:
     def __init__(self, sqlite: AsyncSQLiteDB):
         self.sql = sqlite
 
+    COMMAND_ID_MIGRATIONS = {
+        "拍卖": "阵营拍卖",
+        "的卢": "的卢拍卖",
+        "武林争霸": "武林争霸赛",
+        "试炼之地": "试炼之地排行",
+    }
+
     async def init(self) -> None:
         await self.sql.execute(
             """
@@ -18,6 +25,7 @@ class PluginSettings:
             )
             """
         )
+        await self.sql.execute("DELETE FROM plugin_settings WHERE key='command_descs'")
 
     async def _get(self, key: str) -> str:
         row = await self.sql.select_one("plugin_settings", "key=?", (key,))
@@ -40,7 +48,18 @@ class PluginSettings:
             return {}
         if not isinstance(data, dict):
             return {}
-        return {str(k): str(v) for k, v in data.items() if str(k) and str(v)}
+        overrides = {str(k): str(v) for k, v in data.items() if str(k) and str(v)}
+        migrated = False
+        for old_id, new_id in self.COMMAND_ID_MIGRATIONS.items():
+            if old_id not in overrides:
+                continue
+            value = overrides.pop(old_id)
+            migrated = True
+            if value not in {old_id, new_id}:
+                overrides.setdefault(new_id, value)
+        if migrated:
+            await self.set_command_overrides(overrides)
+        return overrides
 
     async def server_aliases(self) -> dict[str, str]:
         raw = await self._get("server_aliases")
@@ -84,30 +103,5 @@ class PluginSettings:
     async def set_push_names(self, overrides: dict[str, str]) -> None:
         await self._set("push_name_overrides", json.dumps(overrides, ensure_ascii=False))
 
-    async def command_descs(self) -> dict[str, str]:
-        raw = await self._get("command_descs")
-        if not raw:
-            return {}
-        try:
-            data = json.loads(raw)
-        except Exception:
-            return {}
-        if not isinstance(data, dict):
-            return {}
-        return {str(k): str(v) for k, v in data.items() if str(k) and str(v)}
-
-    async def set_command_catalog(
-        self,
-        overrides: dict[str, str],
-        descs: dict[str, str],
-    ) -> None:
-        await self.sql.execute_many([
-            (
-                "INSERT OR REPLACE INTO plugin_settings (key, value) VALUES (?, ?)",
-                ("command_overrides", json.dumps(overrides, ensure_ascii=False)),
-            ),
-            (
-                "INSERT OR REPLACE INTO plugin_settings (key, value) VALUES (?, ?)",
-                ("command_descs", json.dumps(descs, ensure_ascii=False)),
-            ),
-        ])
+    async def set_command_overrides(self, overrides: dict[str, str]) -> None:
+        await self._set("command_overrides", json.dumps(overrides, ensure_ascii=False))
