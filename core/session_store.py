@@ -71,6 +71,7 @@ class SessionStore:
                 push_weibo INTEGER DEFAULT 0,
                 is_private INTEGER DEFAULT 0,
                 claim_identity TEXT DEFAULT '',
+                claim_type TEXT DEFAULT 'claimant',
                 claim_name TEXT DEFAULT '',
                 claim_at TEXT DEFAULT '',
                 bot_enabled INTEGER DEFAULT 1,
@@ -102,6 +103,7 @@ class SessionStore:
             "push_weibo INTEGER DEFAULT 0",
             "is_private INTEGER DEFAULT 0",
             "claim_identity TEXT DEFAULT ''",
+            "claim_type TEXT DEFAULT 'claimant'",
             "claim_name TEXT DEFAULT ''",
             "claim_at TEXT DEFAULT ''",
         ]
@@ -112,6 +114,14 @@ class SessionStore:
                 )
             except Exception:
                 pass
+        await self.sql.execute(
+            "UPDATE session_config SET claim_type='astrbot_admin' "
+            "WHERE TRIM(claim_identity)=''"
+        )
+        await self.sql.execute(
+            "UPDATE session_config SET claim_type='claimant' "
+            "WHERE TRIM(claim_identity)<>'' AND TRIM(COALESCE(claim_type,''))=''"
+        )
         await self.sql.execute(
             """
             CREATE TABLE IF NOT EXISTS plugin_claimants (
@@ -556,6 +566,7 @@ class SessionStore:
             "push_fail_count": int(row.get("push_fail_count") or 0),
             "push_last_error": row.get("push_last_error", ""),
             "claim_identity": row.get("claim_identity", ""),
+            "claim_type": str(row.get("claim_type") or ("astrbot_admin" if not row.get("claim_identity") else "claimant")),
             "claim_name": row.get("claim_name", ""),
             "managers": [],
         }
@@ -591,6 +602,20 @@ class SessionStore:
             return False
         return bool(await self.sql.select_one("plugin_claimants", "user_id=?", (user_id,)))
 
+    async def mark_astrbot_admin_claims(self, admin_ids: list[str] | tuple[str, ...]) -> None:
+        for admin_id in admin_ids:
+            identity = str(admin_id or "").strip()
+            if not identity:
+                continue
+            await self.sql.execute(
+                "UPDATE session_config SET claim_type='astrbot_admin' WHERE claim_identity=?",
+                (identity,),
+            )
+            await self.sql.execute(
+                "DELETE FROM plugin_claimants WHERE user_id=?",
+                (identity,),
+            )
+
     async def get_session_identity(self, umo: str) -> dict[str, Any]:
         row = await self.get(umo) or {}
         return {
@@ -599,7 +624,13 @@ class SessionStore:
             "at": str(row.get("claim_at") or "").strip(),
         }
 
-    async def set_session_claim(self, umo: str, identity: str, name: str = "") -> dict[str, Any]:
+    async def set_session_claim(
+        self,
+        umo: str,
+        identity: str,
+        name: str = "",
+        claim_type: str = "claimant",
+    ) -> dict[str, Any]:
         await self.ensure(umo)
         identity = str(identity or "").strip()
         if not identity:
@@ -607,13 +638,23 @@ class SessionStore:
         await self.sql.execute(
             """
             UPDATE session_config
-            SET claim_identity=?, claim_name=?, claim_at=?, updated_at=?
+            SET claim_identity=?, claim_type=?, claim_name=?, claim_at=?, updated_at=?
             WHERE umo=? AND (claim_identity IS NULL OR TRIM(claim_identity)='')
             """,
-            (identity, str(name or "").strip(), _now(), _now(), umo),
+            (
+                identity,
+                "astrbot_admin" if claim_type == "astrbot_admin" else "claimant",
+                str(name or "").strip(),
+                _now(),
+                _now(),
+                umo,
+            ),
         )
         row = await self.get(umo) or {}
-        if str(row.get("claim_identity") or "").strip() == identity:
+        if (
+            str(row.get("claim_identity") or "").strip() == identity
+            and str(row.get("claim_type") or "") != "astrbot_admin"
+        ):
             await self.claim_admin(identity, name)
         return row
 
@@ -626,6 +667,7 @@ class SessionStore:
             "session_config",
             {
                 "claim_identity": "",
+                "claim_type": "",
                 "claim_name": "",
                 "claim_at": "",
                 "updated_at": _now(),
