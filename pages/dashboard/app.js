@@ -247,8 +247,18 @@ function sessionCard(row) {
     } else if (act === "clear-ticket") {
       await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "ticket" }));
     } else if (act === "delete") {
-      const confirmed = window.confirm("确认删除该会话吗？将停止主动推送并清空该会话数据。");
-      if (!confirmed) return;
+      if (btn.dataset.armed !== "true") {
+        btn.dataset.armed = "true";
+        btn.textContent = "再次点击删除";
+        setStatus("再次点击“删除会话”确认清理。", true);
+        window.setTimeout(() => {
+          if (!document.contains(btn) || btn.dataset.armed !== "true") return;
+          btn.dataset.armed = "";
+          btn.textContent = "删除会话";
+          setStatus("已取消删除。");
+        }, 5000);
+        return;
+      }
       try {
         const result = await bridge.apiPost("page/sessions/delete", { umo: row.umo });
         setStatus(result.message || "已删除会话", !result.left);
