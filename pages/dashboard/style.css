@@ -104,6 +104,19 @@ button.danger[data-armed="true"] {
   word-break: break-all;
 }
 .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick-actions {
+  display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+  margin: -4px 0 12px;
+}
+.quick-actions button {
+  min-height: 34px;
+  padding: 6px 12px;
+  width: auto;
+}
 .pill {
   border-radius: 999px;
   padding: 2px 8px;

@@ -90,6 +90,7 @@ class Jx3ApiPlugin(Star):
             await self.plugin_sql_db.connect()
             await self.init_achievement_cache_data()
             await self.sessions.init()
+            await self.sessions.mark_astrbot_admin_claims(self._astrbot_admin_ids())
             await self.settings.init()
             self.command_catalog = apply_command_overrides(await self.settings.command_overrides())
             self.server_catalog = apply_alias_overrides(await self.settings.server_aliases())
@@ -304,6 +305,25 @@ class Jx3ApiPlugin(Star):
         except Exception:
             raw = None
         return normalize_system_prefixes(raw)
+
+    def _astrbot_admin_ids(self) -> list[str]:
+        try:
+            config = getattr(self.context, "astrbot_config", None) or {}
+            raw = config.get("admins_id", [])
+        except Exception:
+            raw = []
+        if isinstance(raw, str):
+            values = raw.replace("，", ",").split(",")
+        elif isinstance(raw, (list, tuple, set)):
+            values = list(raw)
+        else:
+            values = []
+        result = []
+        for value in values:
+            identity = str(value or "").strip()
+            if identity and identity not in result:
+                result.append(identity)
+        return result
 
     def _event_umo(self, event: AstrMessageEvent) -> str:
         try:
@@ -533,11 +553,13 @@ class Jx3ApiPlugin(Star):
                 self._event_display_name(event),
                 is_private=self._is_private(event),
             )
-            await self.sessions.set_session_claim(
-                umo,
-                self._sender_id(event),
-                self._sender_name(event),
-            )
+            if not self._is_astrbot_admin(event):
+                await self.sessions.set_session_claim(
+                    umo,
+                    self._sender_id(event),
+                    self._sender_name(event),
+                    claim_type="claimant",
+                )
             return event.plain_result(hint_bind_ok(official))
 
         if parsed.action in {"open_push", "close_push"}:
@@ -751,9 +773,8 @@ class Jx3ApiPlugin(Star):
                     self._event_display_name(event),
                     is_private=self._is_private(event),
                 )
-                if self.sessions.is_bot_enabled(row):
-                    if self.sessions.is_llm_enabled(row):
-                        yield self._forced_llm(event, clean_text)
+                if self.sessions.is_llm_enabled(row):
+                    yield self._forced_llm(event, clean_text)
             return
 
         umo = self._event_umo(event)
@@ -764,7 +785,11 @@ class Jx3ApiPlugin(Star):
         )
         claim_cmd = ((self.command_catalog.get("认领") or {}).get("command") or "认领")
         claim_and_voice_cmds = {claim_cmd, current_command_name(self.command_catalog, "张嘴"), current_command_name(self.command_catalog, "闭嘴")}
-        if not self.sessions.is_bot_enabled(row) and parts[0] not in claim_and_voice_cmds:
+        if (
+            not self.sessions.is_bot_enabled(row)
+            and not bot_at
+            and parts[0] not in claim_and_voice_cmds
+        ):
             return
 
         admin_ret = await self._handle_admin_command(event, parts)
@@ -868,6 +893,11 @@ class Jx3ApiPlugin(Star):
     def _forced_llm(self, event: AstrMessageEvent, text: str):
         """被 @ 后强制走 LLM 回话，并屏蔽默认链路避免重复回复。"""
         prompt = (text or "").strip() or "你好"
+        try:
+            event.is_at_or_wake_command = True
+            event.is_wake = True
+        except Exception:
+            pass
         try:
             event.should_call_llm(True)
         except Exception:

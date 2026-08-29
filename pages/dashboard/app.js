@@ -101,8 +101,27 @@ function renderSessions(payload) {
     cardsEl.appendChild(empty);
     return;
   }
+  const groups = new Map();
   for (const row of sessions) {
-    cardsEl.appendChild(sessionCard(row));
+    const isAdmin = row.claim_type === "astrbot_admin" || !row.claim_identity;
+    const key = isAdmin ? "astrbot_admin" : `claimant:${row.claim_identity}`;
+    const title = isAdmin ? "AstrBot 管理员" : (row.claim_name || row.claim_identity || "未认领");
+    if (!groups.has(key)) groups.set(key, { title, sessions: [] });
+    groups.get(key).sessions.push(row);
+  }
+  const orderedGroups = [...groups.values()].sort((left, right) => {
+    if (left.title === "AstrBot 管理员") return -1;
+    if (right.title === "AstrBot 管理员") return 1;
+    return left.title.localeCompare(right.title, "zh-CN");
+  });
+  for (const group of orderedGroups) {
+    const head = document.createElement("div");
+    head.className = "group-head";
+    head.textContent = group.title;
+    cardsEl.appendChild(head);
+    for (const row of group.sessions) {
+      cardsEl.appendChild(sessionCard(row));
+    }
   }
 }
 
@@ -116,7 +135,7 @@ function sessionCard(row) {
         <p class="umo">${escapeHtml(row.umo || "")}</p>
       </div>
       <div class="pills">
-        ${pill("认领人 " + (row.claim_name || row.claim_identity || "未认领"), Boolean(row.claim_identity))}
+        ${pill(row.claim_type === "astrbot_admin" || !row.claim_identity ? "AstrBot 管理员" : `认领人 ${row.claim_name || row.claim_identity}`, true)}
         ${pill(row.server || "未绑定区服", Boolean(row.server))}
         ${pill("Token " + (row.token_status || "未配置"), Boolean(row.has_token))}
         ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
@@ -127,6 +146,10 @@ function sessionCard(row) {
           row.push_last_error || ""
         )}
       </div>
+    </div>
+    <div class="quick-actions">
+      <button data-act="delete" class="danger" type="button">删除会话</button>
+      ${row.claim_type === "claimant" && row.claim_identity ? `<button data-act="clear-claim" class="ghost" type="button">取消认领资格</button>` : ""}
     </div>
     <div class="switches">
       <label class="toggle">
@@ -176,26 +199,6 @@ function sessionCard(row) {
         </label>
         <div class="row-actions">
           <button data-act="save-managers" type="button">保存管理</button>
-        </div>
-      </div>
-      ${row.claim_identity ? `
-      <div class="row">
-        <label class="field">
-          <span>认领人</span>
-          <span class="static-text">${escapeHtml(row.claim_name || row.claim_identity)}</span>
-        </label>
-        <div class="row-actions">
-          <button data-act="clear-claim" class="ghost" type="button">取消认领资格</button>
-        </div>
-      </div>
-      ` : ""}
-      <div class="row">
-        <label class="field">
-          <span>会话清理</span>
-          <span class="static-text">删除会话会清空区服、Token、推栏、推送和管理员数据。</span>
-        </label>
-        <div class="row-actions">
-          <button data-act="delete" class="danger" type="button">删除会话</button>
         </div>
       </div>
     </div>
