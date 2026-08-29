@@ -9,7 +9,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '日常',
         'command_tpl': '日常 | 日常 [天数]',
-        'example_tpl': '日常 | 日常 1',
         'desc': '日常活动 / 日常',
     },
     {
@@ -17,7 +16,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '日常预测',
         'command_tpl': '日常预测',
-        'example_tpl': '日常预测',
         'desc': '日常活动 / 日常预测',
     },
     {
@@ -25,7 +23,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '开服',
         'command_tpl': '开服 | 开服 [服务器]',
-        'example_tpl': '开服 | 开服 飞龙在天',
         'desc': '日常活动 / 开服',
     },
     {
@@ -33,7 +30,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '科举',
         'command_tpl': '科举 [题目] [条数]',
-        'example_tpl': '科举 李白',
         'desc': '日常活动 / 科举',
     },
     {
@@ -41,7 +37,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '小药',
         'command_tpl': '小药 [心法]',
-        'example_tpl': '小药 剑纯',
         'desc': '日常活动 / 小药',
     },
     {
@@ -49,7 +44,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '物价交易',
         'command': '金价',
         'command_tpl': '金价 | 金价 [服务器] [数量]',
-        'example_tpl': '金价 | 金价 飞龙在天 15',
         'desc': '物价交易 / 金价',
     },
     {
@@ -57,7 +51,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '物价交易',
         'command': '物价',
         'command_tpl': '物价 [外观] [服务器]',
-        'example_tpl': '物价 狐金 | 物价 狐金 飞龙在天',
         'desc': '物价交易 / 物价',
     },
     {
@@ -65,7 +58,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '物价交易',
         'command': '外观搜索',
         'command_tpl': '外观搜索 [关键词]',
-        'example_tpl': '外观搜索 狐金',
         'desc': '物价交易 / 外观搜索',
     },
     {
@@ -73,7 +65,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '物价交易',
         'command': '交易行',
         'command_tpl': '交易行 [服务器] [物品]',
-        'example_tpl': '交易行 飞龙在天 六级',
         'desc': '物价交易 / 交易行',
     },
     {
@@ -81,7 +72,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '物价交易',
         'command': '万宝楼',
         'command_tpl': '万宝楼 [编号]',
-        'example_tpl': '万宝楼 123456',
         'desc': '物价交易 / 万宝楼',
     },
     {
@@ -89,7 +79,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '物价交易',
         'command': '花价',
         'command_tpl': '花价 [服务器] [名称] [地图]',
-        'example_tpl': '花价 飞龙在天',
         'desc': '物价交易 / 花价',
     },
     {
@@ -97,7 +86,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '物价交易',
         'command': '装饰',
         'command_tpl': '装饰 [名称]',
-        'example_tpl': '装饰 桌',
         'desc': '物价交易 / 装饰',
     },
     {
@@ -105,7 +93,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '物价交易',
         'command': '器物谱',
         'command_tpl': '器物谱 [地图]',
-        'example_tpl': '器物谱 浩气盟',
         'desc': '物价交易 / 器物谱',
     },
     {
@@ -113,7 +100,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '物价交易',
         'command': '阵营拍卖',
         'command_tpl': '阵营拍卖 [服务器] [物品] [数量]',
-        'example_tpl': '阵营拍卖 飞龙在天',
         'desc': '物价交易 / 阵营拍卖',
     },
     {
@@ -121,7 +107,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '物价交易',
         'command': '配方',
         'command_tpl': '配方 [服务器] [物品] [来源]',
-        'example_tpl': '配方 飞龙在天 狐金 0',
         'desc': '物价交易 / 配方',
     },
     {
@@ -129,7 +114,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '配装工具',
         'command': '配装',
         'command_tpl': '配装 [心法] [类型]',
-        'example_tpl': '配装 剑纯',
         'desc': '配装工具 / 配装',
     },
     {
@@ -137,7 +121,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '配装工具',
         'command': '宏',
         'command_tpl': '宏 [心法]',
-        'example_tpl': '宏 鲸鱼',
         'desc': '配装工具 / 宏',
     },
     {
@@ -145,7 +128,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '配装工具',
         'command': '技能',
         'command_tpl': '技能 [心法]',
-        'example_tpl': '技能 毒经',
         'desc': '配装工具 / 技能',
     },
     {
@@ -153,7 +135,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '配装工具',
         'command': '奇穴',
         'command_tpl': '奇穴 [心法]',
-        'example_tpl': '奇穴 毒经',
         'desc': '配装工具 / 奇穴',
     },
     {
@@ -161,7 +142,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '配装工具',
         'command': '阵眼',
         'command_tpl': '阵眼 [心法]',
-        'example_tpl': '阵眼 毒经',
         'desc': '配装工具 / 阵眼',
     },
     {
@@ -169,7 +149,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '配装工具',
         'command': '沙盘',
         'command_tpl': '沙盘 | 沙盘 [服务器]',
-        'example_tpl': '沙盘 | 沙盘 飞龙在天',
         'desc': '各据点归属帮会 / 阵营 + 本周被献祭（防守）次数',
     },
     {
@@ -177,7 +156,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '配装工具',
         'command': '技改',
         'command_tpl': '技改',
-        'example_tpl': '技改',
         'desc': '配装工具 / 技改',
     },
     {
@@ -185,7 +163,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '骚话',
         'command_tpl': '骚话',
-        'example_tpl': '骚话',
         'desc': '日常活动 / 骚话',
     },
     {
@@ -193,7 +170,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '配装工具',
         'command': '聊天',
         'command_tpl': '聊天 [服务器] [角色] [条数] [页数]',
-        'example_tpl': '聊天 飞龙在天 小螺卜头',
         'desc': '配装工具 / 聊天',
     },
     {
@@ -201,7 +177,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '副本掉落',
         'command': '掉落',
         'command_tpl': '掉落 [物品] [服务器] [数量]',
-        'example_tpl': '掉落 太一玄晶 飞龙在天',
         'desc': '副本掉落 / 掉落',
     },
     {
@@ -209,7 +184,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '副本掉落',
         'command': '烟花',
         'command_tpl': '烟花 [服务器] [角色]',
-        'example_tpl': '烟花 飞龙在天 小螺卜头',
         'desc': '副本掉落 / 烟花',
     },
     {
@@ -217,7 +191,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '查询',
         'command_tpl': '查询 [服务器] [角色]',
-        'example_tpl': '查询 飞龙在天 小螺卜头',
         'desc': '奇遇宠物 / 角色奇遇',
     },
     {
@@ -225,7 +198,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '未出',
         'command_tpl': '未出 [服务器] [角色]',
-        'example_tpl': '未出 飞龙在天 小螺卜头',
         'desc': '奇遇宠物 / 未出',
     },
     {
@@ -233,7 +205,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '汇总',
         'command_tpl': '汇总 [服务器] [天数]',
-        'example_tpl': '汇总 飞龙在天',
         'desc': '奇遇宠物 / 汇总',
     },
     {
@@ -241,7 +212,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '近期',
         'command_tpl': '近期 [服务器] [数量]',
-        'example_tpl': '近期 飞龙在天',
         'desc': '奇遇宠物 / 近期',
     },
     {
@@ -249,7 +219,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '统计',
         'command_tpl': '统计 [奇遇] [服务器] [数量]',
-        'example_tpl': '统计 追魂骨 飞龙在天',
         'desc': '奇遇宠物 / 统计',
     },
     {
@@ -257,7 +226,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '攻略',
         'command_tpl': '攻略 [奇遇]',
-        'example_tpl': '攻略 生死判',
         'desc': '奇遇宠物 / 攻略',
     },
     {
@@ -265,7 +233,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '马场',
         'command_tpl': '马场 | 马场 [服务器]',
-        'example_tpl': '马场 | 马场 飞龙在天',
         'desc': '奇遇宠物 / 马场',
     },
     {
@@ -273,7 +240,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '刷马',
         'command_tpl': '刷马 | 刷马 [服务器]',
-        'example_tpl': '刷马 | 刷马 飞龙在天',
         'desc': '奇遇宠物 / 刷马',
     },
     {
@@ -281,7 +247,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '的卢拍卖',
         'command_tpl': '的卢拍卖 [服务器]',
-        'example_tpl': '的卢拍卖 飞龙在天',
         'desc': '奇遇宠物 / 的卢拍卖',
     },
     {
@@ -289,7 +254,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '赤兔',
         'command_tpl': '赤兔',
-        'example_tpl': '赤兔',
         'desc': '奇遇宠物 / 赤兔',
     },
     {
@@ -297,7 +261,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '奇遇宠物',
         'command': '本周赤兔',
         'command_tpl': '本周赤兔',
-        'example_tpl': '本周赤兔',
         'desc': '奇遇宠物 / 本周赤兔',
     },
     {
@@ -305,7 +268,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '角色资料',
         'command': '角色',
         'command_tpl': '角色 [服务器] [角色]',
-        'example_tpl': '角色 飞龙在天 小螺卜头',
         'desc': '角色资料 / 角色',
     },
     {
@@ -313,7 +275,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '角色资料',
         'command': '名片',
         'command_tpl': '名片 [服务器] [角色]',
-        'example_tpl': '名片 飞龙在天 小螺卜头',
         'desc': '角色资料 / 名片',
     },
     {
@@ -321,7 +282,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '角色资料',
         'command': '全部名片',
         'command_tpl': '全部名片 [服务器] [角色]',
-        'example_tpl': '全部名片 飞龙在天 小螺卜头',
         'desc': '角色资料 / 全部名片',
     },
     {
@@ -329,7 +289,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '角色资料',
         'command': '随机名片',
         'command_tpl': '随机名片 [服务器] [门派] [体型]',
-        'example_tpl': '随机名片 飞龙在天',
         'desc': '角色资料 / 随机名片',
     },
     {
@@ -337,7 +296,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '角色资料',
         'command': '精耐',
         'command_tpl': '精耐 [服务器] [角色]',
-        'example_tpl': '精耐 飞龙在天 小螺卜头',
         'desc': '角色资料 / 精耐',
     },
     {
@@ -345,7 +303,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '角色资料',
         'command': '成就',
         'command_tpl': '成就 [服务器] [角色] [成就]',
-        'example_tpl': '成就 飞龙在天 小螺卜头 名剑',
         'desc': '角色资料 / 成就',
     },
     {
@@ -353,7 +310,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '角色资料',
         'command': '资历',
         'command_tpl': '资历 [服务器] [角色]',
-        'example_tpl': '资历 飞龙在天 小螺卜头',
         'desc': '角色资料 / 资历',
     },
     {
@@ -361,7 +317,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '角色资料',
         'command': '资历分布',
         'command_tpl': '资历分布 [服务器] [角色] [分类]',
-        'example_tpl': '资历分布 飞龙在天 小螺卜头',
         'desc': '角色资料 / 资历分布',
     },
     {
@@ -369,7 +324,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '角色资料',
         'command': '战绩',
         'command_tpl': '战绩 [服务器] [角色] [模式]',
-        'example_tpl': '战绩 飞龙在天 小螺卜头',
         'desc': '角色资料 / 战绩',
     },
     {
@@ -377,7 +331,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '名剑排行',
         'command_tpl': '名剑排行 [模式] [数量]',
-        'example_tpl': '名剑排行 33',
         'desc': '排行榜单 / 名剑排行',
     },
     {
@@ -385,7 +338,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '名剑统计',
         'command_tpl': '名剑统计 [模式]',
-        'example_tpl': '名剑统计 33',
         'desc': '排行榜单 / 名剑统计',
     },
     {
@@ -393,7 +345,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '跨服名剑榜',
         'command_tpl': '跨服名剑榜 [服务器] [模式]',
-        'example_tpl': '跨服名剑榜 飞龙在天 33',
         'desc': '排行榜单 / 跨服名剑榜',
     },
     {
@@ -401,7 +352,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '武林争霸赛',
         'command_tpl': '武林争霸赛 [服务器] [阵营]',
-        'example_tpl': '武林争霸赛 飞龙在天 恶人谷',
         'desc': '排行榜单 / 武林争霸赛',
     },
     {
@@ -409,7 +359,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '捕快荣誉榜',
         'command_tpl': '捕快荣誉榜 [服务器]',
-        'example_tpl': '捕快荣誉榜 飞龙在天',
         'desc': '排行榜单 / 捕快荣誉榜',
     },
     {
@@ -417,7 +366,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '江湖浪客榜',
         'command_tpl': '江湖浪客榜 [服务器]',
-        'example_tpl': '江湖浪客榜 飞龙在天',
         'desc': '排行榜单 / 江湖浪客榜',
     },
     {
@@ -425,7 +373,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '决斗挑战榜',
         'command_tpl': '决斗挑战榜 [服务器] [公开/私密]',
-        'example_tpl': '决斗挑战榜 飞龙在天',
         'desc': '排行榜单 / 决斗挑战榜',
     },
     {
@@ -433,7 +380,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '资历排行',
         'command_tpl': '资历排行 [服务器] [门派]',
-        'example_tpl': '资历排行 飞龙在天',
         'desc': '排行榜单 / 资历排行',
     },
     {
@@ -441,7 +387,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '名士排行',
         'command_tpl': '名士排行 [服务器]',
-        'example_tpl': '名士排行 飞龙在天',
         'desc': '排行榜单 / 名士排行',
     },
     {
@@ -449,7 +394,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '江湖排行',
         'command_tpl': '江湖排行 [服务器]',
-        'example_tpl': '江湖排行 飞龙在天',
         'desc': '排行榜单 / 江湖排行',
     },
     {
@@ -457,7 +401,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '兵甲排行',
         'command_tpl': '兵甲排行 [服务器]',
-        'example_tpl': '兵甲排行 飞龙在天',
         'desc': '排行榜单 / 兵甲排行',
     },
     {
@@ -465,7 +408,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '名师排行',
         'command_tpl': '名师排行 [服务器]',
-        'example_tpl': '名师排行 飞龙在天',
         'desc': '排行榜单 / 名师排行',
     },
     {
@@ -473,7 +415,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '阵营排行',
         'command_tpl': '阵营排行 [服务器]',
-        'example_tpl': '阵营排行 飞龙在天',
         'desc': '排行榜单 / 阵营排行',
     },
     {
@@ -481,7 +422,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '薪火排行',
         'command_tpl': '薪火排行 [服务器]',
-        'example_tpl': '薪火排行 飞龙在天',
         'desc': '排行榜单 / 薪火排行',
     },
     {
@@ -489,7 +429,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '家园排行',
         'command_tpl': '家园排行 [服务器]',
-        'example_tpl': '家园排行 飞龙在天',
         'desc': '排行榜单 / 家园排行',
     },
     {
@@ -497,7 +436,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '浩气神兵排行',
         'command_tpl': '浩气神兵排行 [服务器]',
-        'example_tpl': '浩气神兵排行 飞龙在天',
         'desc': '排行榜单 / 浩气神兵排行',
     },
     {
@@ -505,7 +443,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '恶人神兵排行',
         'command_tpl': '恶人神兵排行 [服务器]',
-        'example_tpl': '恶人神兵排行 飞龙在天',
         'desc': '排行榜单 / 恶人神兵排行',
     },
     {
@@ -513,7 +450,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '浩气爱心排行',
         'command_tpl': '浩气爱心排行 [服务器]',
-        'example_tpl': '浩气爱心排行 飞龙在天',
         'desc': '排行榜单 / 浩气爱心排行',
     },
     {
@@ -521,7 +457,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '恶人爱心排行',
         'command_tpl': '恶人爱心排行 [服务器]',
-        'example_tpl': '恶人爱心排行 飞龙在天',
         'desc': '排行榜单 / 恶人爱心排行',
     },
     {
@@ -529,7 +464,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '试炼之地排行',
         'command_tpl': '试炼之地排行 [服务器] [心法]',
-        'example_tpl': '试炼之地排行 飞龙在天 剑纯',
         'desc': '排行榜单 / 试炼之地排行',
     },
     {
@@ -537,7 +471,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '赛季恶人战功榜',
         'command_tpl': '赛季恶人战功榜 [服务器]',
-        'example_tpl': '赛季恶人战功榜 飞龙在天',
         'desc': '排行榜单 / 赛季恶人战功榜',
     },
     {
@@ -545,7 +478,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '赛季浩气战功榜',
         'command_tpl': '赛季浩气战功榜 [服务器]',
-        'example_tpl': '赛季浩气战功榜 飞龙在天',
         'desc': '排行榜单 / 赛季浩气战功榜',
     },
     {
@@ -553,7 +485,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '上周恶人战功榜',
         'command_tpl': '上周恶人战功榜 [服务器]',
-        'example_tpl': '上周恶人战功榜 飞龙在天',
         'desc': '排行榜单 / 上周恶人战功榜',
     },
     {
@@ -561,7 +492,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '上周浩气战功榜',
         'command_tpl': '上周浩气战功榜 [服务器]',
-        'example_tpl': '上周浩气战功榜 飞龙在天',
         'desc': '排行榜单 / 上周浩气战功榜',
     },
     {
@@ -569,7 +499,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '本周恶人战功榜',
         'command_tpl': '本周恶人战功榜 [服务器]',
-        'example_tpl': '本周恶人战功榜 飞龙在天',
         'desc': '排行榜单 / 本周恶人战功榜',
     },
     {
@@ -577,7 +506,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '本周浩气战功榜',
         'command_tpl': '本周浩气战功榜 [服务器]',
-        'example_tpl': '本周浩气战功榜 飞龙在天',
         'desc': '排行榜单 / 本周浩气战功榜',
     },
     {
@@ -585,7 +513,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '排行榜',
         'command_tpl': '排行榜',
-        'example_tpl': '排行榜',
         'desc': '排行榜单 / 排行榜',
     },
     {
@@ -593,7 +520,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '排行榜单',
         'command': '战功榜',
         'command_tpl': '战功榜 [阵营]',
-        'example_tpl': '战功榜 恶人',
         'desc': '排行榜单 / 战功榜',
     },
     {
@@ -601,7 +527,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '阵营帮会',
         'command': '百战',
         'command_tpl': '百战',
-        'example_tpl': '百战',
         'desc': '阵营帮会 / 百战',
     },
     {
@@ -609,7 +534,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '阵营帮会',
         'command': '楚天社',
         'command_tpl': '楚天社',
-        'example_tpl': '楚天社',
         'desc': '阵营帮会 / 楚天社',
     },
     {
@@ -617,7 +541,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '阵营帮会',
         'command': '云从社',
         'command_tpl': '云从社',
-        'example_tpl': '云从社',
         'desc': '阵营帮会 / 云从社',
     },
     {
@@ -625,7 +548,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '阵营帮会',
         'command': '披风会',
         'command_tpl': '披风会',
-        'example_tpl': '披风会',
         'desc': '阵营帮会 / 披风会',
     },
     {
@@ -633,7 +555,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '阵营帮会',
         'command': '穹野卫',
         'command_tpl': '穹野卫',
-        'example_tpl': '穹野卫',
         'desc': '阵营帮会 / 穹野卫',
     },
     {
@@ -641,7 +562,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '阵营帮会',
         'command': '统战',
         'command_tpl': '统战 [服务器]',
-        'example_tpl': '统战 飞龙在天',
         'desc': '阵营帮会 / 统战',
     },
     {
@@ -649,7 +569,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '阵营帮会',
         'command': '诛恶',
         'command_tpl': '诛恶 [服务器]',
-        'example_tpl': '诛恶 飞龙在天',
         'desc': '阵营帮会 / 诛恶',
     },
     {
@@ -657,7 +576,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '阵营帮会',
         'command': '帮战',
         'command_tpl': '帮战 [服务器]',
-        'example_tpl': '帮战 飞龙在天',
         'desc': '阵营帮会 / 帮战',
     },
     {
@@ -665,7 +583,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '开团招募',
         'command': '招募',
         'command_tpl': '招募 [服务器] [副本]',
-        'example_tpl': '招募 飞龙在天 浪客行',
         'desc': '开团招募 / 招募',
     },
     {
@@ -673,7 +590,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '开团招募',
         'command': '团长',
         'command_tpl': '团长 [服务器] [名称]',
-        'example_tpl': '团长 飞龙在天 小螺卜头',
         'desc': '开团招募 / 团长',
     },
     {
@@ -681,7 +597,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '开团招募',
         'command': '团牌',
         'command_tpl': '团牌 [服务器] [内容]',
-        'example_tpl': '团牌 飞龙在天 开团',
         'desc': '开团招募 / 团牌',
     },
     {
@@ -689,7 +604,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '开团招募',
         'command': '拜师',
         'command_tpl': '拜师 [服务器] [关键词]',
-        'example_tpl': '拜师 飞龙在天',
         'desc': '开团招募 / 拜师',
     },
     {
@@ -697,7 +611,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '开团招募',
         'command': '收徒',
         'command_tpl': '收徒 [服务器] [关键词]',
-        'example_tpl': '收徒 飞龙在天',
         'desc': '开团招募 / 收徒',
     },
     {
@@ -705,7 +618,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '帮助入口',
         'command': '功能',
         'command_tpl': '功能',
-        'example_tpl': '功能',
         'desc': '帮助入口 / 功能',
     },
     {
@@ -713,7 +625,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '会话设置',
         'command': '认领',
         'command_tpl': '认领 [名称]',
-        'example_tpl': '认领 剑网3机器人',
         'desc': '会话设置 / 认领',
     },
     {
@@ -721,7 +632,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '会话设置',
         'command': '绑定',
         'command_tpl': '绑定 [区服]',
-        'example_tpl': '绑定 飞龙在天',
         'desc': '会话设置 / 绑定',
     },
     {
@@ -729,7 +639,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '会话设置',
         'command': '查询令牌',
         'command_tpl': '查询令牌',
-        'example_tpl': '查询令牌',
         'desc': '会话设置 / 查询令牌',
     },
     {
@@ -737,7 +646,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '会话设置',
         'command': '授权管理',
         'command_tpl': '授权管理 [@成员]',
-        'example_tpl': '授权管理 @唐小珂',
         'desc': '会话设置 / 授权管理',
     },
     {
@@ -745,7 +653,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '会话设置',
         'command': '查看管理',
         'command_tpl': '查看管理',
-        'example_tpl': '查看管理',
         'desc': '会话设置 / 查看管理',
     },
     {
@@ -753,15 +660,27 @@ DEFAULT_COMMAND_ROWS = [
         'group': '会话设置',
         'command': '删除管理',
         'command_tpl': '删除管理 [序号]',
-        'example_tpl': '删除管理 2',
         'desc': '会话设置 / 删除管理',
+    },
+    {
+        'id': '张嘴',
+        'group': '会话设置',
+        'command': '张嘴',
+        'command_tpl': '张嘴',
+        'desc': '会话设置 / 张嘴',
+    },
+    {
+        'id': '闭嘴',
+        'group': '会话设置',
+        'command': '闭嘴',
+        'command_tpl': '闭嘴',
+        'desc': '会话设置 / 闭嘴',
     },
     {
         'id': '通知管理',
         'group': '会话设置',
         'command': '通知管理',
         'command_tpl': '通知管理',
-        'example_tpl': '通知管理',
         'desc': '会话设置 / 通知管理',
     },
     {
@@ -769,7 +688,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '会话设置',
         'command': '打开',
         'command_tpl': '打开 [类型]',
-        'example_tpl': '打开 新闻',
         'desc': '会话设置 / 打开',
     },
     {
@@ -777,7 +695,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '会话设置',
         'command': '关闭',
         'command_tpl': '关闭 [类型]',
-        'example_tpl': '关闭 新闻',
         'desc': '会话设置 / 关闭',
     },
     {
@@ -785,23 +702,20 @@ DEFAULT_COMMAND_ROWS = [
         'group': '会话设置',
         'command': 'Token',
         'command_tpl': '私聊 {command} [UMO] [密钥]',
-        'example_tpl': '私聊 {command} UMO 密钥',
-        'desc': '会话设置 / Token，仅私聊可用',
+        'desc': '会话设置 / Token，仅私聊配置群聊会话',
     },
     {
         'id': '推栏',
         'group': '会话设置',
         'command': '推栏',
         'command_tpl': '私聊 {command} [UMO] [标识]',
-        'example_tpl': '私聊 {command} UMO 标识',
-        'desc': '会话设置 / 推栏，仅私聊可用',
+        'desc': '会话设置 / 推栏，仅私聊配置群聊会话',
     },
     {
         'id': '新闻',
         'group': '日常活动',
         'command': '新闻',
         'command_tpl': '新闻 [数量]',
-        'example_tpl': '新闻',
         'desc': '日常活动 / 新闻',
     },
     {
@@ -809,7 +723,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '维护',
         'command_tpl': '维护 [数量]',
-        'example_tpl': '维护',
         'desc': '日常活动 / 维护',
     },
     {
@@ -817,7 +730,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '答案之书',
         'command_tpl': '答案之书',
-        'example_tpl': '答案之书',
         'desc': '日常活动 / 答案之书',
     },
     {
@@ -825,7 +737,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '舔狗语录',
         'command_tpl': '舔狗语录',
-        'example_tpl': '舔狗语录',
         'desc': '日常活动 / 舔狗语录',
     },
     {
@@ -833,7 +744,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '喝什么',
         'command_tpl': '喝什么',
-        'example_tpl': '喝什么',
         'desc': '日常活动 / 喝什么',
     },
     {
@@ -841,7 +751,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '吃什么',
         'command_tpl': '吃什么',
-        'example_tpl': '吃什么',
         'desc': '日常活动 / 吃什么',
     },
     {
@@ -849,7 +758,6 @@ DEFAULT_COMMAND_ROWS = [
         'group': '日常活动',
         'command': '渣男语录',
         'command_tpl': '渣男语录',
-        'example_tpl': '渣男语录',
         'desc': '日常活动 / 渣男语录',
     },
 ]
@@ -992,16 +900,18 @@ WEB_COMMAND_DESCRIPTIONS = {
     "收徒": "按服务器或关键字查询收徒列表",
     "功能": "查看自主查询命令帮助图",
     "认领": "在私聊认领本插件的管理身份",
-    "绑定": "为当前群聊或私聊绑定默认区服",
+    "绑定": "为当前群聊绑定默认区服",
     "查询令牌": "查询 JX3API Token 的等级、已用次数、剩余次数或到期时间",
     "授权管理": "授权被 @ 的成员管理本会话通知",
     "查看管理": "查看本会话认领人与授权管理员",
     "删除管理": "按序号移除本会话授权管理员",
+    "张嘴": "允许被 @ 后触发 LLM 回话",
+    "闭嘴": "禁止被 @ 后触发 LLM 回话",
     "通知管理": "查看和管理本会话主动推送事件",
     "打开": "开启指定事件的主动推送",
     "关闭": "关闭指定事件的主动推送",
-    "Token": "为指定会话配置 JX3API Token，仅私聊可用",
-    "推栏": "为指定会话配置推栏标识，仅私聊可用",
+    "Token": "为指定群聊会话配置 JX3API Token，仅私聊可用",
+    "推栏": "为指定群聊会话配置推栏标识，仅私聊可用",
     "新闻": "查询最新官方资讯",
     "维护": "标题含“版本更新”的公告，最新在前",
     "答案之书": "随机返回一条答案和鼓励语",
@@ -1089,6 +999,16 @@ def _replace_command_text(text: str, old: str, new: str) -> str:
     return re.sub(rf"(?<!\S){re.escape(old)}(?!\S)", new, text)
 
 
+def _web_description(item: dict, row: dict, old: str, new: str) -> str:
+    desc = WEB_COMMAND_DESCRIPTIONS.get(item["id"], "")
+    if desc:
+        return desc
+    desc = str(row.get("desc") or "")
+    if not desc or desc == f"{item['group']} / {item['id']}":
+        return _replace_command_text(str(item.get("command_tpl") or item["id"]), old, new)
+    return _replace_command_text(desc, old, new)
+
+
 def help_rows(
     catalog: dict | None = None,
     *,
@@ -1113,9 +1033,9 @@ def help_rows(
         rows.append({
             "id": item["id"],
             "group": item["group"],
+            "word": new,
             "command": _replace_command_text(item["command_tpl"], old, new),
-            "example": _replace_command_text(item["example_tpl"], old, new),
-            "desc": _replace_command_text(str(row.get("desc") or item["desc"]), old, new),
+            "web_desc": _web_description(item, row, old, new),
         })
     return rows
 
@@ -1136,18 +1056,12 @@ def public_command_rows(catalog: dict | None = None) -> list[dict]:
         old = item["command"]
         new = str(row.get("command") or old)
         desc = WEB_COMMAND_DESCRIPTIONS.get(item["id"], "")
-        if not desc:
-            desc = str(row.get("desc") or "")
-            if not desc or desc == f"{item['group']} / {item['id']}":
-                desc = _replace_command_text(str(item.get("command_tpl") or item["id"]), old, new)
-            else:
-                desc = _replace_command_text(desc, old, new)
+        desc = desc or _web_description(item, row, old, new)
         rows.append({
             "id": item["id"],
             "group": item["group"],
-            "default_command": item["command"],
             "command": new,
-            "example": _replace_command_text(item["example_tpl"], old, new),
+            "params": _replace_command_text(item["command_tpl"], old, new),
             "desc": desc,
         })
     return rows

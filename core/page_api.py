@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import re
+
 from typing import Any
 
 from astrbot.api import logger
 
 from .page_payload import read_json_payload
+from .session_policy import is_group_umo
 
 PLUGIN_NAME = "astrbot_plugin_jx3"
 
@@ -33,6 +36,7 @@ class SessionPageAPI:
             ("/page/sessions/bot", self.set_bot, ["POST"], "设置会话是否启用机器人"),
             ("/page/sessions/claim", self.clear_claim, ["POST"], "取消认领资格"),
             ("/page/sessions/managers", self.save_managers, ["POST"], "保存会话授权管理"),
+            ("/page/sessions/delete", self.delete_session, ["POST"], "删除群聊会话"),
             ("/page/commands", self.list_commands, ["GET"], "列出全局命令"),
             ("/page/commands/save", self.save_command, ["POST"], "保存全局命令"),
             ("/page/commands/reset", self.reset_commands, ["POST"], "恢复默认命令"),
@@ -76,7 +80,7 @@ class SessionPageAPI:
             "sessions": sessions,
             "has_global_token": has_global_token,
             "has_global_ticket": has_global_ticket,
-            "notice": "该页面仅供 AstrBot 后台主人使用，请勿暴露到公网。",
+            "notice": "本页面只展示群聊会话，仅供 AstrBot 后台主人使用。",
         })
 
     async def _payload(self) -> dict[str, Any]:
@@ -88,6 +92,8 @@ class SessionPageAPI:
         server = str(data.get("server") or "").strip()
         if not umo or not server:
             return self.error_response("缺少 umo 或区服", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("本插件只支持群聊会话", status_code=400)
         from .server_catalog import canonical_server
         official = canonical_server(self.plugin.server_catalog, server)
         if not official:
@@ -100,6 +106,8 @@ class SessionPageAPI:
         umo = str(data.get("umo") or "").strip()
         if not umo:
             return self.error_response("缺少 umo", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("本插件只支持群聊会话", status_code=400)
         await self.plugin.sessions.clear_server(umo)
         await self.plugin.jx3at.refresh_jobs()
         return self.json_response({"ok": True})
@@ -110,6 +118,8 @@ class SessionPageAPI:
         token = str(data.get("token") or "").strip()
         if not umo or not token:
             return self.error_response("缺少 umo 或 Token", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("本插件只支持群聊会话", status_code=400)
         values = [part.strip() for part in token.replace("，", ",").split(",") if part.strip()]
         if not values:
             return self.error_response("Token 不能为空", status_code=400)
@@ -131,6 +141,8 @@ class SessionPageAPI:
         ticket = str(data.get("ticket") or "").strip()
         if not umo or not ticket:
             return self.error_response("缺少 umo 或推栏标识", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("本插件只支持群聊会话", status_code=400)
         values = [part.strip() for part in ticket.replace("，", ",").split(",") if part.strip()]
         if not values:
             return self.error_response("推栏标识不能为空", status_code=400)
@@ -157,6 +169,8 @@ class SessionPageAPI:
         enabled = bool(data.get("enabled"))
         if not umo:
             return self.error_response("缺少 umo", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("本插件只支持群聊会话", status_code=400)
         await self.plugin.sessions.set_use_global_token(umo, enabled)
         return self.json_response({"ok": True})
 
@@ -168,6 +182,8 @@ class SessionPageAPI:
             return self.error_response("缺少 umo", status_code=400)
         if kind not in {"token", "ticket"}:
             return self.error_response("不支持的密钥类型", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("本插件只支持群聊会话", status_code=400)
         await self.plugin.sessions.clear_secret(umo, kind)
         return self.json_response({"ok": True})
 
@@ -177,8 +193,34 @@ class SessionPageAPI:
         enabled = bool(data.get("enabled"))
         if not umo:
             return self.error_response("缺少 umo", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("本插件只支持群聊会话", status_code=400)
         await self.plugin.sessions.set_bot_enabled(umo, enabled)
         return self.json_response({"ok": True})
+
+    async def delete_session(self):
+        data = await self._payload()
+        umo = str(data.get("umo") or "").strip()
+        if not umo:
+            return self.error_response("缺少 umo", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("只能删除群聊会话", status_code=400)
+        deleted = await self.plugin.sessions.delete_session(umo)
+        if not deleted:
+            return self.error_response("未找到该会话", status_code=404)
+        left, leave_detail = False, ""
+        try:
+            from .session_lifecycle import leave_group
+            left, leave_detail = await leave_group(self.plugin.context, umo)
+        except Exception:
+            left, leave_detail = False, "退群动作执行异常"
+        await self.plugin.jx3at.refresh_jobs()
+        return self.json_response({
+            "ok": True,
+            "left": left,
+            "leave_detail": leave_detail,
+            "message": "已删除并退群" if left else "已删除会话；自动退群未执行成功",
+        })
 
     async def clear_claim(self):
         data = await self._payload()
@@ -192,14 +234,13 @@ class SessionPageAPI:
         data = await self._payload()
         umo = str(data.get("umo") or "").strip()
         managers_text = str(data.get("managers") or "").strip()
-        additions_text = str(data.get("new_managers") or "").strip()
         if not umo:
             return self.error_response("缺少 umo", status_code=400)
         row = await self.plugin.sessions.get(umo)
         if not row:
             return self.error_response("未找到该会话", status_code=400)
-        if row.get("is_private"):
-            return self.error_response("私聊会话不支持授权管理", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("本插件只支持群聊会话", status_code=400)
         values = [
             part.strip().lstrip("@")
             for part in managers_text.replace("，", ",").split(",")
@@ -209,16 +250,11 @@ class SessionPageAPI:
         for value in values:
             if value not in seen:
                 seen.append(value)
-        additions = [
-            part.strip().lstrip("@")
-            for part in additions_text.replace("，", ",").split(",")
-            if part.strip()
-        ]
-        seen_additions = []
-        for value in additions:
-            if value not in seen_additions:
-                seen_additions.append(value)
-        ok, msg = await self.plugin.sessions.replace_managers(umo, seen, seen_additions)
+        parsed = []
+        for value in seen:
+            match = re.fullmatch(r"(.+?)[（(]([^（）()]+)[）)]", value)
+            parsed.append(match.group(2).strip() if match else value)
+        ok, msg = await self.plugin.sessions.replace_managers(umo, parsed)
         if not ok:
             return self.error_response(msg, status_code=400)
         return self.json_response({"ok": True, "message": msg})

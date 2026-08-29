@@ -173,3 +173,22 @@ def message_text_without_bot_mentions(event: Any) -> str:
         if re.search(pattern, block, flags=re.IGNORECASE):
             text = text.replace(block, "")
     return re.sub(rf"@{re.escape(self_id)}\s*", "", text).strip()
+
+
+def mentioned_bot(event: Any) -> bool:
+    """判断本条消息是否 @ 了机器人自身。"""
+    self_id = _self_id(event)
+    if not self_id:
+        return False
+    for items in _chains(event):
+        for item in items:
+            if component_type(item) in {"at", "mention"} and _read_value(item, _ID_KEYS) == self_id:
+                return True
+    raw_text = str(getattr(event, "message_str", "") or "")
+    pattern = (
+        rf"\[CQ:at[^\]]*?(?:qq|wxid|uid|user_id|v3_username)="
+        rf"{re.escape(self_id)}(?:[^0-9A-Za-z_-]|$)"
+    )
+    if re.search(pattern, raw_text, re.IGNORECASE):
+        return True
+    return self_id in _at_list_from_raw(event)

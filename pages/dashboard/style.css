@@ -66,6 +66,11 @@ button.ghost {
   color: var(--accent);
   border: 1px solid var(--line);
 }
+button.danger {
+  background: #fff;
+  color: #a63b46;
+  border: 1px solid #e3c3c8;
+}
 .status {
   margin: 0 0 12px;
   color: var(--ok);
