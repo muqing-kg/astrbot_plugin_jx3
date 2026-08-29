@@ -26,7 +26,6 @@ class SessionPageAPI:
             ("/page/sessions", self.list_sessions, ["GET"], "列出会话绑定"),
             ("/page/sessions/bind", self.bind_session, ["POST"], "绑定会话区服"),
             ("/page/sessions/clear-server", self.clear_server, ["POST"], "清除会话区服"),
-            ("/page/sessions/push", self.set_push, ["POST"], "设置会话推送"),
             ("/page/sessions/token", self.set_token, ["POST"], "设置会话 Token"),
             ("/page/sessions/ticket", self.set_ticket, ["POST"], "设置会话推栏"),
             ("/page/sessions/use-global", self.set_use_global, ["POST"], "设置是否使用全局 Token"),
@@ -102,17 +101,6 @@ class SessionPageAPI:
         if not umo:
             return self.error_response("缺少 umo", status_code=400)
         await self.plugin.sessions.clear_server(umo)
-        await self.plugin.jx3at.refresh_jobs()
-        return self.json_response({"ok": True})
-
-    async def set_push(self):
-        data = await self._payload()
-        umo = str(data.get("umo") or "").strip()
-        kind = str(data.get("kind") or "").strip()
-        enabled = bool(data.get("enabled"))
-        ok, msg = await self.plugin.sessions.set_push(umo, kind, enabled)
-        if not ok:
-            return self.error_response(msg or "设置失败", status_code=400)
         await self.plugin.jx3at.refresh_jobs()
         return self.json_response({"ok": True})
 
@@ -204,6 +192,7 @@ class SessionPageAPI:
         data = await self._payload()
         umo = str(data.get("umo") or "").strip()
         managers_text = str(data.get("managers") or "").strip()
+        additions_text = str(data.get("new_managers") or "").strip()
         if not umo:
             return self.error_response("缺少 umo", status_code=400)
         row = await self.plugin.sessions.get(umo)
@@ -220,7 +209,16 @@ class SessionPageAPI:
         for value in values:
             if value not in seen:
                 seen.append(value)
-        ok, msg = await self.plugin.sessions.replace_managers(umo, seen)
+        additions = [
+            part.strip().lstrip("@")
+            for part in additions_text.replace("，", ",").split(",")
+            if part.strip()
+        ]
+        seen_additions = []
+        for value in additions:
+            if value not in seen_additions:
+                seen_additions.append(value)
+        ok, msg = await self.plugin.sessions.replace_managers(umo, seen, seen_additions)
         if not ok:
             return self.error_response(msg, status_code=400)
         return self.json_response({"ok": True, "message": msg})
@@ -241,33 +239,22 @@ class SessionPageAPI:
         data = await self._payload()
         command_id = str(data.get("id") or "").strip()
         name = str(data.get("command") or "").strip()
-        desc = str(data.get("desc") or "").strip()
-        catalog, error = set_command_name(self.plugin.command_catalog, command_id, name)
+        _, error = set_command_name(self.plugin.command_catalog, command_id, name)
         if error:
             return self.error_response(error, status_code=400)
-        if desc:
-            catalog[command_id]["desc"] = desc
         overrides = await self.plugin.settings.command_overrides()
         if name == command_id:
             overrides.pop(command_id, None)
         else:
             overrides[command_id] = name
-        descs = await self.plugin.settings.command_descs()
-        if desc:
-            descs[command_id] = desc
-        else:
-            descs.pop(command_id, None)
-        await self.plugin.settings.set_command_catalog(overrides, descs)
+        await self.plugin.settings.set_command_overrides(overrides)
         self.plugin.command_catalog = apply_command_overrides(overrides)
-        for key, value in descs.items():
-            if key in self.plugin.command_catalog and value:
-                self.plugin.command_catalog[key]["desc"] = value
         self.plugin.jx3api.command_catalog = self.plugin.command_catalog
         return self.json_response({"ok": True})
 
     async def reset_commands(self):
         from .command_catalog import apply_command_overrides
-        await self.plugin.settings.set_command_catalog({}, {})
+        await self.plugin.settings.set_command_overrides({})
         self.plugin.command_catalog = apply_command_overrides({})
         self.plugin.jx3api.command_catalog = self.plugin.command_catalog
         return self.json_response({"ok": True})

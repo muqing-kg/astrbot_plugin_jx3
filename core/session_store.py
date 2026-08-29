@@ -15,15 +15,6 @@ from .session_policy import (
 from .sqlite import AsyncSQLiteDB
 
 
-def _join_credentials(values) -> str:
-    parts = []
-    for value in values:
-        text = str(value or "").strip()
-        if text and text not in parts:
-            parts.append(text)
-    return ",".join(parts)
-
-
 __all__ = [
     "CREDENTIAL_MISSING",
     "NEED_TICKET",
@@ -56,7 +47,6 @@ class SessionStore:
                 push_chitu INTEGER DEFAULT 0,
                 push_gengxin INTEGER DEFAULT 0,
                 push_bagua INTEGER DEFAULT 0,
-                push_guanai INTEGER DEFAULT 0,
                 push_yuncong INTEGER DEFAULT 0,
                 push_qiyu INTEGER DEFAULT 0,
                 push_fuyao INTEGER DEFAULT 0,
@@ -82,7 +72,6 @@ class SessionStore:
             "bot_enabled INTEGER DEFAULT 1",
             "push_gengxin INTEGER DEFAULT 0",
             "push_bagua INTEGER DEFAULT 0",
-            "push_guanai INTEGER DEFAULT 0",
             "push_yuncong INTEGER DEFAULT 0",
             "push_qiyu INTEGER DEFAULT 0",
             "push_fuyao INTEGER DEFAULT 0",
@@ -195,23 +184,15 @@ class SessionStore:
                 )
                 row.update(updates)
             return row
-        await self.sql.insert(
-            "session_config",
-            {
-                "umo": umo,
-                "display_name": display_name,
-                "is_private": 1 if is_private else 0,
-                "server": "",
-                "token": "",
-                "ticket": "",
-                "use_global_token": 0,
-                "push_kaifu": 0,
-                "push_xinwen": 0,
-                "push_shuma": 0,
-                "push_chitu": 0,
-                "bot_enabled": 1,
-                "updated_at": _now(),
-            },
+        await self.sql.execute(
+            """
+            INSERT OR IGNORE INTO session_config (
+                umo, display_name, is_private, server, token, ticket,
+                use_global_token, push_kaifu, push_xinwen, push_shuma,
+                push_chitu, bot_enabled, updated_at
+            ) VALUES (?, ?, ?, '', '', '', 0, 0, 0, 0, 0, 1, ?)
+            """,
+            (umo, display_name, 1 if is_private else 0, _now()),
         )
         return await self.get(umo)
 
@@ -417,10 +398,7 @@ class SessionStore:
         token_global_available = bool(global_token) or has_global_token
         ticket_global_available = bool(global_ticket) or has_global_ticket
         use_global_token = bool(row.get("use_global_token"))
-        if use_global_token:
-            token_value = _join_credentials([own_token, global_token])
-        else:
-            token_value = own_token
+        token_display_value = own_token or (global_token if use_global_token else "")
         if has_own_token:
             token_status = mask_secret(own_token)
         elif use_global_token and token_global_available:
@@ -430,7 +408,7 @@ class SessionStore:
         else:
             token_status = "未配置"
         has_own_ticket = bool(own_ticket)
-        ticket_value = _join_credentials([own_ticket, global_ticket])
+        ticket_display_value = own_ticket or global_ticket
         if has_own_ticket:
             ticket_status = mask_secret(own_ticket)
         elif ticket_global_available:
@@ -443,17 +421,16 @@ class SessionStore:
             "server": row.get("server", ""),
             "token_status": token_status,
             "ticket_status": ticket_status,
-            "token_value": token_value,
-            "ticket_value": ticket_value,
+            "token_value": own_token,
+            "token_display_value": token_display_value,
+            "ticket_value": own_ticket,
+            "ticket_display_value": ticket_display_value,
+            "global_token_value": global_token,
+            "global_ticket_value": global_ticket,
             "has_token": has_own_token or (use_global_token and token_global_available),
             "has_ticket": has_own_ticket or ticket_global_available,
             "use_global_token": use_global_token,
             "bot_enabled": self.is_bot_enabled(row),
-            "push_kaifu": bool(row.get("push_kaifu")),
-            "push_xinwen": bool(row.get("push_xinwen")),
-            "push_shuma": bool(row.get("push_shuma")),
-            "push_chitu": bool(row.get("push_chitu")),
-            "pushes": {kind: bool(row.get(field)) for kind, field in PUSH_FIELD.items()},
             "is_private": bool(row.get("is_private")),
             "claim_identity": row.get("claim_identity", ""),
             "claim_name": row.get("claim_name", ""),
@@ -472,14 +449,18 @@ class SessionStore:
                     "plugin_claimants",
                     {"name": name, "claimed_at": _now()},
                     "user_id=?",
-                    (user_id,),
-                )
+                (user_id,),
+            )
             return True, name or str(row.get("name") or "") or user_id
-        await self.sql.insert(
-            "plugin_claimants",
-            {"user_id": user_id, "name": name, "claimed_at": _now()},
+        await self.sql.execute(
+            """
+            INSERT OR IGNORE INTO plugin_claimants (user_id, name, claimed_at)
+            VALUES (?, ?, ?)
+            """,
+            (user_id, name, _now()),
         )
-        return True, name or user_id
+        row = await self.sql.select_one("plugin_claimants", "user_id=?", (user_id,))
+        return True, name or str((row or {}).get("name") or "") or user_id
 
     async def is_claimed_admin(self, user_id: str) -> bool:
         user_id = str(user_id or "").strip()
@@ -500,22 +481,18 @@ class SessionStore:
         identity = str(identity or "").strip()
         if not identity:
             return await self.get(umo)
-        row = await self.get(umo) or {}
-        if str(row.get("claim_identity") or "").strip():
-            return row
-        await self.sql.update(
-            "session_config",
-            {
-                "claim_identity": identity,
-                "claim_name": str(name or "").strip(),
-                "claim_at": _now(),
-                "updated_at": _now(),
-            },
-            "umo=?",
-            (umo,),
+        await self.sql.execute(
+            """
+            UPDATE session_config
+            SET claim_identity=?, claim_name=?, claim_at=?, updated_at=?
+            WHERE umo=? AND (claim_identity IS NULL OR TRIM(claim_identity)='')
+            """,
+            (identity, str(name or "").strip(), _now(), _now(), umo),
         )
-        await self.claim_admin(identity, name)
-        return await self.get(umo)
+        row = await self.get(umo) or {}
+        if str(row.get("claim_identity") or "").strip() == identity:
+            await self.claim_admin(identity, name)
+        return row
 
     async def clear_claimant(self, identity: str) -> None:
         identity = str(identity or "").strip()
@@ -596,7 +573,12 @@ class SessionStore:
         )
         return True, f"已删除管理员：{label}"
 
-    async def replace_managers(self, umo: str, values: list[str]) -> tuple[bool, str]:
+    async def replace_managers(
+        self,
+        umo: str,
+        values: list[str],
+        additions: list[str] | None = None,
+    ) -> tuple[bool, str]:
         umo = str(umo or "").strip()
         claim = await self.get_session_identity(umo)
         identity = claim.get("identity") or ""
@@ -605,6 +587,7 @@ class SessionStore:
         by_id = {str(row.get("user_id") or "").strip(): row for row in current}
         by_name = {str(row.get("name") or "").strip(): row for row in current}
         desired_ids: list[str] = []
+        new_ids: list[str] = []
         unknown: list[str] = []
         for value in values or []:
             text = str(value or "").strip().lstrip("@").strip()
@@ -619,10 +602,19 @@ class SessionStore:
             row_id = str(row.get("user_id") or "").strip()
             if row_id and row_id not in desired_ids:
                 desired_ids.append(row_id)
+        for value in additions or []:
+            user_id = str(value or "").strip().lstrip("@").strip()
+            if not user_id:
+                continue
+            if identity and user_id == identity:
+                return False, "认领人已是本会话管理员，无需重复授权。"
+            if user_id not in desired_ids:
+                desired_ids.append(user_id)
+                new_ids.append(user_id)
         if unknown:
             return False, (
                 "无法识别的成员身份：" + "、".join(unknown) + "。\n"
-                "新增授权请发送 授权管理 @成员，页面只用于保留或移除已有授权。"
+                "已有授权请输入真实 ID 或昵称；新增授权请填写在新增授权 ID 栏。"
             )
         for row in current:
             row_id = str(row.get("user_id") or "").strip()
@@ -631,6 +623,11 @@ class SessionStore:
                     "DELETE FROM session_managers WHERE umo=? AND user_id=?",
                     (umo, row_id),
                 )
+        for user_id in new_ids:
+            await self.sql.insert(
+                "session_managers",
+                {"umo": umo, "user_id": user_id, "name": "", "created_at": _now()},
+            )
         remain = await self.list_managers(umo)
         labels = [str(row.get("name") or row.get("user_id") or "") for row in remain]
         if labels:

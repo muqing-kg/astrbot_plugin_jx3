@@ -10,7 +10,6 @@ PUSH_FIELD = {
     "新闻": "push_xinwen",
     "更新": "push_gengxin",
     "八卦": "push_bagua",
-    "关隘": "push_guanai",
     "云从": "push_yuncong",
     "奇遇": "push_qiyu",
     "刷马": "push_shuma",
@@ -31,46 +30,37 @@ PUSH_TYPES = tuple(PUSH_FIELD.keys())
 
 # 官方事件版 OpenAPI 的接口说明。
 EVENT_DESCRIPTIONS = {
-    0: "赤兔到达与分享消息推送（本地轮询）",
-    1001: "保存奇遇数据并触发处理逻辑",
-    1002: "马驹刷新推送处理",
-    1003: "马驹捕获处理",
-    1005: "扶摇开启处理",
-    1006: "扶摇点名处理",
-    1008: "生成并处理的卢事件每日数据",
-    1009: "的卢刷新处理",
-    1010: "的卢捕获处理",
-    1011: "的卢拍卖处理",
-    1012: "副本掉落/交易行私货处理",
-    1013: "阵营拍卖处理",
-    1014: "诛恶事件处理",
-    1015: "追魂点名处理",
-    1017: "阵营祭祀处理",
-    1018: "关隘首领处理",
-    1101: "领地宣战·开始处理",
-    1102: "领地宣战·结束处理",
-    1103: "帮会宣战·开始处理",
-    1104: "帮会宣战·结束处理",
-    1105: "帮会约战·完胜处理",
-    1111: "据点战况-抢占粮仓处理",
-    1112: "据点战况-大旗重置处理",
-    1113: "据点战况-大旗被夺处理",
-    1114: "据点战况-据点占领处理",
-    1115: "据点战况-据点占领处理（无帮会）",
-    1116: "贡献排行-小攻防（贡献前列非开战据点帮会）处理",
-    1117: "贡献排行-小攻防（开战据点 + 非开战据点帮会）处理",
-    1118: "贡献排行-大攻防处理",
-    1119: "大小攻防-战利品竞拍",
-    1120: "拍卖分红-小攻防处理",
-    1121: "拍卖分红-大攻防处理",
-    1122: "拍卖分红-大攻防（含指挥帮会）处理",
-    1201: "触发后续处理操作",
-    2001: "发送服务器状态更新通知",
-    2002: "检查新闻并将新的新闻项存入数据库",
-    2003: "检查更新补丁并处理更新",
-    2004: "发送符合通知条件的主题信息",
-    2005: "发送据点冷却重置通知",
-    2006: "发送地图事件触发通知",
+    0: "赤兔到达与分享消息通知",
+    1001: "奇遇触发通知",
+    1002: "马驹刷新通知",
+    1003: "马驹捕获通知",
+    1005: "扶摇开启通知",
+    1006: "扶摇点名通知",
+    1009: "的卢刷新通知",
+    1010: "的卢捕获通知",
+    1011: "的卢拍卖通知",
+    1012: "副本掉落与交易行私货通知",
+    1013: "阵营拍卖通知",
+    1014: "诛恶事件通知",
+    1015: "追魂点名通知",
+    1017: "阵营祭祀通知",
+    1101: "领地宣战开始通知",
+    1102: "领地宣战结束通知",
+    1103: "帮会宣战开始通知",
+    1104: "帮会宣战结束通知",
+    1105: "帮会约战完胜通知",
+    1111: "抢占粮仓通知",
+    1112: "大旗重置通知",
+    1113: "大旗被夺通知",
+    1118: "大攻防贡献排行通知",
+    1119: "大小攻防战利品竞拍通知",
+    1120: "小攻防分红通知",
+    1201: "微博更新通知",
+    2001: "服务器开服状态变化通知",
+    2002: "官方新闻更新通知",
+    2003: "游戏版本更新通知",
+    2004: "八卦主题更新通知",
+    2006: "地图事件触发通知",
 }
 
 # 全服事件不按绑定区服过滤。
@@ -82,14 +72,12 @@ ACTION_KIND = {
     2002: "新闻",
     2003: "更新",
     2004: "八卦",
-    2005: "关隘",
     2006: "云从",
     1001: "奇遇",
     1002: "刷马",
     1003: "刷马",
     1005: "扶摇",
     1006: "扶摇",
-    1008: "的卢",
     1009: "的卢",
     1010: "的卢",
     1011: "的卢",
@@ -98,7 +86,6 @@ ACTION_KIND = {
     1014: "诛恶",
     1015: "追魂",
     1017: "祭祀",
-    1018: "关隘",
     1101: "宣战",
     1102: "宣战",
     1103: "宣战",
@@ -107,15 +94,9 @@ ACTION_KIND = {
     1111: "据点",
     1112: "据点",
     1113: "据点",
-    1114: "据点",
-    1115: "据点",
-    1116: "据点",
-    1117: "据点",
     1118: "据点",
     1119: "据点",
     1120: "据点",
-    1121: "据点",
-    1122: "据点",
     1201: "微博",
 }
 
@@ -127,7 +108,6 @@ EVENT_GROUPS = [
             {"action": 2002, "name": "官方新闻", "kind": "新闻"},
             {"action": 2003, "name": "版本更新", "kind": "更新"},
             {"action": 2004, "name": "八卦速报", "kind": "八卦"},
-            {"action": 2005, "name": "关隘首领", "kind": "关隘"},
             {"action": 2006, "name": "云从预告", "kind": "云从"},
             {"action": 0, "name": "赤兔消息", "kind": "赤兔"},
         ],
@@ -140,7 +120,6 @@ EVENT_GROUPS = [
             {"action": 1003, "name": "马驹捕获", "kind": "刷马"},
             {"action": 1005, "name": "扶摇开启", "kind": "扶摇"},
             {"action": 1006, "name": "扶摇点名", "kind": "扶摇"},
-            {"action": 1008, "name": "的卢每日", "kind": "的卢"},
             {"action": 1009, "name": "的卢刷新", "kind": "的卢"},
             {"action": 1010, "name": "的卢捕获", "kind": "的卢"},
             {"action": 1011, "name": "的卢拍卖", "kind": "的卢"},
@@ -154,7 +133,6 @@ EVENT_GROUPS = [
         "items": [
             {"action": 1013, "name": "阵营拍卖", "kind": "拍卖"},
             {"action": 1017, "name": "阵营祭祀", "kind": "祭祀"},
-            {"action": 1018, "name": "关隘首领", "kind": "关隘"},
             {"action": 1101, "name": "领地宣战开始", "kind": "宣战"},
             {"action": 1102, "name": "领地宣战结束", "kind": "宣战"},
             {"action": 1103, "name": "帮会宣战开始", "kind": "宣战"},
@@ -163,15 +141,9 @@ EVENT_GROUPS = [
             {"action": 1111, "name": "抢占粮仓", "kind": "据点"},
             {"action": 1112, "name": "大旗重置", "kind": "据点"},
             {"action": 1113, "name": "大旗被夺", "kind": "据点"},
-            {"action": 1114, "name": "据点占领", "kind": "据点"},
-            {"action": 1115, "name": "据点占领(无帮会)", "kind": "据点"},
-            {"action": 1116, "name": "小攻防贡献(非开战)", "kind": "据点"},
-            {"action": 1117, "name": "小攻防贡献", "kind": "据点"},
             {"action": 1118, "name": "大攻防贡献", "kind": "据点"},
             {"action": 1119, "name": "战利品竞拍", "kind": "据点"},
             {"action": 1120, "name": "小攻防分红", "kind": "据点"},
-            {"action": 1121, "name": "大攻防分红", "kind": "据点"},
-            {"action": 1122, "name": "大攻防分红(含指挥)", "kind": "据点"},
         ],
     },
     {
@@ -263,7 +235,7 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
         place = f"【{server}】" if server else ""
         if state:
             return f"{place}{state}了！"
-        return f"{place}区服状态更新"
+        return f"{place}服务器状态更新"
     if action == 2002:
         return "\n".join(
             part for part in (
@@ -294,11 +266,6 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
                 source,
             ) if part
         )
-    if action == 2005:
-        place = f"【{server}】" if server else ""
-        stage = value("stage")
-        body = f"关隘首领进入{stage}阶段" if stage else "关隘首领"
-        return f"{place}{body}"
     if action == 2006:
         lines = []
         if value("name") not in (None, ""):
@@ -347,10 +314,6 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
         if isinstance(names, list):
             names = "、".join(str(item) for item in names if str(item).strip())
         core = f"扶摇点名：{names}" if names else "扶摇点名"
-        return "\n".join(part for part in (where, core) if part)
-    if action == 1008:
-        detail = " ".join(part for part in (str(value("map_name")), str(value("name"))) if part)
-        core = f"的卢每日：{detail}" if detail else "的卢每日"
         return "\n".join(part for part in (where, core) if part)
     if action == 1009:
         map_name = value("map_name")
@@ -420,18 +383,6 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             ) if part
         )
         return "\n".join(part for part in (where, core) if part)
-    if action == 1018:
-        leader = value("leader_name")
-        stage = value("stage_name")
-        if leader and stage:
-            core = f"关隘首领 {leader} 进入{stage}阶段"
-        elif leader:
-            core = f"关隘首领 {leader}"
-        elif stage:
-            core = f"关隘首领进入{stage}阶段"
-        else:
-            core = "关隘首领"
-        return "\n".join(part for part in (where, core) if part)
     if action in {1101, 1103}:
         declaring = value("declaring_tong_name")
         accepting = value("accepting_tong_name")
@@ -472,16 +423,7 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
         if camp:
             core += f"（{camp}）"
         return "\n".join(part for part in (where, core) if part)
-    if action in {1114, 1115}:
-        castle = value("castle_name")
-        owner = value("tong_name") or value("camp_name")
-        core = "据点占领"
-        if castle:
-            core += f"：{castle}"
-        if owner:
-            core += f" {owner}"
-        return "\n".join(part for part in (where, core) if part)
-    if action in {1116, 1117, 1118}:
+    if action == 1118:
         tong = value("tong_name")
         core = f"{tong} 贡献排行更新" if tong else "贡献排行更新"
         return "\n".join(part for part in (where, core) if part)
@@ -496,7 +438,7 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
         if core == "拍得":
             core = "战利品竞拍"
         return "\n".join(part for part in (where, core) if part)
-    if action in {1120, 1121, 1122}:
+    if action == 1120:
         tong = value("tong_name") or value("chief_tong_name")
         amount = value("split_amount")
         core = "攻防分红"
@@ -524,7 +466,7 @@ def normalize_push_overrides(raw: Any) -> dict[str, str]:
     for key, value in raw.items():
         action = str(key).strip()
         name = str(value or "").strip()
-        if action and name:
+        if action and name and not any(char.isspace() for char in name):
             out[action] = name
     return out
 

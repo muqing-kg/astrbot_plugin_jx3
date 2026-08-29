@@ -56,6 +56,9 @@ class AsyncSQLiteDB:
                     if not retryable or attempt == LOCKED_RETRY_TIMES - 1:
                         raise
                     await asyncio.sleep(LOCKED_RETRY_DELAY)
+                except sqlite3.Error:
+                    await self._safe_rollback()
+                    raise
 
     async def _safe_rollback(self):
         try:
@@ -66,14 +69,24 @@ class AsyncSQLiteDB:
     async def execute_many(self, statements: list[tuple[str, Tuple]]) -> None:
         """在同一事务内依次执行多条写语句，任一条失败则整体回滚。"""
         async with self._write_lock:
-            await self.conn.execute("BEGIN")
-            try:
-                for sql, params in statements:
-                    await self.conn.execute(sql, params)
-                await self.conn.commit()
-            except Exception:
-                await self.conn.rollback()
-                raise
+            for attempt in range(LOCKED_RETRY_TIMES):
+                try:
+                    await self._safe_rollback()
+                    async with self.conn.execute("BEGIN IMMEDIATE"):
+                        pass
+                    for sql, params in statements:
+                        await self.conn.execute(sql, params)
+                    await self.conn.commit()
+                    return
+                except sqlite3.OperationalError as exc:
+                    await self._safe_rollback()
+                    retryable = "database is locked" in str(exc) or "database is busy" in str(exc)
+                    if not retryable or attempt == LOCKED_RETRY_TIMES - 1:
+                        raise
+                    await asyncio.sleep(LOCKED_RETRY_DELAY)
+                except Exception:
+                    await self._safe_rollback()
+                    raise
 
     async def fetch_one(self, sql: str, params: Tuple = ()) -> Optional[Dict[str, Any]]:
         async with self.conn.execute(sql, params) as cursor:

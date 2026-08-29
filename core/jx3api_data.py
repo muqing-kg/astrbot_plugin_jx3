@@ -1,7 +1,11 @@
+import base64
 import html
 import re
+from functools import lru_cache
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Optional
+from zoneinfo import ZoneInfo
 
 from astrbot.api import logger
 from astrbot.api import AstrBotConfig
@@ -9,12 +13,21 @@ import astrbot.api.message_components as Comp
 
 from .request import APIClient
 from .sqlite import AsyncSQLiteDB
-from .fun_basic import week_to_num,compare_date_str,format_time,format_remaining,format_duration,format_short_time
+from .fun_basic import week_to_num,compare_date_str,format_time,format_duration,format_short_time
 from .template import load_template
 from .credentials import current_token, current_ticket
+from .session_policy import camp_code
 
 
 
+
+
+_SAND_CASTLE_NAMES = frozenset({
+    "不空关", "大理山城", "啖杏林", "飞沙关", "枫湖寨", "凤鸣堡", "扶风郡",
+    "红莲岗", "激流坞", "金门关", "惊虬谷", "澜沧城", "烈日岗", "凛风堡",
+    "龙门镇", "盘龙坞", "千岩关", "青云坞", "秋雨堡", "日月崖", "神池岭",
+    "世外坡", "霜戈堡", "卧龙坡", "武王城", "逐鹿坪",
+})
 
 
 class JX3APIService:
@@ -249,6 +262,113 @@ class JX3APIService:
         return f"linear-gradient(90deg, {start}, {end})"
 
     @staticmethod
+    def _chinese_date(timestamp: Any) -> str:
+        if timestamp in (None, "", 0, "0"):
+            return ""
+        try:
+            value = datetime.fromtimestamp(int(timestamp), ZoneInfo("Asia/Shanghai"))
+        except (TypeError, ValueError, OSError) as exc:
+            raise ValueError(f"无效时间戳: {timestamp}") from exc
+
+        digits = "零一二三四五六七八九"
+        year = "".join(digits[int(char)] for char in f"{value.year:04d}")
+
+        def number(value: int) -> str:
+            if value < 10:
+                return digits[value]
+            if value < 20:
+                return "十" + (digits[value - 10] if value % 10 else "")
+            tens = digits[value // 10]
+            return tens + "十" + (digits[value % 10] if value % 10 else "")
+
+        return f"{year}年{number(value.month)}月{number(value.day)}日"
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _sand_assets() -> dict[str, str]:
+        root = Path(__file__).resolve().parent.parent / "templates" / "img" / "sand"
+        return {
+            path.name: "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+            for path in sorted(root.glob("*.png"))
+        }
+
+    @staticmethod
+    @lru_cache(maxsize=1)
+    def _sand_font() -> str:
+        path = Path(__file__).resolve().parent.parent / "templates" / "font" / "STXINGKA.TTF"
+        return "data:font/ttf;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+    async def shapan(self, server: str) -> Dict[str, Any]:
+        """沙盘数据，使用官方 JX3API 并渲染独立战场模板。"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            payload = data if isinstance(data, dict) else {}
+            records = payload.get("data")
+            if not isinstance(records, list) or not records:
+                return_data["msg"] = "暂无沙盘数据"
+                return
+
+            if len(records) != len(_SAND_CASTLE_NAMES):
+                return_data["msg"] = "沙盘据点数据与模板不一致"
+                return
+
+            castles: dict[str, dict[str, Any]] = {}
+            for item in records:
+                if not isinstance(item, dict):
+                    return_data["msg"] = "沙盘据点数据与模板不一致"
+                    return
+                castle_name = str(item.get("castleName") or "").strip()
+                if not castle_name:
+                    return_data["msg"] = "沙盘据点数据与模板不一致"
+                    return
+                try:
+                    camp_id = int(item.get("campId"))
+                except (TypeError, ValueError):
+                    return_data["msg"] = "沙盘数据异常：阵营标识无效"
+                    return
+                if camp_id not in (1, 2):
+                    return_data["msg"] = "沙盘数据异常：阵营标识无效"
+                    return
+                try:
+                    defensive = int(item.get("defendCount"))
+                except (TypeError, ValueError):
+                    return_data["msg"] = "沙盘数据异常：防守次数无效"
+                    return
+                if defensive not in (0, 1, 2, 3):
+                    return_data["msg"] = "沙盘数据异常：防守次数无效"
+                    return
+                tong_id = int(item.get("tongId") or 0)
+                tong_name = str(item.get("tongName") or "").strip()
+                if tong_id == 0 or tong_name == "帮会名" or not tong_name:
+                    tong_name = "未占领"
+                castles[castle_name] = {
+                    "camp_prefix": {1: "浩", 2: "恶"}.get(camp_id, ""),
+                    "tong_name": tong_name,
+                    "ride_piece": item.get("ridePiece"),
+                    "defensive": defensive,
+                }
+
+            if set(castles) != _SAND_CASTLE_NAMES:
+                return_data["msg"] = "沙盘据点数据与模板不一致"
+                return
+
+            return_data["data"] = {
+                "zone": str(payload.get("zone") or ""),
+                "server": str(payload.get("server") or ""),
+                "updateTime": self._chinese_date(payload.get("update")),
+                "resetTime": self._chinese_date(payload.get("reset")),
+                "castles": castles,
+                "assets": self._sand_assets(),
+                "font": self._sand_font(),
+            }
+
+        return await self._request_api(
+            "/sand/records",
+            {"server": server, "token": self.token},
+            processor,
+            "standalone/shapan.html",
+        )
+
+    @staticmethod
     def _limit_color_style(maximum: Any) -> str:
         """招收上限按固定档位分配颜色，超出档位的按稳定哈希自动取色。"""
         try:
@@ -321,14 +441,6 @@ class JX3APIService:
             limit_style,
             "",
         )
-
-    def _camp_code(self, camp: str) -> int:
-        text = str(camp or "").strip()
-        if text in {"2", "恶人", "恶人谷"}:
-            return 2
-        if text in {"1", "浩气", "浩气盟"}:
-            return 1
-        return 1
 
     def _wanted_mode(self, mode: str) -> int:
         text = str(mode or "").strip()
@@ -419,9 +531,9 @@ class JX3APIService:
                 f"宗门：{data.get('school', '')}\n"
                 f"驰援：{data.get('rescue', '')}\n"
                 f"【宠物福缘】\n{', '.join(data.get('lucky') or [])}\n"
-                f"【家园声望·加倍道具】\n{', '.join(data.get('card') or [])}\n"
-                f"【武林通鉴·公共任务】\n{', '.join(weekly.get('conn') or [])}\n"
-                f"【武林通鉴·团队秘境】\n{', '.join(weekly.get('raid') or [])}\n"
+                f"【家园声望 · 加倍道具】\n{', '.join(data.get('card') or [])}\n"
+                f"【武林通鉴 · 公共任务】\n{', '.join(weekly.get('conn') or [])}\n"
+                f"【武林通鉴 · 团队秘境】\n{', '.join(weekly.get('raid') or [])}\n"
             )
 
         return await self._request_api(
@@ -448,49 +560,6 @@ class JX3APIService:
             params={ "name": name},
             processor=processor,
             template="xingxiashijian.html"
-        )
-
-
-    async def guanaishouling(self) -> Dict[str, Any]:
-        """关隘首领"""
-        # 数据处理
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            groups = [
-                {
-                    "server": group.get("server", ""),
-                    "records": [
-                        {
-                            "camp_name": item.get("campName", ""),
-                            "castle": item.get("castle", ""),
-                            "str_status": item.get("statusText", ""),
-                            "start_time": format_time(item.get("startTime")),
-                            "end_time": format_time(item.get("endTime")),
-                            "remaining_time": format_remaining(item.get("endTime")),
-                        }
-                        for item in group.get("data", [])
-                        if isinstance(item, dict)
-                    ],
-                }
-                for group in data
-                if isinstance(group, dict) and group.get("data")
-            ]
-
-            groups = [group for group in groups if group["records"]]
-
-            if not groups:
-                return_data["msg"] = "未查询到关隘首领信息"
-                return return_data
-
-            return_data["data"] = {
-                "groups": groups,
-                "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-
-        return await self._request_api(
-            path="/castle/status",
-            params={"token": self.token},
-            processor=processor,
-            template="guanaishouling.html"
         )
 
 
@@ -546,32 +615,6 @@ class JX3APIService:
         )  
 
 
-    async def zhenyingevent(self, name: str, limit: str) -> Dict[str, Any]:
-        """阵营事件"""
-        text = str(name or "").strip()
-        if text in {"2", "恶人", "恶人谷"}:
-            name = "恶人谷"
-        elif text in {"1", "浩气", "浩气盟"}:
-            name = "浩气盟"
-        # 数据处理
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            for item in data:
-                item["seizeTime"] = format_time(item.get("seizeTime"))
-                item["camp_name"] = self._pick(item, "campName", "camp_name")
-
-            return_data["data"] = {
-                "items": data,
-                "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
-            
-        return await self._request_api(
-            path="/fenxian/records",
-            params={"token": self.token,"name": name, "limit": limit},
-            processor=processor,
-            template="zhenyingevent.html"
-        )  
-            
-
     async def yanhuachaxun(self, server: str, name:str ) -> Dict[str, Any]:
         """烟花记录"""
         # 数据处理
@@ -590,15 +633,43 @@ class JX3APIService:
             template="yanhuan.html"
         )  
 
+    def _ranch_notice(self, title: str, maps: dict, note: str, server: str = "") -> str:
+        heading = f"{server} · {title}" if server else title
+        lines = [heading]
+        preferred = ["阴山大草原", "黑戈壁", "鲲鹏岛", "龙泉府 / 进图（21:10）"]
+        names = [name for name in preferred if name in maps] or list(maps.keys())
+        for name in names:
+            lines.append("--------------------------------")
+            lines.append(str(name))
+            values = maps.get(name) or []
+            if isinstance(values, str):
+                values = [values]
+            if values:
+                lines.extend(str(item) for item in values if str(item).strip())
+            else:
+                lines.append("时间尚久，无法预知。")
+        note = str(note or "").strip()
+        disclaimer = "数据仅供参考，请以游戏内为准。"
+        if note:
+            lines.append("--------------------------------")
+            lines.append(note)
+            if disclaimer not in note:
+                lines.append("")
+                lines.append(disclaimer)
+        else:
+            lines.append("")
+            lines.append(disclaimer)
+        return "\n".join(lines)
+
 
     async def shuma(self,server:str) -> Dict[str, Any]:
         """刷马"""
         # 数据处理
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:    
-            return_data["data"] = (
-                f"【阴山大草原】\n{', '.join(data.get('阴山大草原') or [])}\n"
-                f"【鲲鹏岛】\n{', '.join(data.get('鲲鹏岛') or [])}\n"
-                f"【黑戈壁】\n{', '.join(data.get('黑戈壁') or [])}\n"
+            return_data["data"] = self._ranch_notice(
+                "马场预告",
+                data if isinstance(data, dict) else {},
+                "",
             )
             
         return await self._request_api(
@@ -613,28 +684,12 @@ class JX3APIService:
         """马场"""
         # 数据处理
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            maps = data.get("data") or {}
-            server_name = server
-            lines = [f"{server_name}·马场告示"]
-            preferred = ["阴山大草原", "黑戈壁", "鲲鹏岛", "龙泉府 / 进图（21:10）"]
-            names = [name for name in preferred if name in maps] or list(maps.keys())
-            for name in names:
-                lines.append("--------------------------------")
-                lines.append(str(name))
-                values = maps.get(name) or []
-                if isinstance(values, str):
-                    values = [values]
-                if values:
-                    lines.extend(str(item) for item in values if str(item).strip())
-                else:
-                    lines.append("时间尚久，无法预知。")
-            note = str(data.get("note") or "").strip()
-            if note:
-                lines.append("--------------------------------")
-                lines.append(note)
-            lines.append("")
-            lines.append("数据仅供参考，请以游戏内为准。")
-            return_data["data"] = "\n".join(lines)
+            return_data["data"] = self._ranch_notice(
+                "马场事件",
+                data.get("data") or {} if isinstance(data, dict) else {},
+                str(data.get("note") or "").strip() if isinstance(data, dict) else "",
+                str(data.get("server") or "").strip() if isinstance(data, dict) else "",
+            )
             
         return await self._request_api(
             path="/ranch/records",
@@ -1462,9 +1517,9 @@ class JX3APIService:
                     history_tongs.append(item.get("name"))
             role = name
             return_data["data"] = (
-                f"{role}·详细信息：\n"
-                f"所属服务器：{data.get('zoneName') or ''}·{data.get('serverName') or ''}\n"
-                f"角色体型：{data.get('forceName') or ''}·{data.get('bodyName') or ''}\n"
+                f"{role} · 详细信息：\n"
+                f"所属服务器：{data.get('zoneName') or ''} · {data.get('serverName') or ''}\n"
+                f"角色体型：{data.get('forceName') or ''} · {data.get('bodyName') or ''}\n"
                 f"角色阵营：{data.get('campName') or ''}\n"
                 f"角色帮会：{data.get('tongName') or ''}\n"
                 f"角色标识：{data.get('roleId') or ''}\n"
@@ -2065,77 +2120,6 @@ class JX3APIService:
 
 
 
-    async def tiebawujia(self, name: str, server: str, limit: int ) -> Dict[str, Any]:
-        """贴吧物价"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            lines = [
-                f"贴吧物价：{name}",
-                f"服务器：{server}",
-                f"记录数：{len(data)}",
-                "",
-            ]
-
-            for index, item in enumerate(data, start=1):
-                if not isinstance(item, dict):
-                    continue
-
-                item_time = item.get("time", "")
-                if item_time:
-                    try:
-                        item_time = datetime.fromtimestamp(int(item_time)).strftime("%Y-%m-%d %H:%M:%S")
-                    except (TypeError, ValueError, OSError):
-                        item_time = str(item_time)
-
-                lines.extend([
-                    f"{index}. {item.get('name', '')}",
-                    f"区服：{item.get('zone', '')}  服务器：{item.get('server', '')}",
-                    f"内容：{item.get('context', '')}",
-                    f"回复：{item.get('reply', '')}  楼层：{item.get('floor', '')}",
-                    f"时间：{item_time}",
-                    f"链接：https://tieba.baidu.com/p/{item.get('url', '')}",
-                    "",
-                ])
-
-            if len(lines) <= 4:
-                return_data["msg"] = "未查询到贴吧物价记录"
-                return return_data
-
-            return_data["data"] = "\n".join(lines).rstrip()
-
-        return await self._request_api(
-            path="/tieba/item/records",
-            params= {"server": server,"name": name,"limit": limit,"token": self.token,},
-            processor=processor,
-            template=""
-        ) 
-
-
-    async def bagua(self, tags: str, server:str, limit:str ) -> Dict[str, Any]:
-        """八卦"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            if not data:
-                result_msg = f"未找到相关 {tags} 记录。\n"
-                result_msg += "可选范围：818 616 鬼网三 鬼网3 树洞 记录 教程 街拍 故事 吐槽 提问"
-            else:
-                result_msg = f"类型：【{tags}】\n\n"
-
-                for item in data:
-                    result_msg += f"{item['title']}\n"
-                    result_msg += f"服务器：{item['server']}\n"
-                    result_msg += f"所属吧：{item['name']}\n"
-                    result_msg += f"链接：https://tieba.baidu.com/p/{item['url']}\n"
-                    result_msg += f"日期：{item['date']}\n\n"
-            return_data["data"] = result_msg
-
-        return await self._request_api(
-            path="/tieba/random",
-            params= {"server": server,"tags": tags,"limit": limit,"token": self.token,},
-            processor=processor,
-            template=""
-        ) 
-
-
-
     async def kuafumingjian(self, server: str = "", mode: str = "33") -> Dict[str, Any]:
         """跨服名剑"""
         mode_code = self._arena_mode_code(mode)
@@ -2165,10 +2149,10 @@ class JX3APIService:
             params["server"] = server
         return await self._request_api("/rank/arena", params, processor, "data_list.html")
 
-    async def wulinzhengba(self, server: str = "", camp: str = "浩气") -> Dict[str, Any]:
+    async def wulinzhengba(self, server: str = "", camp: str = "恶人") -> Dict[str, Any]:
         """武林争霸赛"""
-        camp_code = self._camp_code(camp)
-        camp_name = "恶人谷" if camp_code == 2 else "浩气盟"
+        camp_id = camp_code(camp)
+        camp_name = "恶人谷" if camp_id == 2 else "浩气盟"
 
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
             items = self._rank_items(data, inherit=False)[:50]
@@ -2187,9 +2171,9 @@ class JX3APIService:
             if return_data.get("data"):
                 return_data["data"]["note"] = "排行榜仅展示前 50 名"
                 return_data["data"]["camp_name"] = camp_name
-                return_data["data"]["camp_class"] = "camp-eren" if camp_code == 2 else "camp-haoqi"
+                return_data["data"]["camp_class"] = "camp-eren" if camp_id == 2 else "camp-haoqi"
 
-        params = {"camp": camp_code, "token": self.token}
+        params = {"camp": camp_id, "token": self.token}
         if server:
             params["server"] = server
         return await self._request_api("/rank/championship", params, processor, "data_list.html")
@@ -2351,31 +2335,6 @@ class JX3APIService:
 
         return await self._request_api("/trade/item/search", {"name": name, "token": self.token}, processor, "data_list.html")
 
-    async def peizhuang(self, name: str, tags: str = "") -> Dict[str, Any]:
-        """配装搜索"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            items = self._as_list(data)
-            if not items and isinstance(data, dict):
-                items = [data]
-            lines = [f"{name} 配装"]
-            if tags:
-                lines[0] += f"（{tags}）"
-            for item in items:
-                title = self._pick(item, "title", "name", "zlp", default="配装")
-                url = self._pick(item, "url", "link", "href")
-                mode = self._pick(item, "mode", "tags", "type")
-                piece = f"【{mode}】{title}" if mode else title
-                if url:
-                    piece += f"\n{url}"
-                lines.append(piece)
-            return_data["data"] = "\n\n".join(lines) if len(lines) > 1 else f"{name} 暂无配装结果"
-
-        params = {"name": name, "token": self.token, "ticket": self.ticket}
-        if tags:
-            params["mode"] = tags
-        return await self._request_api("/school/search", params, processor, "")
-
-
     async def token_stats(self, token: str) -> dict:
         """查询令牌用量。POST /token/stats"""
         result = self._init_return_data()
@@ -2390,7 +2349,7 @@ class JX3APIService:
             result["valid"] = False
             return result
         if isinstance(data, dict) and data.get("_error"):
-            result["msg"] = f"JX3API 令牌不可用：{data['_error']}"
+            result["msg"] = self._token_error_message(data["_error"])
             result["valid"] = False
             return result
         payload = data.get("data") if isinstance(data, dict) and "data" in data else data
@@ -2404,6 +2363,9 @@ class JX3APIService:
         expire_at = payload.get("expireAt")
         valid = payload.get("valid")
         result["valid"] = True if valid is None else bool(valid)
+        if valid is False:
+            result["msg"] = "JX3API Token 已失效，请更换后再试。"
+            return result
         lines = ["JX3API 令牌状态"]
         if valid is not None:
             lines.append("状态：" + ("有效" if valid else "已失效"))
@@ -2472,6 +2434,11 @@ class JX3APIService:
             return False, "校验推栏标识需要 JX3API Token，请先配置可用 Token 后再设置推栏。"
         data = await self._base_request("/school/skills", {"name": "毒经", "token": token, "ticket": ticket})
         if isinstance(data, dict) and data.get("_error"):
+            error = str(data["_error"])
+            lowered = error.lower()
+            token_error = any(key in lowered for key in ("token", "expire", "expired", "quota", "limit", "remaining", "insufficient", "count")) or any(key in error for key in ("令牌", "过期", "次数", "余额", "额度", "用尽", "不足"))
+            if token_error:
+                return False, self._token_error_message(error)
             return False, "推栏标识校验失败，可能是标识已过期或无效，请更换后再试。"
         if not data:
             return False, "推栏标识校验失败，请检查网络后更换重试。"

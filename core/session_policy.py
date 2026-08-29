@@ -21,7 +21,7 @@ NEED_TICKET = frozenset({
 })
 
 NEED_TOKEN = frozenset({
-    "关隘首领", "赤兔", "本周赤兔", "阵营事件", "烟花", "刷马", "马场",
+    "赤兔", "本周赤兔", "烟花", "刷马", "马场", "沙盘",
     "战绩", "名剑排行", "名剑统计",
     "名士排行", "江湖排行", "兵甲排行", "名师排行",
     "阵营排行", "薪火排行", "家园排行",
@@ -30,12 +30,13 @@ NEED_TOKEN = frozenset({
     "赛季恶人战功榜", "赛季浩气战功榜",
     "上周恶人战功榜", "上周浩气战功榜",
     "本周恶人战功榜", "本周浩气战功榜",
-    "试炼之地", "拍卖", "的卢", "金价", "物价", "配方", "万宝楼", "诛恶",
+    "试炼之地排行", "阵营拍卖", "的卢拍卖", "金价", "物价", "配方", "万宝楼", "诛恶",
     "名片", "全部名片", "随机名片", "查询", "未出", "汇总", "近期", "统计",
     "精耐", "百战", "成就", "角色", "阵眼", "资历排行", "技能", "奇穴", "资历",
-    "贴吧物价", "818", "掉落",
-    "跨服名剑榜", "武林争霸", "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
+    "掉落",
+    "跨服名剑榜", "武林争霸赛", "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
     "资历分布", "外观搜索",
+    "聊天", "拜师", "收徒", "招募", "团长", "团牌",
 })
 
 # 命令最少需要的非服务器参数个数。少填了就把绑定服插到最前。
@@ -48,23 +49,23 @@ SERVER_ARITY = {
     "赛季恶人战功榜": 0, "赛季浩气战功榜": 0,
     "上周恶人战功榜": 0, "上周浩气战功榜": 0,
     "本周恶人战功榜": 0, "本周浩气战功榜": 0,
-    "试炼之地": 1, "拍卖": 0, "的卢": 0, "金价": 0, "配方": 1,
+    "试炼之地排行": 1, "阵营拍卖": 0, "的卢拍卖": 0, "金价": 0, "配方": 1,
     "帮战": 0, "沙盘": 0, "诛恶": 0, "名片": 1, "全部名片": 1, "随机名片": 0,
     "查询": 1, "未出": 1, "汇总": 0, "近期": 0,
     "精耐": 1, "成就": 2, "角色": 1, "资历排行": 0, "聊天": 1, "统战": 0,
     "花价": 0, "拜师": 0, "收徒": 0, "招募": 0, "团长": 0, "团牌": 0,
     "开服": 0, "资历": 1, "交易行": 1,
-    "跨服名剑榜": 0, "武林争霸": 0, "捕快荣誉榜": 0, "江湖浪客榜": 0, "决斗挑战榜": 0,
+    "跨服名剑榜": 0, "武林争霸赛": 0, "捕快荣誉榜": 0, "江湖浪客榜": 0, "决斗挑战榜": 0,
     "资历分布": 1,
 }
 
 # 跨服/全服榜单：不强制注入绑定区服，缺省查询返回各自真实区服。
 CROSS_SERVER_COMMANDS = frozenset({
-    "跨服名剑榜", "武林争霸", "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
+    "跨服名剑榜", "武林争霸赛", "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
 })
 
 SERVER_SECOND_COMMANDS = frozenset({
-    "物价", "统计", "贴吧物价", "掉落",
+    "物价", "统计", "掉落",
 })
 
 
@@ -90,6 +91,15 @@ def resolve_query_server(explicit: str, bound: str) -> str:
 MODE_TOKENS = {"22", "33", "55", "2v2", "3v3", "5v5"}
 
 
+def camp_code(camp: str) -> int:
+    text = str(camp or "").strip()
+    if not text or text in {"2", "恶人", "恶人谷"}:
+        return 2
+    if text in {"1", "浩气", "浩气盟"}:
+        return 1
+    raise ValueError("阵营仅支持 恶人/恶人谷、浩气/浩气盟")
+
+
 SCHOOL_TAILS = {
     "万花", "纯阳", "七秀", "少林", "天策", "藏剑", "五毒", "唐门", "明教",
     "丐帮", "苍云", "长歌", "霸刀", "蓬莱", "凌雪", "衍天", "药宗", "刀宗",
@@ -102,11 +112,11 @@ def _is_optional_tail(cmd: str, value: str) -> bool:
         return False
     if cmd in {"战绩", "跨服名剑榜"} and text.lower() in MODE_TOKENS:
         return True
-    if cmd == "武林争霸" and text in {"浩气", "恶人", "浩气盟", "恶人谷", "1", "2"}:
+    if cmd == "武林争霸赛" and text in {"浩气", "恶人", "浩气盟", "恶人谷", "1", "2"}:
         return True
     if cmd == "决斗挑战榜" and text in {"公开", "私密", "1", "2"}:
         return True
-    if cmd in {"金价", "近期", "汇总", "聊天", "资历分布"} and text.isdigit():
+    if cmd in {"金价", "近期", "汇总", "聊天", "资历分布", "统计", "掉落"} and text.isdigit():
         return True
     if cmd in {"随机名片", "资历排行"} and text in SCHOOL_TAILS:
         return True
@@ -145,56 +155,35 @@ def inject_server_args(cmd: str, args: list[str], bound: str, resolver=None) -> 
             return [official] + core[1:] + tail
         return core + tail
 
-    if cmd == "拍卖":
-        if args:
-            official = canonicalize_server_token(args[0], resolver)
-            if official:
-                return [official] + args[1:]
-        if bound:
-            return [bound] + args
-        return UNBOUND_SERVER
-
     if cmd in SERVER_ARITY:
-        needed = SERVER_ARITY[cmd]
         core = list(args)
         tail = []
         while core and _is_optional_tail(cmd, core[-1]):
             tail.insert(0, core.pop())
-        if len(core) <= needed:
-            if not bound:
-                return UNBOUND_SERVER
-            return [bound] + core + tail
-        explicit = core[0]
-        official = canonicalize_server_token(explicit, resolver)
+
+        official = canonicalize_server_token(core[0], resolver) if core else ""
         if official:
             return [official] + core[1:] + tail
-        if bound:
-            return [bound] + core + tail
-        return UNKNOWN_SERVER
+
+        if not bound:
+            return UNBOUND_SERVER
+        return [bound] + core + tail
 
     if cmd in SERVER_SECOND_COMMANDS:
         if not args:
             return args
-        if len(args) >= 2:
-            official = canonicalize_server_token(args[1], resolver)
+        core = list(args)
+        tail = []
+        while core and _is_optional_tail(cmd, core[-1]):
+            tail.insert(0, core.pop())
+        if len(core) >= 2:
+            official = canonicalize_server_token(core[1], resolver)
             if official:
-                return [args[0], official] + args[2:]
-            if bound:
-                return [args[0], bound] + args[1:]
-            return UNBOUND_SERVER
+                return [core[0], official] + core[2:] + tail
+            return UNKNOWN_SERVER
         if not bound:
             return UNBOUND_SERVER
-        return [args[0], bound]
-
-    if cmd == "818":
-        if not args:
-            return [bound] if bound else UNBOUND_SERVER
-        official = canonicalize_server_token(args[0], resolver)
-        if official:
-            return [official] + args[1:]
-        if bound:
-            return [bound] + args
-        return UNBOUND_SERVER if args[0].isdigit() else UNKNOWN_SERVER
+        return [core[0], bound] + tail
 
     return args
 

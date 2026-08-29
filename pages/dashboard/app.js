@@ -146,7 +146,7 @@ function sessionCard(row) {
       <div class="row">
         <label class="field">
           <span>JX3API Token</span>
-          <input data-k="token" value="${escapeHtml(row.token_value || "")}" placeholder="多个用逗号分隔" />
+          <input data-k="token" data-initial="${escapeHtml(row.token_display_value || "")}" value="${escapeHtml(row.token_display_value || "")}" placeholder="多个用逗号分隔" />
         </label>
         <div class="row-actions">
           <button data-act="token" type="button">保存 Token</button>
@@ -156,7 +156,7 @@ function sessionCard(row) {
       <div class="row">
         <label class="field">
           <span>推栏标识</span>
-          <input data-k="ticket" value="${escapeHtml(row.ticket_value || "")}" placeholder="多个用逗号分隔" />
+          <input data-k="ticket" data-initial="${escapeHtml(row.ticket_display_value || "")}" value="${escapeHtml(row.ticket_display_value || "")}" placeholder="多个用逗号分隔" />
         </label>
         <div class="row-actions">
           <button data-act="ticket" type="button">保存推栏</button>
@@ -166,8 +166,17 @@ function sessionCard(row) {
       ${row.is_private ? "" : `
       <div class="row">
         <label class="field">
-          <span>授权管理</span>
-          <input data-k="managers" value="${escapeHtml((row.managers || []).map(m => m.name || m).join(","))}" placeholder="仅展示或移除已有授权，新增请群聊发送 授权管理 @成员" />
+          <span>授权管理 ID</span>
+          <input data-k="managers" value="${escapeHtml((row.managers || []).map(m => m.id || m).join(","))}" placeholder="保留或删除已有授权，多个用逗号分隔" />
+        </label>
+        <div class="row-actions">
+          <button data-act="save-managers" type="button">保存管理</button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>新增授权 ID</span>
+          <input data-k="new_managers" value="" placeholder="填写被授权人的真实 ID，多个用逗号分隔" />
         </label>
         <div class="row-actions">
           <button data-act="save-managers" type="button">保存管理</button>
@@ -207,18 +216,26 @@ function sessionCard(row) {
     const ticket = card.querySelector('[data-k="ticket"]').value.trim();
     const managerEl = card.querySelector('[data-k="managers"]');
     const managers = managerEl ? managerEl.value.trim() : "";
+    const newManagerEl = card.querySelector('[data-k="new_managers"]');
+    const newManagers = newManagerEl ? newManagerEl.value.trim() : "";
     if (act === "bind") {
       if (!row.umo || !server) return setStatus("请填写区服", true);
       await run(() => bridge.apiPost("page/sessions/bind", { umo: row.umo, server }));
     } else if (act === "token") {
       if (!row.umo || !token) return setStatus("请填写 Token", true);
+      if (token === (card.querySelector('[data-k="token"]').dataset.initial || "")) {
+        return setStatus("Token 未修改，保持当前配置");
+      }
       await run(() => bridge.apiPost("page/sessions/token", { umo: row.umo, token }));
     } else if (act === "ticket") {
       if (!row.umo || !ticket) return setStatus("请填写推栏标识", true);
+      if (ticket === (card.querySelector('[data-k="ticket"]').dataset.initial || "")) {
+        return setStatus("推栏标识未修改，保持当前配置");
+      }
       await run(() => bridge.apiPost("page/sessions/ticket", { umo: row.umo, ticket }));
     } else if (act === "save-managers") {
       if (!row.umo) return setStatus("缺少 UMO", true);
-      await run(() => bridge.apiPost("page/sessions/managers", { umo: row.umo, managers }));
+      await run(() => bridge.apiPost("page/sessions/managers", { umo: row.umo, managers, new_managers: newManagers }));
     } else if (act === "clear-claim") {
       await run(() => bridge.apiPost("page/sessions/claim", { identity: row.claim_identity }));
     } else if (act === "clear-server") {
