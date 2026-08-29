@@ -16,18 +16,18 @@
                 <table class="help-table">
                     <thead>
                         <tr>
-                            <th>功能</th>
                             <th>命令</th>
-                            <th>示例</th>
+                            <th>参数</th>
+                            <th>功能描述</th>
                         </tr>
                     </thead>
                     <tbody>
             {% set ns.group = row.group %}
         {% endif %}
                         <tr>
-                            <td class="help-feature">{{ row.desc.split(' / ')[-1] if row.desc else row.id }}</td>
-                            <td class="help-command">{{ row.command }}</td>
-                            <td class="help-example">{{ row.example }}</td>
+                            <td class="help-command">{{ row.word }}</td>
+                            <td class="help-example">{{ row.command }}</td>
+                            <td class="help-desc">{{ row.web_desc }}</td>
                         </tr>
     {% endfor %}
     {% if ns.group %}

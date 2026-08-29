@@ -197,7 +197,22 @@ class AdminCommand:
     error: str = ""
 
 
-ADMIN_COMMAND_IDS = ("Token", "推栏", "认领", "查询令牌", "绑定", "打开", "关闭", "授权管理", "查看管理", "删除管理")
+ADMIN_COMMAND_IDS = (
+    "Token",
+    "推栏",
+    "认领",
+    "查询令牌",
+    "绑定",
+    "打开",
+    "关闭",
+    "授权管理",
+    "查看管理",
+    "删除管理",
+    "张嘴",
+    "闭嘴",
+)
+
+PRIVATE_ONLY_COMMAND_IDS = {"认领", "Token", "推栏"}
 
 
 def remap_admin_parts(parts: list[str], catalog: dict | None) -> list[str]:
@@ -244,6 +259,8 @@ def parse_admin_command(
         return AdminCommand(action="claim", value=" ".join(parts[1:]).strip())
     if cmd == "查询令牌":
         return AdminCommand(action="token_stats")
+    if cmd in {"张嘴", "闭嘴"}:
+        return AdminCommand(action="llm_enabled", value="1" if cmd == "张嘴" else "0")
     if cmd in {"授权管理", "查看管理", "删除管理"}:
         if is_private:
             return AdminCommand(error="group_manage_only")
@@ -277,6 +294,18 @@ def current_command_name(catalog: dict | None, command_id: str) -> str:
     if not catalog:
         return command_id
     return str((catalog.get(command_id) or {}).get("command") or command_id)
+
+
+def parse_umo(umo: str) -> tuple[str, str, str]:
+    parts = str(umo or "").split(":", 2)
+    if len(parts) != 3:
+        return "", "", ""
+    platform_id, message_type, session_id = parts
+    return platform_id.strip(), message_type.strip(), session_id.strip()
+
+
+def is_group_umo(umo: str) -> bool:
+    return parse_umo(umo)[1] == "GroupMessage"
 
 
 def hint_unbound(catalog: dict | None = None) -> str:
@@ -320,7 +349,7 @@ def hint_need_token(catalog: dict | None = None) -> str:
         "请前往 https://www.jx3api.com 购买 Token。\n"
         "\n"
         "配置方式（请私聊机器人，不要在群里发送 Token）：\n"
-        "1. 在目标群或私聊发送 sid ，复制该会话 UMO\n"
+        "1. 在目标群聊发送 sid ，复制该群 UMO\n"
         f"2. 私聊发送：{token_cmd} <UMO> <你的Token>\n"
         f"例如：{token_cmd} <UMO> <你的Token>\n"
         "\n"
@@ -333,7 +362,7 @@ def hint_need_ticket(catalog: dict | None = None) -> str:
     return (
         "该功能需要推栏标识，当前未配置。\n"
         "推栏默认使用全局配置；如需本会话单独使用，请私聊机器人（不要在群里发送）：\n"
-        "1. 在目标群或私聊发送 sid ，复制该会话 UMO\n"
+        "1. 在目标群聊发送 sid ，复制该群 UMO\n"
         f"2. 私聊发送：{ticket_cmd} <UMO> <你的推栏标识>\n"
         f"例如：{ticket_cmd} <UMO> <你的推栏标识>"
     )
@@ -342,7 +371,7 @@ def hint_need_ticket(catalog: dict | None = None) -> str:
 def hint_group_secret() -> str:
     return (
         "请勿在群聊中发送 Token 或推栏标识。\n"
-        "请先在目标群或私聊发送 sid 复制 UMO，再私聊机器人完成配置。"
+        "请先在目标群聊发送 sid 复制 UMO，再私聊机器人完成配置。"
     )
 
 
@@ -356,8 +385,8 @@ def hint_secret_saved(kind: str, umo: str) -> str:
 
 def hint_umo_invalid() -> str:
     return (
-        "未找到该 UMO 对应的会话。\n"
-        "请先在目标群或私聊发送 sid ，复制完整 UMO 后再试。"
+        "未找到该 UMO 对应的群聊会话。\n"
+        "请先在目标群聊发送 sid ，复制完整 UMO 后再试。"
     )
 
 

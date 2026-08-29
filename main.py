@@ -19,8 +19,10 @@ from .core.session_policy import (
     GROUP_SECRET_FORBIDDEN,
     NEED_TICKET,
     NEED_TOKEN,
+    PRIVATE_ONLY_COMMAND_IDS,
     UNBOUND_SERVER,
     UNKNOWN_SERVER,
+    is_group_umo,
     CLAIM_PHRASE,
     hint_authorize_usage,
     hint_bind_ok,
@@ -51,7 +53,7 @@ from .core.session_policy import (
     strip_command_prefix,
 )
 from .core.credentials import reset_request_credentials, set_request_credentials
-from .core.mentions import mentioned_target, message_text_without_bot_mentions
+from .core.mentions import mentioned_bot, mentioned_target, message_text_without_bot_mentions
 from .core.page_api import SessionPageAPI
 from .core.event_catalog import push_arg_map
 from .core.command_catalog import apply_command_overrides, resolve_command, suggest_command
@@ -463,6 +465,15 @@ class Jx3ApiPlugin(Star):
                 return event.plain_result(hint_claim_phrase(self.command_catalog))
             return event.plain_result(hint_claim_ok(name))
 
+        if parsed.action == "llm_enabled":
+            if not await self._is_owner_admin(event) and not await self._is_plugin_admin(event, umo=self._event_umo(event)):
+                return event.plain_result(hint_need_claim(self.command_catalog))
+            enabled = parsed.value == "1"
+            await self.sessions.set_llm_enabled(self._event_umo(event), enabled)
+            label = "张嘴" if enabled else "闭嘴"
+            state = "允许" if enabled else "禁止"
+            return event.plain_result(f"已{label}：被 @ 后{state}触发 LLM 回话。")
+
         if parsed.action in {"authorize", "deauthorize", "list_admins"}:
             if not await self._is_session_owner_admin(event):
                 return event.plain_result(hint_need_claim(self.command_catalog))
@@ -498,7 +509,7 @@ class Jx3ApiPlugin(Star):
             blocks = []
             if session_token:
                 data = await self.jx3api.token_stats(session_token)
-                title = "【该群 Token】" if not self._is_private(event) else "【该会话 Token】"
+                title = "【该群 Token】"
                 body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
                 blocks.append(title + "\n" + body)
             if use_global and global_token and global_token != session_token:
@@ -551,6 +562,8 @@ class Jx3ApiPlugin(Star):
 
         if parsed.action in {"set_token", "set_ticket"}:
             target = parsed.target.strip()
+            if not is_group_umo(target):
+                return event.plain_result("目标 UMO 必须是群聊会话。请先在目标群发送 sid 复制 UMO。")
             row = await self.sessions.get(target)
             if not row:
                 return event.plain_result(hint_umo_invalid())
@@ -714,8 +727,33 @@ class Jx3ApiPlugin(Star):
     async def on_all_message(self, event: AstrMessageEvent):
         if not self.command_map:
             return
-        parts = self.parse_message(message_text_without_bot_mentions(event))
+        bot_at = mentioned_bot(event)
+        clean_text = message_text_without_bot_mentions(event)
+        parts = self.parse_message(clean_text)
+        if self._is_private(event):
+            if not parts:
+                return
+            normalized = remap_admin_parts(parts, self.command_catalog)
+            trigger = normalized[0]
+            if trigger.lower() == "token":
+                trigger = "Token"
+            if trigger not in PRIVATE_ONLY_COMMAND_IDS:
+                return
+            admin_ret = await self._handle_admin_command(event, parts)
+            if admin_ret is not None:
+                event.stop_event()
+                yield admin_ret
+            return
         if not parts:
+            if bot_at:
+                row = await self.sessions.ensure(
+                    self._event_umo(event),
+                    self._event_display_name(event),
+                    is_private=self._is_private(event),
+                )
+                if self.sessions.is_bot_enabled(row):
+                    if self.sessions.is_llm_enabled(row):
+                        yield self._forced_llm(event, clean_text)
             return
 
         umo = self._event_umo(event)
@@ -725,7 +763,8 @@ class Jx3ApiPlugin(Star):
             is_private=self._is_private(event),
         )
         claim_cmd = ((self.command_catalog.get("认领") or {}).get("command") or "认领")
-        if not self.sessions.is_bot_enabled(row) and parts[0] != claim_cmd:
+        claim_and_voice_cmds = {claim_cmd, current_command_name(self.command_catalog, "张嘴"), current_command_name(self.command_catalog, "闭嘴")}
+        if not self.sessions.is_bot_enabled(row) and parts[0] not in claim_and_voice_cmds:
             return
 
         admin_ret = await self._handle_admin_command(event, parts)
@@ -737,6 +776,10 @@ class Jx3ApiPlugin(Star):
         trigger, *args = parts
         cmd = resolve_command(self.command_catalog, trigger)
         if not cmd:
+            if bot_at:
+                if self.sessions.is_llm_enabled(row):
+                    yield self._forced_llm(event, clean_text)
+                return
             if self._looks_like_command(event.message_str):
                 suggested = suggest_command(self.command_catalog, trigger)
                 if suggested:
@@ -744,6 +787,7 @@ class Jx3ApiPlugin(Star):
                     yield event.plain_result(hint_command_usage(suggested, self.command_catalog))
                     return
             return
+
         if cmd in {"排行榜", "战功榜"}:
             event.stop_event()
             if cmd == "排行榜":
@@ -820,3 +864,12 @@ class Jx3ApiPlugin(Star):
             yield event.plain_result(format_command_error(cmd, e, self.command_catalog))
         finally:
             reset_request_credentials(creds)
+
+    def _forced_llm(self, event: AstrMessageEvent, text: str):
+        """被 @ 后强制走 LLM 回话，并屏蔽默认链路避免重复回复。"""
+        prompt = (text or "").strip() or "你好"
+        try:
+            event.should_call_llm(True)
+        except Exception:
+            pass
+        return event.request_llm(prompt=prompt)

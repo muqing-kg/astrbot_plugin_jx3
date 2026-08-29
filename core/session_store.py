@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 from typing import Any
 
@@ -9,6 +10,7 @@ from .session_policy import (
     NEED_TICKET,
     NEED_TOKEN,
     UNBOUND_SERVER,
+    is_group_umo,
     mask_secret,
     resolve_query_server,
 )
@@ -30,6 +32,14 @@ __all__ = [
 class SessionStore:
     def __init__(self, sqlite: AsyncSQLiteDB):
         self.sql = sqlite
+        self._session_locks: dict[str, asyncio.Lock] = {}
+        self._push_state_lock = asyncio.Lock()
+
+    def session_lock(self, umo: str) -> asyncio.Lock:
+        key = str(umo or "").strip()
+        if key not in self._session_locks:
+            self._session_locks[key] = asyncio.Lock()
+        return self._session_locks[key]
 
     async def init(self) -> None:
         await self.sql.execute(
@@ -64,12 +74,18 @@ class SessionStore:
                 claim_name TEXT DEFAULT '',
                 claim_at TEXT DEFAULT '',
                 bot_enabled INTEGER DEFAULT 1,
+                llm_enabled INTEGER DEFAULT 1,
+                push_fail_count INTEGER DEFAULT 0,
+                push_last_error TEXT DEFAULT '',
                 updated_at TEXT DEFAULT ''
             )
             """
         )
         extra_columns = [
             "bot_enabled INTEGER DEFAULT 1",
+            "llm_enabled INTEGER DEFAULT 1",
+            "push_fail_count INTEGER DEFAULT 0",
+            "push_last_error TEXT DEFAULT ''",
             "push_gengxin INTEGER DEFAULT 0",
             "push_bagua INTEGER DEFAULT 0",
             "push_yuncong INTEGER DEFAULT 0",
@@ -165,8 +181,16 @@ class SessionStore:
             )
             """
         )
+        # 插件功能只面向群聊。历史私聊会话不再保留。
+        await self.sql.execute("DELETE FROM session_config WHERE is_private=1")
+        await self.sql.execute(
+            "DELETE FROM session_managers WHERE NOT EXISTS ("
+            "SELECT 1 FROM session_config WHERE session_config.umo=session_managers.umo)"
+        )
 
     async def ensure(self, umo: str, display_name: str = "", is_private: bool = False) -> dict[str, Any]:
+        if is_private or not is_group_umo(umo):
+            return {}
         row = await self.get(umo)
         if row:
             updates = {}
@@ -206,9 +230,14 @@ class SessionStore:
 
     async def list_bound(self) -> list[dict[str, Any]]:
         rows = await self.list_all()
-        return [row for row in rows if (row.get("server") or "").strip()]
+        return [
+            row for row in rows
+            if (row.get("server") or "").strip() and is_group_umo(row.get("umo", ""))
+        ]
 
     async def bind_server(self, umo: str, server: str, display_name: str = "", is_private: bool = False) -> dict[str, Any]:
+        if is_private or not is_group_umo(umo):
+            raise ValueError("本插件只支持群聊会话绑定")
         await self.ensure(umo, display_name, is_private)
         resolver = getattr(self, "resolve_server", None)
         if callable(resolver):
@@ -250,6 +279,8 @@ class SessionStore:
         return True, ""
 
     async def set_token(self, umo: str, token: str) -> None:
+        if not is_group_umo(umo):
+            raise ValueError("本插件只支持群聊会话配置 Token")
         await self.ensure(umo)
         await self.sql.update(
             "session_config",
@@ -259,6 +290,8 @@ class SessionStore:
         )
 
     async def set_ticket(self, umo: str, ticket: str) -> None:
+        if not is_group_umo(umo):
+            raise ValueError("本插件只支持群聊会话配置推栏标识")
         await self.ensure(umo)
         await self.sql.update(
             "session_config",
@@ -268,6 +301,8 @@ class SessionStore:
         )
 
     async def set_bot_enabled(self, umo: str, enabled: bool) -> None:
+        if not is_group_umo(umo):
+            raise ValueError("本插件只支持群聊会话开关")
         await self.ensure(umo)
         await self.sql.update(
             "session_config",
@@ -283,7 +318,84 @@ class SessionStore:
             return True
         return bool(row.get("bot_enabled"))
 
+    async def set_llm_enabled(self, umo: str, enabled: bool) -> None:
+        await self.ensure(umo)
+        await self.sql.update(
+            "session_config",
+            {"llm_enabled": 1 if enabled else 0, "updated_at": _now()},
+            "umo=?",
+            (umo,),
+        )
+
+    def is_llm_enabled(self, row: dict[str, Any] | None) -> bool:
+        if not row:
+            return True
+        if "llm_enabled" not in row or row.get("llm_enabled") is None:
+            return True
+        return bool(row.get("llm_enabled"))
+
+    async def delete_session(self, umo: str) -> bool:
+        if not is_group_umo(umo):
+            raise ValueError("只能删除群聊会话")
+        async with self.session_lock(umo):
+            async with self._push_state_lock:
+                row = await self.get(umo)
+                if not row:
+                    return False
+                await self.sql.execute("DELETE FROM session_config WHERE umo=?", (umo,))
+                await self.sql.execute("DELETE FROM session_managers WHERE umo=?", (umo,))
+                for state in await self.sql.select_all("push_state"):
+                    kind = str(state.get("kind") or "")
+                    server = str(state.get("server") or "")
+                    if kind in PUSH_FIELD and not await self.push_targets(kind, server):
+                        await self.sql.execute(
+                            "DELETE FROM push_state WHERE kind=? AND server=?",
+                            (kind, server),
+                        )
+            self._session_locks.pop(umo, None)
+            return True
+
+    async def is_active_push_target(self, umo: str, kind: str) -> bool:
+        field = PUSH_FIELD.get(kind)
+        if not field or not is_group_umo(umo):
+            return False
+        row = await self.get(umo)
+        return bool(row and self.is_bot_enabled(row) and row.get(field))
+
+    async def mark_push_success(self, umo: str) -> None:
+        if not is_group_umo(umo):
+            return
+        row = await self.get(umo)
+        if not row or (
+            not int(row.get("push_fail_count") or 0)
+            and not str(row.get("push_last_error") or "").strip()
+        ):
+            return
+        await self.sql.update(
+            "session_config",
+            {"push_fail_count": 0, "push_last_error": "", "updated_at": _now()},
+            "umo=?",
+            (umo,),
+        )
+
+    async def record_permanent_push_failure(self, umo: str, detail: str) -> None:
+        if not is_group_umo(umo):
+            return
+        row = await self.get(umo)
+        if not row:
+            return
+        count = int(row.get("push_fail_count") or 0) + 1
+        detail = str(detail or "").strip()[:500]
+        await self.sql.update(
+            "session_config",
+            {"push_fail_count": count, "push_last_error": detail, "updated_at": _now()},
+            "umo=?",
+            (umo,),
+        )
+
     async def set_use_global_token(self, umo: str, enabled: bool) -> None:
+        if not is_group_umo(umo):
+            raise ValueError("本插件只支持群聊会话配置")
         await self.ensure(umo)
         await self.sql.update(
             "session_config",
@@ -295,6 +407,8 @@ class SessionStore:
     async def clear_secret(self, umo: str, kind: str) -> None:
         if kind not in ("token", "ticket"):
             raise ValueError(f"不支持的密钥类型: {kind}")
+        if not is_group_umo(umo):
+            raise ValueError("本插件只支持群聊会话配置")
         field = "token" if kind == "token" else "ticket"
         await self.ensure(umo)
         await self.sql.update(
@@ -326,7 +440,10 @@ class SessionStore:
         if not field:
             return []
         rows = await self.sql.select_all("session_config", f"{field}=?", (1,))
-        rows = [row for row in rows if self.is_bot_enabled(row)]
+        rows = [
+            row for row in rows
+            if self.is_bot_enabled(row) and is_group_umo(row.get("umo", ""))
+        ]
         if kind in GLOBAL_KINDS:
             return rows
         server = (server or "").strip()
@@ -354,6 +471,8 @@ class SessionStore:
         servers = []
         resolver = getattr(self, "resolve_server", None)
         for row in rows:
+            if not is_group_umo(row.get("umo", "")):
+                continue
             server = (row.get("server") or "").strip()
             if callable(resolver):
                 official = resolver(server)
@@ -368,19 +487,22 @@ class SessionStore:
         return "" if not row else str(row.get("status") or "")
 
     async def set_push_state(self, kind: str, server: str, status: str) -> None:
-        row = await self.sql.select_one("push_state", "kind=? AND server=?", (kind, server))
-        if row:
-            await self.sql.update(
+        async with self._push_state_lock:
+            if not await self.push_targets(kind, server):
+                return
+            row = await self.sql.select_one("push_state", "kind=? AND server=?", (kind, server))
+            if row:
+                await self.sql.update(
+                    "push_state",
+                    {"status": str(status)},
+                    "kind=? AND server=?",
+                    (kind, server),
+                )
+                return
+            await self.sql.insert(
                 "push_state",
-                {"status": str(status)},
-                "kind=? AND server=?",
-                (kind, server),
+                {"kind": kind, "server": server, "status": str(status)},
             )
-            return
-        await self.sql.insert(
-            "push_state",
-            {"kind": kind, "server": server, "status": str(status)},
-        )
 
     def public_row(
         self,
@@ -431,7 +553,8 @@ class SessionStore:
             "has_ticket": has_own_ticket or ticket_global_available,
             "use_global_token": use_global_token,
             "bot_enabled": self.is_bot_enabled(row),
-            "is_private": bool(row.get("is_private")),
+            "push_fail_count": int(row.get("push_fail_count") or 0),
+            "push_last_error": row.get("push_last_error", ""),
             "claim_identity": row.get("claim_identity", ""),
             "claim_name": row.get("claim_name", ""),
             "managers": [],
@@ -577,7 +700,6 @@ class SessionStore:
         self,
         umo: str,
         values: list[str],
-        additions: list[str] | None = None,
     ) -> tuple[bool, str]:
         umo = str(umo or "").strip()
         claim = await self.get_session_identity(umo)
@@ -587,7 +709,6 @@ class SessionStore:
         by_id = {str(row.get("user_id") or "").strip(): row for row in current}
         by_name = {str(row.get("name") or "").strip(): row for row in current}
         desired_ids: list[str] = []
-        new_ids: list[str] = []
         unknown: list[str] = []
         for value in values or []:
             text = str(value or "").strip().lstrip("@").strip()
@@ -602,19 +723,10 @@ class SessionStore:
             row_id = str(row.get("user_id") or "").strip()
             if row_id and row_id not in desired_ids:
                 desired_ids.append(row_id)
-        for value in additions or []:
-            user_id = str(value or "").strip().lstrip("@").strip()
-            if not user_id:
-                continue
-            if identity and user_id == identity:
-                return False, "认领人已是本会话管理员，无需重复授权。"
-            if user_id not in desired_ids:
-                desired_ids.append(user_id)
-                new_ids.append(user_id)
         if unknown:
             return False, (
                 "无法识别的成员身份：" + "、".join(unknown) + "。\n"
-                "已有授权请输入真实 ID 或昵称；新增授权请填写在新增授权 ID 栏。"
+                "已有授权请输入真实 ID、昵称或「昵称（ID）」格式。"
             )
         for row in current:
             row_id = str(row.get("user_id") or "").strip()
@@ -623,11 +735,6 @@ class SessionStore:
                     "DELETE FROM session_managers WHERE umo=? AND user_id=?",
                     (umo, row_id),
                 )
-        for user_id in new_ids:
-            await self.sql.insert(
-                "session_managers",
-                {"umo": umo, "user_id": user_id, "name": "", "created_at": _now()},
-            )
         remain = await self.list_managers(umo)
         labels = [str(row.get("name") or row.get("user_id") or "") for row in remain]
         if labels:

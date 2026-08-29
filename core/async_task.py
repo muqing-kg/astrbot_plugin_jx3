@@ -12,6 +12,7 @@ from astrbot.api import AstrBotConfig
 from .event_catalog import event_dedupe_key, format_event_text, parse_ws_message, resolve_push_kind
 from .jx3api_data import JX3APIService
 from .jx3box_data import JX3BOXService
+from .push_errors import is_permanent_group_failure
 from .session_store import SessionStore
 from .ws_client import DEFAULT_WS_URL, JX3WSClient
 
@@ -120,7 +121,7 @@ class AsyncTask:
         targets = await self.sessions.push_targets(kind, server)
         if not targets:
             return
-        await self._send(targets, text)
+        await self._send(targets, text, kind)
         await self.sessions.set_push_state(kind, server or "*", status)
 
     async def _push_server(self, kind: str, server: str):
@@ -132,10 +133,10 @@ class AsyncTask:
         if old == status:
             return
         targets = await self.sessions.push_targets(kind, server)
-        await self._send(targets, data.get("data") or "")
+        await self._send(targets, data.get("data") or "", kind)
         await self.sessions.set_push_state(kind, server, status)
 
-    async def _send(self, targets, text: str):
+    async def _send(self, targets, text: str, kind: str):
         if not text or not targets:
             return
         message_chain = MessageChain().message(text)
@@ -143,7 +144,20 @@ class AsyncTask:
             umo = row.get("umo")
             if not umo:
                 continue
-            await self.context.send_message(umo, message_chain)
+            async with self.sessions.session_lock(umo):
+                if not await self.sessions.is_active_push_target(umo, kind):
+                    continue
+                try:
+                    sent = await self.context.send_message(umo, message_chain)
+                except Exception as exc:
+                    logger.warning(f"主动推送发送失败: {umo}, error={exc}")
+                    if is_permanent_group_failure(exc):
+                        await self.sessions.record_permanent_push_failure(umo, str(exc))
+                else:
+                    if sent:
+                        await self.sessions.mark_push_success(umo)
+                    else:
+                        logger.warning(f"主动推送平台不可达，已跳过计数: {umo}")
 
     def stop_all_tasks(self):
         try:

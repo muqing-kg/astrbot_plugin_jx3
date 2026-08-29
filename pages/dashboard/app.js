@@ -75,8 +75,9 @@ function waitForPluginBridge(timeoutMs = 8000) {
   });
 }
 
-function pill(label, on) {
-  return `<span class="pill ${on ? "on" : ""}">${escapeHtml(label)}</span>`;
+function pill(label, on, title = "") {
+  const titleAttribute = title ? ` title="${escapeHtml(title)}"` : "";
+  return `<span class="pill ${on ? "on" : ""}"${titleAttribute}>${escapeHtml(label)}</span>`;
 }
 
 function setView(view) {
@@ -96,7 +97,7 @@ function renderSessions(payload) {
   if (!sessions.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = "暂无已绑定区服的群/私聊。先在对应会话发送 绑定 区服名。";
+    empty.textContent = "暂无已绑定区服的群聊。先在对应群聊发送 绑定 区服名。";
     cardsEl.appendChild(empty);
     return;
   }
@@ -120,6 +121,11 @@ function sessionCard(row) {
         ${pill("Token " + (row.token_status || "未配置"), Boolean(row.has_token))}
         ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
         ${pill(row.bot_enabled === false ? "机器人已关闭" : "机器人开启", row.bot_enabled !== false)}
+        ${pill(
+          row.push_fail_count ? `推送异常 ${row.push_fail_count} 次` : "推送正常",
+          !row.push_fail_count,
+          row.push_last_error || ""
+        )}
       </div>
     </div>
     <div class="switches">
@@ -163,26 +169,15 @@ function sessionCard(row) {
           <button data-act="clear-ticket" class="ghost" type="button">清除推栏</button>
         </div>
       </div>
-      ${row.is_private ? "" : `
       <div class="row">
         <label class="field">
           <span>授权管理 ID</span>
-          <input data-k="managers" value="${escapeHtml((row.managers || []).map(m => m.id || m).join(","))}" placeholder="保留或删除已有授权，多个用逗号分隔" />
+          <input data-k="managers" value="${escapeHtml((row.managers || []).map(m => (m.name && m.name !== m.id) ? `${m.name}（${m.id}）` : (m.id || m.name || "")).join(","))}" placeholder="保留或删除已有授权，多个用逗号分隔" />
         </label>
         <div class="row-actions">
           <button data-act="save-managers" type="button">保存管理</button>
         </div>
       </div>
-      <div class="row">
-        <label class="field">
-          <span>新增授权 ID</span>
-          <input data-k="new_managers" value="" placeholder="填写被授权人的真实 ID，多个用逗号分隔" />
-        </label>
-        <div class="row-actions">
-          <button data-act="save-managers" type="button">保存管理</button>
-        </div>
-      </div>
-      `}
       ${row.claim_identity ? `
       <div class="row">
         <label class="field">
@@ -194,6 +189,15 @@ function sessionCard(row) {
         </div>
       </div>
       ` : ""}
+      <div class="row">
+        <label class="field">
+          <span>会话清理</span>
+          <span class="static-text">删除会话会清空区服、Token、推栏、推送和管理员数据。</span>
+        </label>
+        <div class="row-actions">
+          <button data-act="delete" class="danger" type="button">删除会话</button>
+        </div>
+      </div>
     </div>
   `;
 
@@ -216,8 +220,6 @@ function sessionCard(row) {
     const ticket = card.querySelector('[data-k="ticket"]').value.trim();
     const managerEl = card.querySelector('[data-k="managers"]');
     const managers = managerEl ? managerEl.value.trim() : "";
-    const newManagerEl = card.querySelector('[data-k="new_managers"]');
-    const newManagers = newManagerEl ? newManagerEl.value.trim() : "";
     if (act === "bind") {
       if (!row.umo || !server) return setStatus("请填写区服", true);
       await run(() => bridge.apiPost("page/sessions/bind", { umo: row.umo, server }));
@@ -235,7 +237,7 @@ function sessionCard(row) {
       await run(() => bridge.apiPost("page/sessions/ticket", { umo: row.umo, ticket }));
     } else if (act === "save-managers") {
       if (!row.umo) return setStatus("缺少 UMO", true);
-      await run(() => bridge.apiPost("page/sessions/managers", { umo: row.umo, managers, new_managers: newManagers }));
+      await run(() => bridge.apiPost("page/sessions/managers", { umo: row.umo, managers }));
     } else if (act === "clear-claim") {
       await run(() => bridge.apiPost("page/sessions/claim", { identity: row.claim_identity }));
     } else if (act === "clear-server") {
@@ -244,6 +246,16 @@ function sessionCard(row) {
       await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "token" }));
     } else if (act === "clear-ticket") {
       await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "ticket" }));
+    } else if (act === "delete") {
+      const confirmed = window.confirm("确认删除该会话吗？将停止主动推送并清空该会话数据。");
+      if (!confirmed) return;
+      try {
+        const result = await bridge.apiPost("page/sessions/delete", { umo: row.umo });
+        setStatus(result.message || "已删除会话", !result.left);
+        await loadSessions();
+      } catch (err) {
+        setStatus(err.message || "删除失败", true);
+      }
     }
   });
 
@@ -276,7 +288,7 @@ function sessionCard(row) {
 
 function renderCommands(payload) {
   const commands = payload.commands || [];
-  commandListEl.innerHTML = `<div class="head"><span>命令</span><span>示例</span><span>描述</span><span></span></div>`;
+  commandListEl.innerHTML = `<div class="head"><span>命令</span><span>参数</span><span>功能描述</span><span></span></div>`;
   let currentGroup = "";
   for (const row of commands) {
     if (row.group && row.group !== currentGroup) {
@@ -290,7 +302,7 @@ function renderCommands(payload) {
     el.className = "row";
     el.innerHTML = `
       <input data-k="command" value="${escapeHtml(row.command || "")}" />
-      <div class="cell-text">${escapeHtml(row.example || "")}</div>
+      <div class="cell-text">${escapeHtml(row.params || "")}</div>
       <div class="cell-text">${escapeHtml(row.desc || "")}</div>
       <button data-act="save" type="button">保存</button>
     `;
@@ -311,13 +323,13 @@ function renderCommands(payload) {
 }
 
 function renderPush(payload) {
-  pushListEl.innerHTML = `<div class="head"><span>命令</span><span>示例</span><span>描述</span><span></span></div>`;
+  pushListEl.innerHTML = `<div class="head"><span>命令</span><span>参数</span><span>功能描述</span><span></span></div>`;
   for (const row of [payload.open, payload.close]) {
     const el = document.createElement("div");
     el.className = "row";
     el.innerHTML = `
       <input data-k="value" value="${escapeHtml(row.command || "")}" placeholder="${escapeHtml(row.id === "打开" ? "例如 打开" : "例如 关闭")}" />
-      <div class="cell-text">${escapeHtml(row.example || "")}</div>
+      <div class="cell-text">事件类型</div>
       <div class="cell-text">${row.id === "打开" ? "开启推送" : "关闭推送"}</div>
       <button data-act="save" type="button">保存</button>
     `;
@@ -344,8 +356,8 @@ function renderPush(payload) {
       const el = document.createElement("div");
       el.className = "row";
       el.innerHTML = `
+        <div class="cell-text">${escapeHtml(payload.open.command)}</div>
         <input data-k="name" value="${escapeHtml(event.name || "")}" />
-        <div class="cell-text">${escapeHtml(payload.open.command)} ${escapeHtml(event.name)}</div>
         <div class="cell-text">${escapeHtml(event.desc || event.kind)}</div>
         <button data-act="save" type="button">保存</button>
       `;
