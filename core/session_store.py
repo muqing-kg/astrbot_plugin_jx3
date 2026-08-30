@@ -886,10 +886,25 @@ class SessionStore:
         identity: str,
         name: str = "",
         claim_type: str = "claimant",
+        force: bool = False,
     ) -> dict[str, Any]:
         await self.ensure(umo)
         identity = str(identity or "").strip()
         if not identity:
+            return await self.get(umo)
+        if force and claim_type == "astrbot_admin":
+            await self.sql.execute(
+                """
+                UPDATE session_config
+                SET claim_identity=?, claim_type='astrbot_admin', claim_name=?, claim_at=?, updated_at=?
+                WHERE umo=?
+                """,
+                (identity, str(name or "").strip(), _now(), _now(), umo),
+            )
+            await self.sql.execute(
+                "DELETE FROM plugin_claimants WHERE user_id=?",
+                (identity,),
+            )
             return await self.get(umo)
         await self.sql.execute(
             """
@@ -913,6 +928,36 @@ class SessionStore:
         ):
             await self.claim_admin(identity, name)
         return row
+
+    async def reconcile_astrbot_admin_session(
+        self,
+        umo: str,
+        identity: str,
+        name: str = "",
+    ) -> bool:
+        identity = str(identity or "").strip()
+        if not identity:
+            return False
+        row = await self.get(umo)
+        if not row:
+            return False
+        current_identity = str(row.get("claim_identity") or "").strip()
+        if current_identity and current_identity != identity:
+            return False
+        if (
+            current_identity == identity
+            and str(row.get("claim_type") or "") == "astrbot_admin"
+            and (not name or str(row.get("claim_name") or "") == name)
+        ):
+            return False
+        await self.set_session_claim(
+            umo,
+            identity,
+            name,
+            claim_type="astrbot_admin",
+            force=bool(current_identity),
+        )
+        return True
 
     async def clear_claimant(self, identity: str) -> None:
         identity = str(identity or "").strip()

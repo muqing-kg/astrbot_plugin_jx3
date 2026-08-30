@@ -78,6 +78,19 @@ def mask_secret(value: str) -> str:
     return "****" + text[-4:]
 
 
+def valid_display_name(value: object) -> bool:
+    text = str(value or "").strip()
+    return bool(text and text.upper() not in {"N/A", "NULL", "NONE"})
+
+
+def resolve_display_name(event_name: object, fallback: object = "") -> str:
+    event = str(event_name or "").strip()
+    if valid_display_name(event):
+        return event
+    stored = str(fallback or "").strip()
+    return stored if valid_display_name(stored) else ""
+
+
 def resolve_query_server(explicit: str, bound: str) -> str:
     server = (explicit or "").strip()
     if server:
@@ -94,6 +107,12 @@ def can_bind_session(is_admin: bool, claim_identity: str, sender_id: str) -> boo
     claim_identity = str(claim_identity or "").strip()
     sender_id = str(sender_id or "").strip()
     return not claim_identity or claim_identity == sender_id
+
+
+def is_astrbot_admin(event_is_admin: bool, sender_id: str, admin_ids: list[str] | tuple[str, ...]) -> bool:
+    if event_is_admin:
+        return True
+    return str(sender_id or "").strip() in {str(item or "").strip() for item in admin_ids or []}
 
 
 MODE_TOKENS = {"22", "33", "55", "2v2", "3v3", "5v5"}

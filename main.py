@@ -24,6 +24,7 @@ from .core.session_policy import (
     UNKNOWN_SERVER,
     is_group_umo,
     CLAIM_PHRASE,
+    resolve_display_name,
     hint_authorize_usage,
     hint_bind_ok,
     hint_claim_ok,
@@ -50,6 +51,7 @@ from .core.session_policy import (
     format_command_error,
     hint_unknown_server,
     can_bind_session,
+    is_astrbot_admin,
     normalize_system_prefixes,
     match_system_prefix,
     strip_command_prefix,
@@ -357,8 +359,7 @@ class Jx3ApiPlugin(Star):
 
     @staticmethod
     def _valid_display_name(value: object) -> bool:
-        text = str(value or "").strip()
-        return bool(text and text.upper() not in {"N/A", "NULL", "NONE"})
+        return valid_display_name(value)
 
     def _group_display_name(self, event: AstrMessageEvent) -> str:
         try:
@@ -381,11 +382,11 @@ class Jx3ApiPlugin(Star):
             pass
         return ""
 
-    def _event_display_name(self, event: AstrMessageEvent) -> str:
+    def _event_display_name(self, event: AstrMessageEvent, fallback: object = "") -> str:
         try:
             group_id = str(event.get_group_id() or "").strip()
             if group_id:
-                return self._group_display_name(event) or f"群 {group_id}"
+                return resolve_display_name(self._group_display_name(event), fallback)
             sender = str(event.get_sender_id() or "").strip()
             name = self._sender_name(event)
             if name and name != sender:
@@ -413,9 +414,10 @@ class Jx3ApiPlugin(Star):
 
     def _is_astrbot_admin(self, event: AstrMessageEvent) -> bool:
         try:
-            return bool(hasattr(event, "is_admin") and callable(event.is_admin) and event.is_admin())
+            event_is_admin = bool(hasattr(event, "is_admin") and callable(event.is_admin) and event.is_admin())
         except Exception:
-            return False
+            event_is_admin = False
+        return is_astrbot_admin(event_is_admin, self._sender_id(event), self._astrbot_admin_ids())
 
     async def _is_session_owner_admin(self, event: AstrMessageEvent, umo: str = "") -> bool:
         if self._is_astrbot_admin(event):
@@ -517,9 +519,13 @@ class Jx3ApiPlugin(Star):
             snapshot = await self.sessions.manager_snapshot(umo)
             if not snapshot:
                 return event.plain_result(hint_list_admins_empty(self.command_catalog))
+            manager_row = await self.sessions.get(umo)
             return await self.jx3cmd.T2I_image_msg(
                 event,
-                lambda: self.jx3api.view_managers(self._event_display_name(event), snapshot),
+                lambda: self.jx3api.view_managers(
+                    self._event_display_name(event, (manager_row or {}).get("display_name")),
+                    snapshot,
+                ),
             )
 
         if parsed.action == "token_stats":
@@ -583,7 +589,7 @@ class Jx3ApiPlugin(Star):
             await self.sessions.bind_server(
                 umo,
                 official,
-                self._event_display_name(event),
+                self._event_display_name(event, (current or {}).get("display_name")),
                 is_private=self._is_private(event),
             )
             if self._is_astrbot_admin(event):
@@ -592,6 +598,7 @@ class Jx3ApiPlugin(Star):
                     self._sender_id(event),
                     self._sender_name(event),
                     claim_type="astrbot_admin",
+                    force=True,
                 )
             else:
                 await self.sessions.set_session_claim(
@@ -860,6 +867,13 @@ class Jx3ApiPlugin(Star):
             self._event_display_name(event),
             is_private=self._is_private(event),
         )
+        if self._is_astrbot_admin(event):
+            await self.sessions.reconcile_astrbot_admin_session(
+                umo,
+                self._sender_id(event),
+                self._sender_name(event),
+            )
+            row = await self.sessions.get(umo) or row
         claim_cmd = ((self.command_catalog.get("认领") or {}).get("command") or "认领")
         claim_and_voice_cmds = {claim_cmd, current_command_name(self.command_catalog, "张嘴"), current_command_name(self.command_catalog, "闭嘴")}
         if (
@@ -901,7 +915,7 @@ class Jx3ApiPlugin(Star):
             event.stop_event()
             yield await self.jx3cmd.notice_manage(
                 event,
-                display_name=self._event_display_name(event),
+                display_name=self._event_display_name(event, row.get("display_name")),
                 server=(row.get("server") or "").strip() or "未绑定",
                 enabled=await self.sessions.enabled_actions(umo),
             )
@@ -910,7 +924,7 @@ class Jx3ApiPlugin(Star):
             event.stop_event()
             yield await self.jx3cmd.helps(
                 event,
-                display_name=self._event_display_name(event),
+                display_name=self._event_display_name(event, row.get("display_name")),
                 server=(row.get("server") or "").strip(),
             )
             return
