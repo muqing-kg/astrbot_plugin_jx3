@@ -771,6 +771,14 @@ class SessionStore:
             token_status = "全局未配置"
         else:
             token_status = "未配置"
+        if has_own_token and use_global_token and token_global_available:
+            token_source = "all"
+        elif has_own_token:
+            token_source = "group"
+        elif use_global_token and token_global_available:
+            token_source = "global"
+        else:
+            token_source = "none"
         has_own_ticket = bool(own_ticket)
         ticket_display_value = own_ticket or global_ticket
         if has_own_ticket:
@@ -794,6 +802,7 @@ class SessionStore:
             "has_token": has_own_token or (use_global_token and token_global_available),
             "has_ticket": has_own_ticket or ticket_global_available,
             "use_global_token": use_global_token,
+            "token_source": token_source,
             "push_token_status": (
                 own_push_token
                 or ("使用全局" if use_global_push_token and has_global_push_token else "全局未配置" if use_global_push_token else "未配置")
@@ -803,6 +812,12 @@ class SessionStore:
             "global_push_token_value": global_push_token,
             "has_push_token": bool(own_push_token or (use_global_push_token and global_push_token)),
             "use_global_push_token": use_global_push_token,
+            "push_token_source": (
+                "all" if own_push_token and use_global_push_token and global_push_token
+                else "group" if own_push_token
+                else "global" if use_global_push_token and global_push_token
+                else "none"
+            ),
             "bot_enabled": self.is_bot_enabled(row),
             "push_fail_count": int(row.get("push_fail_count") or 0),
             "push_last_error": row.get("push_last_error", ""),
