@@ -29,9 +29,10 @@ class SessionPageAPI:
             ("/page/sessions", self.list_sessions, ["GET"], "列出会话绑定"),
             ("/page/sessions/bind", self.bind_session, ["POST"], "绑定会话区服"),
             ("/page/sessions/clear-server", self.clear_server, ["POST"], "清除会话区服"),
-            ("/page/sessions/token", self.set_token, ["POST"], "设置会话 Token"),
+            ("/page/sessions/token", self.set_token, ["POST"], "设置会话接口令牌"),
+            ("/page/sessions/push-token", self.set_push_token, ["POST"], "设置会话推送令牌"),
             ("/page/sessions/ticket", self.set_ticket, ["POST"], "设置会话推栏"),
-            ("/page/sessions/use-global", self.set_use_global, ["POST"], "设置是否使用全局 Token"),
+            ("/page/sessions/use-global", self.set_use_global, ["POST"], "设置是否使用全局接口/推送令牌"),
             ("/page/sessions/clear-secret", self.clear_secret, ["POST"], "清除会话密钥"),
             ("/page/sessions/bot", self.set_bot, ["POST"], "设置会话是否启用机器人"),
             ("/page/sessions/claim", self.clear_claim, ["POST"], "取消认领资格"),
@@ -59,14 +60,17 @@ class SessionPageAPI:
         rows = await self.plugin.sessions.list_bound()
         has_global_ticket = bool(self.plugin._global_ticket())
         has_global_token = bool(self.plugin._global_token())
+        has_global_push_token = bool(self.plugin._global_push_token())
         sessions = []
         for row in rows:
             item = self.plugin.sessions.public_row(
                 row,
                 has_global_ticket=has_global_ticket,
                 has_global_token=has_global_token,
+                has_global_push_token=has_global_push_token,
                 global_token=self.plugin._global_token(),
                 global_ticket=self.plugin._global_ticket(),
+                global_push_token=self.plugin._global_push_token(),
             )
             item["managers"] = [
                 {
@@ -80,6 +84,7 @@ class SessionPageAPI:
             "sessions": sessions,
             "has_global_token": has_global_token,
             "has_global_ticket": has_global_ticket,
+            "has_global_push_token": has_global_push_token,
             "notice": "本页面只展示群聊会话，仅供 AstrBot 后台主人使用。",
         })
 
@@ -117,22 +122,48 @@ class SessionPageAPI:
         umo = str(data.get("umo") or "").strip()
         token = str(data.get("token") or "").strip()
         if not umo or not token:
-            return self.error_response("缺少 umo 或 Token", status_code=400)
+            return self.error_response("缺少 umo 或接口令牌", status_code=400)
         if not is_group_umo(umo):
             return self.error_response("本插件只支持群聊会话", status_code=400)
         values = [part.strip() for part in token.replace("，", ",").split(",") if part.strip()]
         if not values:
-            return self.error_response("Token 不能为空", status_code=400)
+            return self.error_response("接口令牌不能为空", status_code=400)
         for index, value in enumerate(values, 1):
             result = await self.plugin.jx3api.token_stats(value)
             if result.get("code") != 200 or result.get("valid") is False:
-                detail = str(result.get("msg") or "Token 不可用")
+                detail = str(result.get("msg") or "接口令牌不可用")
                 message = self.plugin.jx3api._token_error_message(detail)
                 return self.error_response(
-                    f"第 {index} 个 Token 校验失败：{message}",
+                    f"第 {index} 个接口令牌校验失败：{message}",
                     status_code=400,
                 )
         await self.plugin.sessions.set_token(umo, token)
+        return self.json_response({"ok": True})
+
+    async def set_push_token(self):
+        data = await self._payload()
+        umo = str(data.get("umo") or "").strip()
+        token = str(data.get("token") or "").strip()
+        if not umo or not token:
+            return self.error_response("缺少 umo 或推送令牌", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("本插件只支持群聊会话", status_code=400)
+        values = [part.strip() for part in token.replace("，", ",").split(",") if part.strip()]
+        if not values:
+            return self.error_response("推送令牌不能为空", status_code=400)
+        if len(values) > 1:
+            return self.error_response("推送令牌一次只能配置一枚；如需更换，请保存新的推送令牌。", status_code=400)
+        for index, value in enumerate(values, 1):
+            result = await self.plugin.jx3api.token_stats(value)
+            if result.get("code") != 200 or result.get("valid") is False:
+                detail = str(result.get("msg") or "推送令牌不可用")
+                message = self.plugin.jx3api._token_error_message(detail)
+                return self.error_response(
+                    f"第 {index} 个推送令牌校验失败：{message}",
+                    status_code=400,
+                )
+        await self.plugin.sessions.set_push_token(umo, token)
+        await self.plugin.jx3at.refresh_jobs()
         return self.json_response({"ok": True})
 
     async def set_ticket(self):
@@ -167,11 +198,18 @@ class SessionPageAPI:
         data = await self._payload()
         umo = str(data.get("umo") or "").strip()
         enabled = bool(data.get("enabled"))
+        kind = str(data.get("kind") or "token").strip()
         if not umo:
             return self.error_response("缺少 umo", status_code=400)
+        if kind not in {"token", "push_token"}:
+            return self.error_response("不支持的密钥类型", status_code=400)
         if not is_group_umo(umo):
             return self.error_response("本插件只支持群聊会话", status_code=400)
-        await self.plugin.sessions.set_use_global_token(umo, enabled)
+        if kind == "push_token":
+            await self.plugin.sessions.set_use_global_push_token(umo, enabled)
+            await self.plugin.jx3at.refresh_jobs()
+        else:
+            await self.plugin.sessions.set_use_global_token(umo, enabled)
         return self.json_response({"ok": True})
 
     async def clear_secret(self):
@@ -180,11 +218,13 @@ class SessionPageAPI:
         kind = str(data.get("kind") or "token").strip()
         if not umo:
             return self.error_response("缺少 umo", status_code=400)
-        if kind not in {"token", "ticket"}:
+        if kind not in {"token", "push_token", "ticket"}:
             return self.error_response("不支持的密钥类型", status_code=400)
         if not is_group_umo(umo):
             return self.error_response("本插件只支持群聊会话", status_code=400)
         await self.plugin.sessions.clear_secret(umo, kind)
+        if kind == "push_token":
+            await self.plugin.jx3at.refresh_jobs()
         return self.json_response({"ok": True})
 
     async def set_bot(self):

@@ -1,5 +1,8 @@
 {# template-title: 查询功能 #}
 <div class="container help-page">
+    <div class="help-fee-card">
+        玫红功能需付费接口令牌；蓝色功能需付费接口令牌与推栏标识；未标色功能免费。
+    </div>
     {% set ns = namespace(group='') %}
     {% for row in rows %}
         {% if row.group != ns.group %}
@@ -25,7 +28,7 @@
             {% set ns.group = row.group %}
         {% endif %}
                         <tr>
-                            <td class="help-command">{{ row.word }}</td>
+                            <td class="help-command {% if row.fee == 'token' %}fee-token{% elif row.fee == 'token_ticket' %}fee-token-ticket{% endif %}">{{ row.word }}</td>
                             <td class="help-example">{{ row.command }}</td>
                             <td class="help-desc">{{ row.web_desc }}</td>
                         </tr>

@@ -4,30 +4,6 @@ from datetime import datetime
 from typing import Any
 from zoneinfo import ZoneInfo
 
-# 开关名 -> 会话表字段。相近事件共用一个开关。
-PUSH_FIELD = {
-    "开服": "push_kaifu",
-    "新闻": "push_xinwen",
-    "更新": "push_gengxin",
-    "八卦": "push_bagua",
-    "云从": "push_yuncong",
-    "奇遇": "push_qiyu",
-    "刷马": "push_shuma",
-    "扶摇": "push_fuyao",
-    "的卢": "push_dilu",
-    "掉落": "push_diaoluo",
-    "拍卖": "push_paimai",
-    "诛恶": "push_zhue",
-    "追魂": "push_zhuihun",
-    "祭祀": "push_jisi",
-    "宣战": "push_xuanzhan",
-    "据点": "push_judian",
-    "微博": "push_weibo",
-    "赤兔": "push_chitu",
-}
-
-PUSH_TYPES = tuple(PUSH_FIELD.keys())
-
 # 官方事件版 OpenAPI 的接口说明。
 EVENT_DESCRIPTIONS = {
     0: "赤兔到达与分享消息通知",
@@ -36,7 +12,6 @@ EVENT_DESCRIPTIONS = {
     1003: "马驹捕获通知",
     1005: "扶摇开启通知",
     1006: "扶摇点名通知",
-    1009: "的卢刷新通知",
     1010: "的卢捕获通知",
     1011: "的卢拍卖通知",
     1012: "副本掉落与交易行私货通知",
@@ -52,9 +27,12 @@ EVENT_DESCRIPTIONS = {
     1111: "抢占粮仓通知",
     1112: "大旗重置通知",
     1113: "大旗被夺通知",
+    1114: "据点占领通知",
+    1117: "小攻防贡献排行通知",
     1118: "大攻防贡献排行通知",
     1119: "大小攻防战利品竞拍通知",
     1120: "小攻防分红通知",
+    1122: "大攻防分红（含指挥）通知",
     1201: "微博更新通知",
     2001: "服务器开服状态变化通知",
     2002: "官方新闻更新通知",
@@ -66,8 +44,12 @@ EVENT_DESCRIPTIONS = {
 # 全服事件不按绑定区服过滤。
 GLOBAL_KINDS = frozenset({"新闻", "更新", "八卦", "云从", "微博"})
 
+# JX3API 事件版免费档；其余事件需要付费推送令牌。
+FREE_PUSH_ACTIONS = frozenset({"0", "2001", "2002", "2003", "2004", "2006"})
+
 # 官方 action -> 开关名。
 ACTION_KIND = {
+    0: "赤兔",
     2001: "开服",
     2002: "新闻",
     2003: "更新",
@@ -78,7 +60,6 @@ ACTION_KIND = {
     1003: "刷马",
     1005: "扶摇",
     1006: "扶摇",
-    1009: "的卢",
     1010: "的卢",
     1011: "的卢",
     1012: "掉落",
@@ -94,9 +75,12 @@ ACTION_KIND = {
     1111: "据点",
     1112: "据点",
     1113: "据点",
+    1114: "据点",
+    1117: "据点",
     1118: "据点",
     1119: "据点",
     1120: "据点",
+    1122: "据点",
     1201: "微博",
 }
 
@@ -120,7 +104,6 @@ EVENT_GROUPS = [
             {"action": 1003, "name": "马驹捕获", "kind": "刷马"},
             {"action": 1005, "name": "扶摇开启", "kind": "扶摇"},
             {"action": 1006, "name": "扶摇点名", "kind": "扶摇"},
-            {"action": 1009, "name": "的卢刷新", "kind": "的卢"},
             {"action": 1010, "name": "的卢捕获", "kind": "的卢"},
             {"action": 1011, "name": "的卢拍卖", "kind": "的卢"},
             {"action": 1012, "name": "副本掉落", "kind": "掉落"},
@@ -141,9 +124,12 @@ EVENT_GROUPS = [
             {"action": 1111, "name": "抢占粮仓", "kind": "据点"},
             {"action": 1112, "name": "大旗重置", "kind": "据点"},
             {"action": 1113, "name": "大旗被夺", "kind": "据点"},
+            {"action": 1114, "name": "据点占领", "kind": "据点"},
+            {"action": 1117, "name": "小攻防贡献", "kind": "据点"},
             {"action": 1118, "name": "大攻防贡献", "kind": "据点"},
             {"action": 1119, "name": "战利品竞拍", "kind": "据点"},
             {"action": 1120, "name": "小攻防分红", "kind": "据点"},
+            {"action": 1122, "name": "大攻防分红（含指挥）", "kind": "据点"},
         ],
     },
     {
@@ -153,6 +139,45 @@ EVENT_GROUPS = [
         ],
     },
 ]
+
+# 每个官方 action 都是一个独立开关；kind 只用于旧版本数据迁移。
+EVENT_ITEMS = [
+    item
+    for group in EVENT_GROUPS
+    for item in group["items"]
+]
+ACTION_IDS = frozenset(str(item["action"]) for item in EVENT_ITEMS)
+GLOBAL_ACTIONS = frozenset(
+    str(item["action"])
+    for item in EVENT_ITEMS
+    if item["kind"] in GLOBAL_KINDS
+)
+
+# 旧版把相近事件合并保存到 session_config 的这些列；仅用于迁移。
+LEGACY_PUSH_FIELDS = {
+    "开服": "push_kaifu",
+    "新闻": "push_xinwen",
+    "更新": "push_gengxin",
+    "八卦": "push_bagua",
+    "云从": "push_yuncong",
+    "奇遇": "push_qiyu",
+    "刷马": "push_shuma",
+    "扶摇": "push_fuyao",
+    "的卢": "push_dilu",
+    "掉落": "push_diaoluo",
+    "拍卖": "push_paimai",
+    "诛恶": "push_zhue",
+    "追魂": "push_zhuihun",
+    "祭祀": "push_jisi",
+    "宣战": "push_xuanzhan",
+    "据点": "push_judian",
+    "微博": "push_weibo",
+    "赤兔": "push_chitu",
+}
+KIND_ACTIONS = {
+    kind: [str(item["action"]) for item in EVENT_ITEMS if item["kind"] == kind]
+    for kind in LEGACY_PUSH_FIELDS
+}
 
 
 def event_dedupe_key(action: int | str | None, payload: dict[str, Any] | None = None) -> str:
@@ -165,6 +190,9 @@ def event_dedupe_key(action: int | str | None, payload: dict[str, Any] | None = 
     names = data.get("name")
     if isinstance(names, list):
         names = "、".join(str(item) for item in names if str(item).strip())
+    tongs = data.get("tong_name", data.get("tong_names"))
+    if isinstance(tongs, list):
+        tongs = "、".join(str(item) for item in tongs if str(item).strip())
     parts = [
         str(code),
         server,
@@ -173,6 +201,14 @@ def event_dedupe_key(action: int | str | None, payload: dict[str, Any] | None = 
         str(data.get("map_name") or data.get("event") or data.get("horse") or data.get("item_name") or ""),
         str(names or data.get("role_name") or data.get("capture_role_name") or data.get("auction_role_name") or ""),
     ]
+    if code in {1114, 1117, 1118, 1122}:
+        parts.extend((
+            str(data.get("camp_name") or ""),
+            str(data.get("castle_name") or ""),
+            str(tongs or ""),
+            str(data.get("chief_tong_name") or ""),
+            str(data.get("split_amount") or ""),
+        ))
     return ":".join(parts)
 
 
@@ -184,6 +220,14 @@ def resolve_push_kind(action: int | str | None) -> str:
     return ACTION_KIND.get(code, "")
 
 
+def resolve_push_action(action: int | str | None) -> str:
+    try:
+        code = int(action)
+    except (TypeError, ValueError):
+        return ""
+    return str(code) if str(code) in ACTION_IDS else ""
+
+
 def parse_ws_message(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         return {"action": 0, "payload": {}}
@@ -192,9 +236,9 @@ def parse_ws_message(raw: Any) -> dict[str, Any]:
         action = int(action)
     except (TypeError, ValueError):
         action = 0
-    payload = raw.get("data")
+    payload = raw.get("detail")
     if not isinstance(payload, dict):
-        payload = raw.get("detail")
+        payload = raw.get("data")
     if not isinstance(payload, dict):
         payload = {}
     return {"action": action, "payload": payload, "raw": raw}
@@ -214,6 +258,20 @@ def _fmt_time(value: Any) -> str:
         return str(value)
 
 
+def _fmt_clock(value: Any) -> str:
+    try:
+        ts = int(value)
+    except (TypeError, ValueError):
+        return str(value or "")
+    if ts > 10_000_000_000:
+        ts //= 1000
+    try:
+        dt = datetime.fromtimestamp(ts, tz=ZoneInfo("Asia/Shanghai"))
+        return dt.strftime("%H:%M:%S")
+    except (OSError, OverflowError, ValueError):
+        return str(value)
+
+
 def format_event_text(action: int, payload: dict[str, Any]) -> str:
     data = payload or {}
     server = str(data.get("server") or "").strip()
@@ -227,45 +285,37 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
                 return item
         return ""
 
+    def copy(*parts):
+        return "\n\n".join(str(part) for part in parts if str(part).strip())
+
     if action == 2001:
         status = data.get("status")
         state = ""
         if status not in (None, ""):
-            state = "开服" if str(status) in {"1", "True", "true"} or status == 1 else "维护"
-        place = f"【{server}】" if server else ""
+            state = "开服啦" if str(status) in {"1", "True", "true"} or status == 1 else "维护了"
+        place = " · ".join(part for part in (zone, server) if part)
         if state:
-            return f"{place}{state}了！"
-        return f"{place}服务器状态更新"
+            return copy(" · ".join(part for part in (place, f"{state}！") if part))
+        return copy(" · ".join(part for part in (place, "服务器状态更新") if part))
     if action == 2002:
-        return "\n".join(
-            part for part in (
-                str(value("type")),
-                str(value("title")),
-                str(value("url")),
-                str(value("date")),
-            ) if part
-        )
+        return copy(value("type"), value("title"), value("url"), value("date"))
     if action == 2003:
-        lines = ["游戏客户端检查到新版本"]
+        clock = _fmt_clock(data.get("time") or datetime.now(ZoneInfo("Asia/Shanghai")).timestamp())
+        lines = [f"[{clock}]西山居又偷偷更新了！"]
         if value("now_version") not in (None, ""):
-            lines.append(f"当前版本：{value('now_version')}")
-        if value("new_version") not in (None, ""):
-            lines.append(f"新版本：{value('new_version')}")
+            version_text = f"{value('now_version')}"
+            if value("new_version") not in (None, ""):
+                version_text += f"->{value('new_version')}"
+            lines.append(f"版本 {version_text}")
         if value("package_num") not in (None, ""):
-            lines.append(f"更新包数：{value('package_num')}")
-        if value("package_size") not in (None, ""):
-            lines.append(f"更新包大小：{value('package_size')}")
+            package_text = f"共{value('package_num')}个更新包"
+            if value("package_size") not in (None, ""):
+                package_text += f"，总计{value('package_size')}"
+            lines.append(package_text)
         return "\n".join(lines)
     if action == 2004:
         source = f"来自{value('tieba', 'name')}吧" if value("tieba", "name") else ""
-        return "\n".join(
-            part for part in (
-                str(value("title")),
-                str(value("url")),
-                str(value("date")),
-                source,
-            ) if part
-        )
+        return copy(value("title"), value("url"), value("date"), source)
     if action == 2006:
         lines = []
         if value("name") not in (None, ""):
@@ -277,48 +327,46 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
         when = _fmt_time(data.get("time"))
         if when:
             lines.append(f"时间：{when}")
-        return "\n".join(lines)
+        return copy(*lines)
     if action == 1001:
         name = value("name")
         event = value("event")
+        level = value("level")
+        category = "绝世奇遇" if str(level) == "2" else "普通奇遇"
         if name and event:
-            core = f"【{name}】触发了 {event}"
+            core = f"{name} 触发了 {category} · {event}"
         elif name:
-            core = f"【{name}】触发奇遇"
+            core = f"{name} 触发普通奇遇"
         elif event:
             core = f"触发了 {event}"
         else:
             core = "奇遇触发"
-        return "\n".join(part for part in (where, core) if part)
+        when = _fmt_time(data.get("time"))
+        return copy(where, core, f"时间：{when}" if when else "")
     if action == 1002:
         map_name = value("map_name")
         core = f"马驹刷新：{map_name}" if map_name else "马驹刷新"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1003:
         name = value("name")
         horse = value("horse")
         if name:
-            core = f"{name} 捕获了{horse}" if horse else f"{name} 捕获马驹"
+            core = f"{name} 捕获马驹：{horse}" if horse else f"{name} 捕获马驹"
         elif horse:
-            core = f"捕获了{horse}"
+            core = f"捕获马驹：{horse}"
         else:
             core = "马驹捕获"
         map_name = value("map_name")
-        if map_name:
-            core = f"{core}（{map_name}）"
-        return "\n".join(part for part in (where, core) if part)
+        when = _fmt_time(data.get("time"))
+        return copy(where, core, f"地图：{map_name}" if map_name else "", f"时间：{when}" if when else "")
     if action == 1005:
-        return "\n".join(part for part in (where, "扶摇已开启") if part)
+        return copy(where, "扶摇已开启，没跳扶摇的抓紧去吧")
     if action == 1006:
         names = value("name")
         if isinstance(names, list):
             names = "、".join(str(item) for item in names if str(item).strip())
         core = f"扶摇点名：{names}" if names else "扶摇点名"
-        return "\n".join(part for part in (where, core) if part)
-    if action == 1009:
-        map_name = value("map_name")
-        core = f"的卢刷新：{map_name}" if map_name else "的卢刷新"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1010:
         core = " ".join(
             part for part in (
@@ -330,7 +378,7 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
         map_name = value("map_name")
         if map_name:
             core = f"{core}（{map_name}）"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1011:
         core = " ".join(
             part for part in (
@@ -339,7 +387,7 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
                 str(value("auction_amount")),
             ) if part
         )
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1012:
         core = " ".join(
             part for part in (
@@ -350,7 +398,7 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
                 f"x{value('item_amount')}" if value("item_amount") not in (None, "") else "",
             ) if part
         )
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1013:
         core = " ".join(
             part for part in (
@@ -360,11 +408,11 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
                 f"x{value('item_amount')}" if value("item_amount") not in (None, "") else "",
             ) if part
         )
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1014:
         map_name = value("map_name")
         core = f"诛恶刷新：{map_name}" if map_name else "诛恶刷新"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1015:
         role = value("role_name")
         role_server = value("role_server")
@@ -373,7 +421,7 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             core += f"：{role}"
         if role_server:
             core += f"（{role_server}）"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1017:
         core = " ".join(
             part for part in (
@@ -382,7 +430,30 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
                 str(value("castle_name")),
             ) if part
         )
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
+    if action == 1114:
+        tongs = value("tong_name")
+        if isinstance(tongs, list):
+            tongs = "、".join(str(item) for item in tongs if str(item).strip())
+        core = " · ".join(
+            part for part in (
+                str(value("camp_name")),
+                str(tongs),
+                f"占领{value('castle_name')}" if value("castle_name") else "",
+            ) if part
+        ) or "据点占领"
+        return copy(where, core)
+    if action == 1117:
+        tongs = value("tong_name")
+        if isinstance(tongs, list):
+            tongs = "、".join(str(item) for item in tongs if str(item).strip())
+        core = " · ".join(
+            part for part in (
+                str(value("camp_name")),
+                f"{tongs} 贡献排行更新" if tongs else "小攻防贡献",
+            ) if part
+        ) or "小攻防贡献"
+        return copy(where, core)
     if action in {1101, 1103}:
         declaring = value("declaring_tong_name")
         accepting = value("accepting_tong_name")
@@ -394,15 +465,15 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             core = f"向 {accepting} 宣战"
         else:
             core = "宣战"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action in {1102, 1104}:
         winner = value("victory_tong_name") or value("declaring_tong_name")
         core = f"宣战结束：{winner}" if winner else "宣战结束"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1105:
         winner = value("victory_tong_name")
         core = f"约战结束，胜方：{winner}" if winner else "约战结束"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1111:
         castle, camp = value("castle_name"), value("camp_name")
         core = "抢占粮仓"
@@ -410,11 +481,11 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             core += f"：{castle}"
         if camp:
             core += f"（{camp}）"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1112:
         castle = value("castle_name")
         core = f"大旗重置：{castle}" if castle else "大旗重置"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1113:
         castle, camp = value("castle_name"), value("camp_name")
         core = "大旗被夺"
@@ -422,11 +493,11 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             core += f"：{castle}"
         if camp:
             core += f"（{camp}）"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1118:
         tong = value("tong_name")
         core = f"{tong} 贡献排行更新" if tong else "贡献排行更新"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1119:
         role = value("role_name")
         item = value("item_name")
@@ -437,7 +508,7 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
         core = " ".join(piece for piece in pieces if piece)
         if core == "拍得":
             core = "战利品竞拍"
-        return "\n".join(part for part in (where, core) if part)
+        return copy(where, core)
     if action == 1120:
         tong = value("tong_name") or value("chief_tong_name")
         amount = value("split_amount")
@@ -446,15 +517,26 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             core = f"{tong} 分红"
         if amount not in (None, ""):
             core += f"：{amount}"
-        return "\n".join(part for part in (where, core) if part)
-    if action == 1201:
-        return "\n".join(
+        return copy(where, core)
+    if action == 1122:
+        tongs = value("tong_names")
+        if isinstance(tongs, list):
+            tongs = "、".join(str(item) for item in tongs if str(item).strip())
+        core = " · ".join(
             part for part in (
-                str(value("user_name")),
-                str(value("article_text")),
-                str(value("url")),
+                str(value("camp_name")),
+                f"{tongs} 分红" if tongs else "大攻防分红",
             ) if part
-        )
+        ) or "大攻防分红"
+        chief = value("chief_tong_name")
+        if chief:
+            core += f"（指挥：{chief}）"
+        amount = value("split_amount")
+        if amount not in (None, ""):
+            core += f"：{amount}"
+        return copy(where, core)
+    if action == 1201:
+        return copy(value("user_name"), value("article_text"), value("url"))
     kind = resolve_push_kind(action) or ""
     return "\n".join(part for part in (kind, where) if part)
 
@@ -486,7 +568,7 @@ def push_arg_map(overrides: dict[str, str] | None = None) -> dict[str, str]:
     for item in effective_push_items(overrides):
         name = str(item["name"]).strip()
         if name:
-            mapping.setdefault(name, str(item["kind"]))
+            mapping.setdefault(name, str(item["action"]))
     return mapping
 
 
@@ -509,7 +591,7 @@ def build_notice_view(
         items = []
         enabled_count = 0
         for item in group["items"]:
-            on = item["kind"] in enabled_set
+            on = str(item["action"]) in enabled_set
             if on:
                 enabled_count += 1
             name = normalized.get(str(item["action"]), item["name"])

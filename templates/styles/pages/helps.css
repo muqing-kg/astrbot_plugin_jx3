@@ -1,5 +1,16 @@
 .jx3-template--helps { --jx3-page-width: 1000px; }
 .help-page { width: 100%; padding: 0; }
+.help-fee-card {
+    margin-bottom: 18px;
+    padding: 14px 18px;
+    border-radius: 16px;
+    background: #fff7f9;
+    border: 1px solid #f3d5df;
+    color: #c45c7a;
+    font-size: 14px;
+    font-weight: 700;
+    text-align: center;
+}
 .help-group { margin: 0 0 18px; padding: 0; background: transparent; box-shadow: none; border-radius: 0; }
 .help-group:last-of-type { margin-bottom: 0; }
 .help-group-head {
@@ -28,3 +39,5 @@
 .help-table tbody tr:last-child td { border-bottom: 0; }
 .help-desc { color: #5c5666; font-weight: 500; }
 .help-command, .help-example { color: #5c5666; font-weight: 500; }
+.help-command.fee-token { color: #c45c7a; font-weight: 700; }
+.help-command.fee-token-ticket { color: #4b7bec; font-weight: 700; }
