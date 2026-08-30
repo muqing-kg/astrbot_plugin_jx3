@@ -6,6 +6,12 @@ const serverListEl = document.getElementById("serverList");
 const resetBtn = document.getElementById("resetBtn");
 let bridge = null;
 let currentView = "sessions";
+const TOKEN_SOURCE_TEXT = {
+  none: "未配置",
+  global: "已配置全局",
+  group: "已配置群属",
+  all: "已配置全部",
+};
 
 function setStatus(text, isError = false) {
   if (!text) {
@@ -80,6 +86,10 @@ function pill(label, on, title = "") {
   return `<span class="pill ${on ? "on" : ""}"${titleAttribute}>${escapeHtml(label)}</span>`;
 }
 
+function sourcePill(label, state) {
+  return `<span class="pill source-${escapeHtml(state || "none")}">${escapeHtml(label)}</span>`;
+}
+
 function setView(view) {
   currentView = view;
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -137,8 +147,8 @@ function sessionCard(row) {
       <div class="pills">
         ${pill(row.claim_type === "astrbot_admin" || !row.claim_identity ? "AstrBot 管理员" : `认领人 ${row.claim_name || row.claim_identity}`, true)}
         ${pill(row.server || "未绑定区服", Boolean(row.server))}
-        ${pill("接口令牌 " + (row.token_status || "未配置"), Boolean(row.has_token))}
-        ${pill("推送令牌 " + (row.push_token_status || "未配置"), Boolean(row.has_push_token))}
+        ${sourcePill("接口令牌：" + TOKEN_SOURCE_TEXT[row.token_source || "none"], row.token_source || "none")}
+        ${sourcePill("推送令牌：" + TOKEN_SOURCE_TEXT[row.push_token_source || "none"], row.push_token_source || "none")}
         ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
         ${pill(row.bot_enabled === false ? "机器人已关闭" : "机器人开启", row.bot_enabled !== false)}
         ${pill(
@@ -183,8 +193,8 @@ function sessionCard(row) {
           <input data-k="token" data-initial="${escapeHtml(row.token_display_value || "")}" value="${escapeHtml(row.token_display_value || "")}" placeholder="多个用逗号分隔" />
         </label>
         <div class="row-actions">
-          <button data-act="token" type="button">保存接口令牌</button>
-          <button data-act="clear-token" class="ghost" type="button">清除接口令牌</button>
+          <button data-act="token" type="button">保存令牌</button>
+          <button data-act="clear-token" class="ghost" type="button">清除令牌</button>
         </div>
       </div>
       <div class="row">
@@ -193,8 +203,8 @@ function sessionCard(row) {
           <input data-k="push-token" data-initial="${escapeHtml(row.push_token_display_value || "")}" value="${escapeHtml(row.push_token_display_value || "")}" placeholder="推送令牌" />
         </label>
         <div class="row-actions">
-          <button data-act="push-token" type="button">保存推送令牌</button>
-          <button data-act="clear-push-token" class="ghost" type="button">清除推送令牌</button>
+          <button data-act="push-token" type="button">保存令牌</button>
+          <button data-act="clear-push-token" class="ghost" type="button">清除令牌</button>
         </div>
       </div>
       <div class="row">
