@@ -285,8 +285,12 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
                 return item
         return ""
 
-    def copy(*parts):
-        return "\n\n".join(str(part) for part in parts if str(part).strip())
+    def line(*parts):
+        return "\n".join(str(part) for part in parts if str(part).strip())
+
+    def field(label, item):
+        text = str(item or "").strip()
+        return f"{label}：{text}" if text else ""
 
     if action == 2001:
         status = data.get("status")
@@ -295,10 +299,23 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             state = "开服啦" if str(status) in {"1", "True", "true"} or status == 1 else "维护了"
         place = " · ".join(part for part in (zone, server) if part)
         if state:
-            return copy(" · ".join(part for part in (place, f"{state}！") if part))
-        return copy(" · ".join(part for part in (place, "服务器状态更新") if part))
+            when = _fmt_time(data.get("time"))
+            return line(
+                " · ".join(part for part in (place, f"{state}！") if part),
+                f"时间：{when}" if when else "",
+            )
+        return place
     if action == 2002:
-        return copy(value("type"), value("title"), value("url"), value("date"))
+        title = str(value("title") or "").strip()
+        news_type = str(value("type") or "").strip()
+        url = str(value("url") or "").strip()
+        date = str(value("date") or "").strip()
+        return line(
+            "官方新闻" if not news_type else f"官方新闻 · {news_type}",
+            field("标题", title),
+            field("链接", url),
+            field("日期", date),
+        )
     if action == 2003:
         clock = _fmt_clock(data.get("time") or datetime.now(ZoneInfo("Asia/Shanghai")).timestamp())
         lines = [f"[{clock}]西山居又偷偷更新了！"]
@@ -314,8 +331,16 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             lines.append(package_text)
         return "\n".join(lines)
     if action == 2004:
-        source = f"来自{value('tieba', 'name')}吧" if value("tieba", "name") else ""
-        return copy(value("title"), value("url"), value("date"), source)
+        tags = value("tags")
+        if isinstance(tags, list):
+            tags = "、".join(str(item).strip() for item in tags if str(item).strip())
+        return line(
+            "八卦速报" if not tags else f"八卦速报 · {tags}",
+            field("标题", value("title")),
+            field("来源", value("tieba", "name")),
+            field("日期", value("date")),
+            field("链接", value("url")),
+        )
     if action == 2006:
         lines = []
         if value("name") not in (None, ""):
@@ -327,7 +352,7 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
         when = _fmt_time(data.get("time"))
         if when:
             lines.append(f"时间：{when}")
-        return copy(*lines)
+        return line(*lines)
     if action == 1001:
         name = value("name")
         event = value("event")
@@ -336,17 +361,23 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
         if name and event:
             core = f"{name} 触发了 {category} · {event}"
         elif name:
-            core = f"{name} 触发普通奇遇"
+            core = f"{name} 触发奇遇"
         elif event:
-            core = f"触发了 {event}"
+            core = f"触发奇遇：{event}"
         else:
             core = "奇遇触发"
         when = _fmt_time(data.get("time"))
-        return copy(where, core, f"时间：{when}" if when else "")
+        return line(
+            where,
+            core,
+            field("类别", category) if str(level) not in (None, "") else "",
+            f"时间：{when}" if when else "",
+        )
     if action == 1002:
         map_name = value("map_name")
         core = f"马驹刷新：{map_name}" if map_name else "马驹刷新"
-        return copy(where, core)
+        when = _fmt_time(data.get("time"))
+        return line(where, core, f"时间：{when}" if when else "")
     if action == 1003:
         name = value("name")
         horse = value("horse")
@@ -358,61 +389,69 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             core = "马驹捕获"
         map_name = value("map_name")
         when = _fmt_time(data.get("time"))
-        return copy(where, core, f"地图：{map_name}" if map_name else "", f"时间：{when}" if when else "")
+        return line(where, core, f"地图：{map_name}" if map_name else "", f"时间：{when}" if when else "")
     if action == 1005:
-        return copy(where, "扶摇已开启，没跳扶摇的抓紧去吧")
+        when = _fmt_time(data.get("time"))
+        return line(where, "扶摇已开启，没跳扶摇的抓紧去吧", f"时间：{when}" if when else "")
     if action == 1006:
         names = value("name")
         if isinstance(names, list):
             names = "、".join(str(item) for item in names if str(item).strip())
         core = f"扶摇点名：{names}" if names else "扶摇点名"
-        return copy(where, core)
+        when = _fmt_time(data.get("time"))
+        return line(where, core, f"时间：{when}" if when else "")
     if action == 1010:
-        core = " ".join(
+        horse = value("horse", "name")
+        prefix = " · ".join(
             part for part in (
                 str(value("capture_camp_name")),
                 str(value("capture_role_name")),
-                "捕获的卢",
             ) if part
         )
+        core = f"{prefix} 捕获的卢：{horse}" if horse else (f"{prefix} 捕获的卢" if prefix else "捕获的卢")
         map_name = value("map_name")
-        if map_name:
-            core = f"{core}（{map_name}）"
-        return copy(where, core)
+        when = _fmt_time(data.get("capture_time"))
+        return line(where, core, field("地图", map_name), f"时间：{when}" if when else "")
     if action == 1011:
-        core = " ".join(
+        horse = value("horse", "name")
+        prefix = " · ".join(
             part for part in (
+                str(value("auction_camp_name")),
                 str(value("auction_role_name")),
-                "拍得的卢",
-                str(value("auction_amount")),
             ) if part
         )
-        return copy(where, core)
+        core = f"{prefix} 拍得的卢：{horse}" if horse else (f"{prefix} 拍得的卢" if prefix else "拍得的卢")
+        when = _fmt_time(data.get("auction_time"))
+        return line(
+            where,
+            core,
+            field("金额", value("auction_amount")),
+            f"时间：{when}" if when else "",
+        )
     if action == 1012:
-        core = " ".join(
-            part for part in (
-                str(value("role_name")),
-                f"在{value('map_name')}" if value("map_name") else "",
-                "获得",
-                str(value("item_name")),
-                f"x{value('item_amount')}" if value("item_amount") not in (None, "") else "",
-            ) if part
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"副本掉落 · {value('role_name')}" if value("role_name") else "副本掉落",
+            field("获得", value("item_name")),
+            field("地图", value("map_name")),
+            f"时间：{when}" if when else "",
         )
-        return copy(where, core)
     if action == 1013:
-        core = " ".join(
-            part for part in (
-                str(value("role_name")),
-                "拍得",
-                str(value("item_name")),
-                f"x{value('item_amount')}" if value("item_amount") not in (None, "") else "",
-            ) if part
+        amount = value("item_amount")
+        amount_text = f" ×{amount}" if amount not in (None, "") else ""
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"阵营拍卖 · {value('camp_name')}" if value("camp_name") else "阵营拍卖",
+            f"{value('role_name')} 拍得：{value('item_name')}{amount_text}" if value("role_name") else field("物品", value("item_name")),
+            f"时间：{when}" if when else "",
         )
-        return copy(where, core)
     if action == 1014:
         map_name = value("map_name")
-        core = f"诛恶刷新：{map_name}" if map_name else "诛恶刷新"
-        return copy(where, core)
+        core = f"诛恶事件：{map_name}" if map_name else "诛恶事件"
+        when = _fmt_time(data.get("time"))
+        return line(where, core, f"时间：{when}" if when else "")
     if action == 1015:
         role = value("role_name")
         role_server = value("role_server")
@@ -421,122 +460,160 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             core += f"：{role}"
         if role_server:
             core += f"（{role_server}）"
-        return copy(where, core)
+        when = _fmt_time(data.get("time"))
+        return line(where, core, f"时间：{when}" if when else "")
     if action == 1017:
-        core = " ".join(
-            part for part in (
-                str(value("tong_name")),
-                "祭祀",
-                str(value("castle_name")),
-            ) if part
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"阵营祭祀 · {value('camp_name')}" if value("camp_name") else "阵营祭祀",
+            field("帮会", value("tong_name")),
+            field("据点", value("castle_name")),
+            f"时间：{when}" if when else "",
         )
-        return copy(where, core)
     if action == 1114:
         tongs = value("tong_name")
         if isinstance(tongs, list):
-            tongs = "、".join(str(item) for item in tongs if str(item).strip())
-        core = " · ".join(
-            part for part in (
-                str(value("camp_name")),
-                str(tongs),
-                f"占领{value('castle_name')}" if value("castle_name") else "",
-            ) if part
-        ) or "据点占领"
-        return copy(where, core)
+            tongs = "、".join(str(item).strip() for item in tongs if str(item).strip())
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"据点占领：{value('castle_name')}" if value("castle_name") else "据点占领",
+            field("阵营", value("camp_name")),
+            field("帮会", tongs),
+            f"时间：{when}" if when else "",
+        )
     if action == 1117:
         tongs = value("tong_name")
         if isinstance(tongs, list):
-            tongs = "、".join(str(item) for item in tongs if str(item).strip())
-        core = " · ".join(
-            part for part in (
-                str(value("camp_name")),
-                f"{tongs} 贡献排行更新" if tongs else "小攻防贡献",
-            ) if part
-        ) or "小攻防贡献"
-        return copy(where, core)
-    if action in {1101, 1103}:
-        declaring = value("declaring_tong_name")
-        accepting = value("accepting_tong_name")
-        if declaring and accepting:
-            core = f"{declaring} 向 {accepting} 宣战"
-        elif declaring:
-            core = f"{declaring} 宣战"
-        elif accepting:
-            core = f"向 {accepting} 宣战"
-        else:
-            core = "宣战"
-        return copy(where, core)
-    if action in {1102, 1104}:
-        winner = value("victory_tong_name") or value("declaring_tong_name")
-        core = f"宣战结束：{winner}" if winner else "宣战结束"
-        return copy(where, core)
+            tongs = "、".join(str(item).strip() for item in tongs if str(item).strip())
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"小攻防贡献 · {value('camp_name')}" if value("camp_name") else "小攻防贡献",
+            field("贡献前列", tongs),
+            f"时间：{when}" if when else "",
+        )
+    if action == 1101:
+        when = _fmt_time(data.get("start_time"))
+        return line(
+            where,
+            "领地宣战 · 开始",
+            field("攻方", value("declaring_tong_name")),
+            field("守方", value("accepting_tong_name")),
+            field("战场帮会", value("battlefield_tong_name")),
+            f"时间：{when}" if when else "",
+        )
+    if action == 1102:
+        when = _fmt_time(data.get("end_time"))
+        return line(
+            where,
+            "领地宣战 · 结束",
+            field("胜方", value("victory_tong_name")),
+            field("得分", value("victory_score")),
+            f"时间：{when}" if when else "",
+        )
+    if action == 1103:
+        when = _fmt_time(data.get("start_time"))
+        return line(
+            where,
+            "帮会宣战 · 开始",
+            field("攻方", value("declaring_tong_name")),
+            field("守方", value("accepting_tong_name")),
+            f"时间：{when}" if when else "",
+        )
+    if action == 1104:
+        when = _fmt_time(data.get("end_time"))
+        return line(
+            where,
+            "帮会宣战 · 结束",
+            field("胜方", value("victory_tong_name")),
+            f"时间：{when}" if when else "",
+        )
     if action == 1105:
-        winner = value("victory_tong_name")
-        core = f"约战结束，胜方：{winner}" if winner else "约战结束"
-        return copy(where, core)
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            "帮会约战 · 完胜",
+            field("胜方", value("victory_tong_name")),
+            f"时间：{when}" if when else "",
+        )
     if action == 1111:
-        castle, camp = value("castle_name"), value("camp_name")
-        core = "抢占粮仓"
-        if castle:
-            core += f"：{castle}"
-        if camp:
-            core += f"（{camp}）"
-        return copy(where, core)
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"抢占粮仓：{value('castle_name')}" if value("castle_name") else "抢占粮仓",
+            field("阵营", value("camp_name")),
+            f"时间：{when}" if when else "",
+        )
     if action == 1112:
-        castle = value("castle_name")
-        core = f"大旗重置：{castle}" if castle else "大旗重置"
-        return copy(where, core)
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"大旗重置：{value('castle_name')}" if value("castle_name") else "大旗重置",
+            f"时间：{when}" if when else "",
+        )
     if action == 1113:
-        castle, camp = value("castle_name"), value("camp_name")
-        core = "大旗被夺"
-        if castle:
-            core += f"：{castle}"
-        if camp:
-            core += f"（{camp}）"
-        return copy(where, core)
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"大旗被夺：{value('castle_name')}" if value("castle_name") else "大旗被夺",
+            field("阵营", value("camp_name")),
+            field("地图", value("map_name")),
+            f"时间：{when}" if when else "",
+        )
     if action == 1118:
-        tong = value("tong_name")
-        core = f"{tong} 贡献排行更新" if tong else "贡献排行更新"
-        return copy(where, core)
+        tongs = value("tong_name")
+        if isinstance(tongs, list):
+            tongs = "、".join(str(item).strip() for item in tongs if str(item).strip())
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"大攻防贡献 · {value('camp_name')}" if value("camp_name") else "大攻防贡献",
+            field("贡献前列", tongs),
+            f"时间：{when}" if when else "",
+        )
     if action == 1119:
-        role = value("role_name")
-        item = value("item_name")
         amount = value("item_amount")
-        pieces = [str(role), "拍得", str(item)]
-        if amount not in (None, ""):
-            pieces.append(f"x{amount}")
-        core = " ".join(piece for piece in pieces if piece)
-        if core == "拍得":
-            core = "战利品竞拍"
-        return copy(where, core)
+        amount_text = f" ×{amount}" if amount not in (None, "") else ""
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"战利品竞拍 · {value('camp_name')}" if value("camp_name") else "战利品竞拍",
+            f"{value('role_name')} 拍得：{value('item_name')}{amount_text}" if value("role_name") else field("物品", value("item_name")),
+            f"时间：{when}" if when else "",
+        )
     if action == 1120:
-        tong = value("tong_name") or value("chief_tong_name")
-        amount = value("split_amount")
-        core = "攻防分红"
-        if tong:
-            core = f"{tong} 分红"
-        if amount not in (None, ""):
-            core += f"：{amount}"
-        return copy(where, core)
+        tongs = value("tong_name")
+        if isinstance(tongs, list):
+            tongs = "、".join(str(item).strip() for item in tongs if str(item).strip())
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"小攻防分红 · {value('camp_name')}" if value("camp_name") else "小攻防分红",
+            field("受益帮会", tongs),
+            field("金额", value("split_amount")),
+            f"时间：{when}" if when else "",
+        )
     if action == 1122:
         tongs = value("tong_names")
         if isinstance(tongs, list):
-            tongs = "、".join(str(item) for item in tongs if str(item).strip())
-        core = " · ".join(
-            part for part in (
-                str(value("camp_name")),
-                f"{tongs} 分红" if tongs else "大攻防分红",
-            ) if part
-        ) or "大攻防分红"
-        chief = value("chief_tong_name")
-        if chief:
-            core += f"（指挥：{chief}）"
-        amount = value("split_amount")
-        if amount not in (None, ""):
-            core += f"：{amount}"
-        return copy(where, core)
+            tongs = "、".join(str(item).strip() for item in tongs if str(item).strip())
+        when = _fmt_time(data.get("time"))
+        return line(
+            where,
+            f"大攻防分红 · {value('camp_name')}" if value("camp_name") else "大攻防分红",
+            field("受益帮会", tongs),
+            field("指挥帮会", value("chief_tong_name")),
+            field("金额", value("split_amount")),
+            f"时间：{when}" if when else "",
+        )
     if action == 1201:
-        return copy(value("user_name"), value("article_text"), value("url"))
+        return line(
+            f"微博动态 · {value('user_name')}" if value("user_name") else "微博动态",
+            str(value("article_text") or ""),
+            field("链接", value("url")),
+        )
     kind = resolve_push_kind(action) or ""
     return "\n".join(part for part in (kind, where) if part)
 
