@@ -57,6 +57,7 @@ class SessionPageAPI:
             )
 
     async def list_sessions(self):
+        await self.plugin.sessions.mark_astrbot_admin_claims(self.plugin._astrbot_admin_ids())
         rows = await self.plugin.sessions.list_bound()
         has_global_ticket = bool(self.plugin._global_ticket())
         has_global_token = bool(self.plugin._global_token())

@@ -462,10 +462,12 @@ class JX3APIService:
             return_data["msg"] = "系统错误：模板文件不存在"
             return return_data
         catalog = getattr(self, "command_catalog", None)
+        page_meta = " · ".join(part for part in (display_name, server) if part)
         return_data["data"] = {
             "rows": help_rows(catalog, exclude_ids=HELP_EXCLUDED_COMMAND_IDS),
             "display_name": display_name,
             "server": server,
+            "page_meta": page_meta,
         }
         return_data["code"] = 200
    
