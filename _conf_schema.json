@@ -35,11 +35,11 @@
     "default": "wss://socket.nicemoe.cn",
     "hint": "事件版主动推送使用的 WebSocket 地址。"
   },
-  "jx3api_ws_token": {
-    "description": "JX3API 事件通道 Token",
+  "jx3api_push_token": {
+    "description": "全局 JX3API 推送令牌",
     "type": "string",
     "default": "",
-    "hint": "用于连接事件通道；留空时使用全局 JX3API Token。"
+    "hint": "用于事件版付费推送，仅填一枚；留空时只能接收免费事件档，不会回退使用接口令牌。"
   },
   "jx3api_ssl_verify": {
     "description": "校验 JX3API 等接口的 TLS 证书",

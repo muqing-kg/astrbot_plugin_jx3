@@ -46,7 +46,7 @@ class JX3APIService:
         self._global_token = self._config.get("jx3api_token", "") or ""
         self._global_ticket = self._config.get("jx3api_ticket", "") or ""
         if not self._global_token:
-            logger.warning("未配置全局 JX3API Token，未勾选使用全局的会话将无法使用付费功能")
+            logger.warning("未配置全局接口令牌，未勾选使用全局接口令牌的会话将无法使用付费查询")
         if not self._global_ticket:
             logger.warning("未配置全局推栏标识，需要推栏的功能将依赖全局或会话自定义配置")
         self.command_catalog: dict | None = None
@@ -206,11 +206,11 @@ class JX3APIService:
         text = str(raw or "").strip()
         lowered = text.lower()
         if any(key in lowered for key in ("expire", "expired")) or "过期" in text:
-            return "JX3API Token 已过期，请更换或续费后再试。可发送 查询令牌 查看状态。"
+            return "JX3API 接口令牌已过期，请更换或续费后再试。可发送 查询接口令牌 查看状态。"
         if any(key in lowered for key in ("quota", "limit", "remaining", "insufficient", "count")) or any(key in text for key in ("次数", "余额", "额度", "用尽", "不足")):
-            return "JX3API Token 次数已用尽，请更换或续费后再试。可发送 查询令牌 查看剩余次数。"
+            return "JX3API 接口令牌次数已用尽，请更换或续费后再试。可发送 查询接口令牌 查看剩余次数。"
         if "token" in lowered or "令牌" in text:
-            return f"JX3API Token 不可用：{text}。可发送 查询令牌 查看状态。"
+            return f"JX3API 接口令牌不可用：{text}。可发送 查询接口令牌 查看状态。"
         return text or "接口请求失败"
 
     def _table_data(self, title: str, columns: list[str], rows: list[list[str]], subtitle: str = "", note: str = "") -> dict:
@@ -449,7 +449,7 @@ class JX3APIService:
         return 1
 
     # --- 业务功能函数 ---
-    async def helps(self) -> Dict[str, Any]:
+    async def helps(self, display_name: str = "", server: str = "") -> Dict[str, Any]:
         """帮助"""
         from .command_catalog import HELP_EXCLUDED_COMMAND_IDS, help_rows
         return_data = self._init_return_data()
@@ -462,7 +462,11 @@ class JX3APIService:
             return_data["msg"] = "系统错误：模板文件不存在"
             return return_data
         catalog = getattr(self, "command_catalog", None)
-        return_data["data"] = {"rows": help_rows(catalog, exclude_ids=HELP_EXCLUDED_COMMAND_IDS)}
+        return_data["data"] = {
+            "rows": help_rows(catalog, exclude_ids=HELP_EXCLUDED_COMMAND_IDS),
+            "display_name": display_name,
+            "server": server,
+        }
         return_data["code"] = 200
    
         return return_data
@@ -2417,7 +2421,7 @@ class JX3APIService:
             ["序号", "身份", "昵称", "身份信息"],
             table_rows,
             subtitle=display_name or "插件管理员",
-            note="认领人不可被删除；授权管理员可管理通知开关与查询令牌。",
+            note="认领人不可被删除；授权管理员可管理通知开关与查询接口令牌。",
         )
         return_data["code"] = 200
         return return_data

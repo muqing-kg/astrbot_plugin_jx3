@@ -137,7 +137,8 @@ function sessionCard(row) {
       <div class="pills">
         ${pill(row.claim_type === "astrbot_admin" || !row.claim_identity ? "AstrBot 管理员" : `认领人 ${row.claim_name || row.claim_identity}`, true)}
         ${pill(row.server || "未绑定区服", Boolean(row.server))}
-        ${pill("Token " + (row.token_status || "未配置"), Boolean(row.has_token))}
+        ${pill("接口令牌 " + (row.token_status || "未配置"), Boolean(row.has_token))}
+        ${pill("推送令牌 " + (row.push_token_status || "未配置"), Boolean(row.has_push_token))}
         ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
         ${pill(row.bot_enabled === false ? "机器人已关闭" : "机器人开启", row.bot_enabled !== false)}
         ${pill(
@@ -158,7 +159,11 @@ function sessionCard(row) {
       </label>
       <label class="toggle">
         <input data-k="use_global" type="checkbox" ${row.use_global_token ? "checked" : ""} />
-        使用全局 JX3API Token
+        使用全局接口令牌
+      </label>
+      <label class="toggle">
+        <input data-k="use_global_push_token" type="checkbox" ${row.use_global_push_token ? "checked" : ""} />
+        使用全局推送令牌
       </label>
     </div>
     <div class="rows">
@@ -174,12 +179,22 @@ function sessionCard(row) {
       </div>
       <div class="row">
         <label class="field">
-          <span>JX3API Token</span>
+          <span>JX3API 接口令牌</span>
           <input data-k="token" data-initial="${escapeHtml(row.token_display_value || "")}" value="${escapeHtml(row.token_display_value || "")}" placeholder="多个用逗号分隔" />
         </label>
         <div class="row-actions">
-          <button data-act="token" type="button">保存 Token</button>
-          <button data-act="clear-token" class="ghost" type="button">清除 Token</button>
+          <button data-act="token" type="button">保存接口令牌</button>
+          <button data-act="clear-token" class="ghost" type="button">清除接口令牌</button>
+        </div>
+      </div>
+      <div class="row">
+        <label class="field">
+          <span>JX3API 推送令牌</span>
+          <input data-k="push-token" data-initial="${escapeHtml(row.push_token_display_value || "")}" value="${escapeHtml(row.push_token_display_value || "")}" placeholder="推送令牌" />
+        </label>
+        <div class="row-actions">
+          <button data-act="push-token" type="button">保存推送令牌</button>
+          <button data-act="clear-push-token" class="ghost" type="button">清除推送令牌</button>
         </div>
       </div>
       <div class="row">
@@ -220,6 +235,7 @@ function sessionCard(row) {
     const act = btn.dataset.act;
     const server = card.querySelector('[data-k="server"]').value.trim();
     const token = card.querySelector('[data-k="token"]').value.trim();
+    const pushToken = card.querySelector('[data-k="push-token"]').value.trim();
     const ticket = card.querySelector('[data-k="ticket"]').value.trim();
     const managerEl = card.querySelector('[data-k="managers"]');
     const managers = managerEl ? managerEl.value.trim() : "";
@@ -227,11 +243,17 @@ function sessionCard(row) {
       if (!row.umo || !server) return setStatus("请填写区服", true);
       await run(() => bridge.apiPost("page/sessions/bind", { umo: row.umo, server }));
     } else if (act === "token") {
-      if (!row.umo || !token) return setStatus("请填写 Token", true);
+      if (!row.umo || !token) return setStatus("请填写接口令牌", true);
       if (token === (card.querySelector('[data-k="token"]').dataset.initial || "")) {
-        return setStatus("Token 未修改，保持当前配置");
+        return setStatus("接口令牌未修改，保持当前配置");
       }
       await run(() => bridge.apiPost("page/sessions/token", { umo: row.umo, token }));
+    } else if (act === "push-token") {
+      if (!row.umo || !pushToken) return setStatus("请填写推送令牌", true);
+      if (pushToken === (card.querySelector('[data-k="push-token"]').dataset.initial || "")) {
+        return setStatus("推送令牌未修改，保持当前配置");
+      }
+      await run(() => bridge.apiPost("page/sessions/push-token", { umo: row.umo, token: pushToken }));
     } else if (act === "ticket") {
       if (!row.umo || !ticket) return setStatus("请填写推栏标识", true);
       if (ticket === (card.querySelector('[data-k="ticket"]').dataset.initial || "")) {
@@ -247,6 +269,8 @@ function sessionCard(row) {
       await run(() => bridge.apiPost("page/sessions/clear-server", { umo: row.umo }));
     } else if (act === "clear-token") {
       await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "token" }));
+    } else if (act === "clear-push-token") {
+      await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "push_token" }));
     } else if (act === "clear-ticket") {
       await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "ticket" }));
     } else if (act === "delete") {
@@ -276,8 +300,20 @@ function sessionCard(row) {
     const enabled = ev.target.checked;
     try {
       if (!row.umo) throw new Error("当前会话缺少标识");
-      await bridge.apiPost("page/sessions/use-global", { umo: row.umo, enabled });
-      setStatus(enabled ? "已启用全局 JX3API Token" : "已关闭全局 JX3API Token");
+      await bridge.apiPost("page/sessions/use-global", { umo: row.umo, enabled, kind: "token" });
+      setStatus(enabled ? "已启用全局接口令牌" : "已关闭全局接口令牌");
+      await loadSessions();
+    } catch (err) {
+      ev.target.checked = !enabled;
+      setStatus(err.message || "保存失败", true);
+    }
+  });
+  card.querySelector('[data-k="use_global_push_token"]').addEventListener("change", async (ev) => {
+    const enabled = ev.target.checked;
+    try {
+      if (!row.umo) throw new Error("当前会话缺少标识");
+      await bridge.apiPost("page/sessions/use-global", { umo: row.umo, enabled, kind: "push_token" });
+      setStatus(enabled ? "已启用全局推送令牌" : "已关闭全局推送令牌");
       await loadSessions();
     } catch (err) {
       ev.target.checked = !enabled;

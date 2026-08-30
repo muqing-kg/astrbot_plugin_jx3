@@ -36,6 +36,7 @@ from .core.session_policy import (
     hint_private_only_claim,
     hint_need_ticket,
     hint_need_token,
+    hint_need_push_token,
     hint_push_need_bind,
     hint_push_ok,
     hint_secret_saved,
@@ -48,6 +49,7 @@ from .core.session_policy import (
     current_command_name,
     format_command_error,
     hint_unknown_server,
+    can_bind_session,
     normalize_system_prefixes,
     match_system_prefix,
     strip_command_prefix,
@@ -55,7 +57,7 @@ from .core.session_policy import (
 from .core.credentials import reset_request_credentials, set_request_credentials
 from .core.mentions import mentioned_bot, mentioned_target, message_text_without_bot_mentions
 from .core.page_api import SessionPageAPI
-from .core.event_catalog import push_arg_map
+from .core.event_catalog import FREE_PUSH_ACTIONS, push_arg_map
 from .core.command_catalog import apply_command_overrides, resolve_command, suggest_command
 from .core.server_catalog import apply_alias_overrides, canonical_server
 from .core.plugin_settings import PluginSettings
@@ -415,11 +417,6 @@ class Jx3ApiPlugin(Star):
         except Exception:
             return False
 
-    async def _is_owner_admin(self, event: AstrMessageEvent) -> bool:
-        if self._is_astrbot_admin(event):
-            return True
-        return await self.sessions.is_claimed_admin(self._sender_id(event))
-
     async def _is_session_owner_admin(self, event: AstrMessageEvent, umo: str = "") -> bool:
         if self._is_astrbot_admin(event):
             return True
@@ -446,6 +443,13 @@ class Jx3ApiPlugin(Star):
     def _global_ticket(self) -> str:
         return str(self.conf.get("jx3api_ticket", "") or "").strip()
 
+    def _global_push_token(self) -> str:
+        return str(
+            self.conf.get("jx3api_push_token", "")
+            or self.conf.get("jx3api_ws_token", "")
+            or ""
+        ).strip()
+
     async def _handle_admin_command(self, event: AstrMessageEvent, parts: list[str]):
         parsed = parse_admin_command(
             remap_admin_parts(parts, self.command_catalog),
@@ -469,7 +473,7 @@ class Jx3ApiPlugin(Star):
         if parsed.error == "missing_secret_args":
             token_cmd = current_command_name(self.command_catalog, "Token")
             ticket_cmd = current_command_name(self.command_catalog, "推栏")
-            return event.plain_result(f"用法：{token_cmd} <UMO> <Token> 或 {ticket_cmd} <UMO> <推栏标识>")
+            return event.plain_result(f"用法：{token_cmd} <UMO> <接口令牌> 或 {ticket_cmd} <UMO> <推栏标识>")
         if parsed.error == "missing_authorize_target":
             return event.plain_result(hint_authorize_usage(self.command_catalog))
         if parsed.error == "missing_manager_index":
@@ -486,7 +490,7 @@ class Jx3ApiPlugin(Star):
             return event.plain_result(hint_claim_ok(name))
 
         if parsed.action == "llm_enabled":
-            if not await self._is_owner_admin(event) and not await self._is_plugin_admin(event, umo=self._event_umo(event)):
+            if not await self._is_plugin_admin(event, umo=self._event_umo(event)):
                 return event.plain_result(hint_need_claim(self.command_catalog))
             enabled = parsed.value == "1"
             await self.sessions.set_llm_enabled(self._event_umo(event), enabled)
@@ -529,21 +533,50 @@ class Jx3ApiPlugin(Star):
             blocks = []
             if session_token:
                 data = await self.jx3api.token_stats(session_token)
-                title = "【该群 Token】"
+                title = "【该群接口令牌】"
                 body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
                 blocks.append(title + "\n" + body)
             if use_global and global_token and global_token != session_token:
                 data = await self.jx3api.token_stats(global_token)
                 body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
-                blocks.append("【全局 Token】\n" + body)
+                blocks.append("【全局接口令牌】\n" + body)
             if not blocks:
                 return event.plain_result(hint_need_token(self.command_catalog))
             return event.plain_result("\n\n".join(blocks))
 
-        if parsed.action == "bind":
-            if not await self._is_owner_admin(event):
-                return event.plain_result(hint_need_claim(self.command_catalog))
+        if parsed.action == "push_token_stats":
             umo = self._event_umo(event)
+            if not await self._is_plugin_admin(event, umo=umo):
+                return event.plain_result(hint_need_claim(self.command_catalog))
+            row = await self.sessions.get(umo)
+            group_push_token = ((row or {}).get("push_token") or "").strip()
+            global_push_token = self._global_push_token()
+            use_global_push_token = bool((row or {}).get("use_global_push_token"))
+            blocks = []
+            for label, value in (
+                ("【该群推送令牌】", group_push_token),
+                ("【全局推送令牌】", global_push_token if use_global_push_token else ""),
+            ):
+                if not value:
+                    continue
+                for index, token in enumerate([item.strip() for item in value.replace("，", ",").split(",") if item.strip()], 1):
+                    suffix = f"（第 {index} 个）" if "," in value else ""
+                    data = await self.jx3api.token_stats(token)
+                    body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
+                    blocks.append(f"{label}{suffix}\n{body}")
+            if not blocks:
+                return event.plain_result(hint_need_push_token(self.command_catalog))
+            return event.plain_result("\n\n".join(blocks))
+
+        if parsed.action == "bind":
+            umo = self._event_umo(event)
+            current = await self.sessions.get(umo)
+            if not can_bind_session(
+                self._is_astrbot_admin(event),
+                (current or {}).get("claim_identity"),
+                self._sender_id(event),
+            ):
+                return event.plain_result(hint_need_claim(self.command_catalog))
             official = canonical_server(self.server_catalog, parsed.value)
             if not official:
                 return event.plain_result("未识别的区服。请使用正式区服名或已配置的别名。")
@@ -553,7 +586,14 @@ class Jx3ApiPlugin(Star):
                 self._event_display_name(event),
                 is_private=self._is_private(event),
             )
-            if not self._is_astrbot_admin(event):
+            if self._is_astrbot_admin(event):
+                await self.sessions.set_session_claim(
+                    umo,
+                    self._sender_id(event),
+                    self._sender_name(event),
+                    claim_type="astrbot_admin",
+                )
+            else:
                 await self.sessions.set_session_claim(
                     umo,
                     self._sender_id(event),
@@ -571,6 +611,19 @@ class Jx3ApiPlugin(Star):
                 self._event_display_name(event),
                 is_private=self._is_private(event),
             )
+            row = await self.sessions.get(umo)
+            if parsed.action == "open_push" and parsed.value not in FREE_PUSH_ACTIONS:
+                push_token = self.sessions.resolve_push_token(row, self._global_push_token())
+                if push_token == CREDENTIAL_MISSING:
+                    return event.plain_result(hint_need_push_token(self.command_catalog))
+                stats = await self.jx3api.token_stats(push_token)
+                if stats.get("code") != 200 or stats.get("valid") is False:
+                    detail = str(stats.get("msg") or "推送令牌不可用")
+                    if "过期" in detail:
+                        detail = "JX3API 推送令牌已过期，请更换或续费后再试。"
+                    elif any(key in detail for key in ("次数", "余额", "额度", "不足", "用尽")):
+                        detail = "JX3API 推送令牌次数已用尽，请更换或续费后再试。"
+                    return event.plain_result(f"推送令牌校验失败：{detail}")
             ok, msg = await self.sessions.set_push(umo, parsed.value, parsed.action == "open_push")
             if not ok:
                 return event.plain_result(hint_push_need_bind(self.command_catalog))
@@ -591,18 +644,18 @@ class Jx3ApiPlugin(Star):
                 return event.plain_result(hint_umo_invalid())
             values = [part.strip() for part in parsed.value.replace("，", ",").split(",") if part.strip()]
             if not values:
-                label = "Token" if parsed.action == "set_token" else "推栏标识"
+                label = "接口令牌" if parsed.action == "set_token" else "推栏标识"
                 return event.plain_result(f"请填写需要保存的 {label}。")
             if parsed.action == "set_token":
                 for index, value in enumerate(values, 1):
                     data = await self.jx3api.token_stats(value)
                     if data.get("code") != 200 or data.get("valid") is False:
-                        detail = str(data.get("msg") or "Token 不可用")
+                        detail = str(data.get("msg") or "接口令牌不可用")
                         if "过期" in detail:
-                            detail = "JX3API Token 已过期，请更换后再试。"
+                            detail = "JX3API 接口令牌已过期，请更换后再试。"
                         elif any(key in detail for key in ("次数", "余额", "额度", "不足", "用尽")):
-                            detail = "JX3API Token 次数已用尽，请更换或续费后再试。"
-                        return event.plain_result(f"第 {index} 个 Token 校验失败：{detail}")
+                            detail = "JX3API 接口令牌次数已用尽，请更换或续费后再试。"
+                        return event.plain_result(f"第 {index} 个接口令牌校验失败：{detail}")
                 await self.sessions.set_token(target, parsed.value)
                 return event.plain_result(hint_secret_saved("token", target) + "\n已通过 JX3API 校验。")
             probe_token = self.sessions.resolve_token(row, self._global_token())
@@ -616,6 +669,30 @@ class Jx3ApiPlugin(Star):
                     return event.plain_result(f"第 {index} 个推栏标识校验失败：{msg}")
             await self.sessions.set_ticket(target, parsed.value)
             return event.plain_result(hint_secret_saved("ticket", target) + "\n已通过真实接口校验。")
+        if parsed.action == "set_push_token":
+            target = parsed.target.strip()
+            if not is_group_umo(target):
+                return event.plain_result("目标 UMO 必须是群聊会话。请先在目标群发送 sid 复制 UMO。")
+            row = await self.sessions.get(target)
+            if not row:
+                return event.plain_result(hint_umo_invalid())
+            values = [part.strip() for part in parsed.value.replace("，", ",").split(",") if part.strip()]
+            if not values:
+                return event.plain_result("请填写需要保存的推送令牌。")
+            if len(values) > 1:
+                return event.plain_result("推送令牌一次只能配置一枚；如需更换，请保存新的推送令牌。")
+            for index, value in enumerate(values, 1):
+                data = await self.jx3api.token_stats(value)
+                if data.get("code") != 200 or data.get("valid") is False:
+                    detail = str(data.get("msg") or "推送令牌不可用")
+                    if "过期" in detail:
+                        detail = "JX3API 推送令牌已过期，请更换后再试。"
+                    elif any(key in detail for key in ("次数", "余额", "额度", "不足", "用尽")):
+                        detail = "JX3API 推送令牌次数已用尽，请更换或续费后再试。"
+                    return event.plain_result(f"第 {index} 个推送令牌校验失败：{detail}")
+            await self.sessions.set_push_token(target, parsed.value)
+            await self.jx3at.refresh_jobs()
+            return event.plain_result(hint_secret_saved("push_token", target) + "\n已通过 JX3API 校验。")
         return None
 
     async def _call_with_auto_args(self, handler, event: AstrMessageEvent, args: list[str]):
@@ -826,7 +903,15 @@ class Jx3ApiPlugin(Star):
                 event,
                 display_name=self._event_display_name(event),
                 server=(row.get("server") or "").strip() or "未绑定",
-                enabled=self.sessions.enabled_kinds(row),
+                enabled=await self.sessions.enabled_actions(umo),
+            )
+            return
+        if cmd == "功能":
+            event.stop_event()
+            yield await self.jx3cmd.helps(
+                event,
+                display_name=self._event_display_name(event),
+                server=(row.get("server") or "").strip(),
             )
             return
 

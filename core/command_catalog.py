@@ -637,9 +637,16 @@ DEFAULT_COMMAND_ROWS = [
     {
         'id': '查询令牌',
         'group': '会话设置',
-        'command': '查询令牌',
-        'command_tpl': '查询令牌',
-        'desc': '会话设置 / 查询令牌',
+        'command': '查询接口令牌',
+        'command_tpl': '查询接口令牌',
+        'desc': '会话设置 / 查询接口令牌',
+    },
+    {
+        'id': '查询推送令牌',
+        'group': '会话设置',
+        'command': '查询推送令牌',
+        'command_tpl': '查询推送令牌',
+        'desc': '会话设置 / 查询推送令牌',
     },
     {
         'id': '授权管理',
@@ -700,9 +707,16 @@ DEFAULT_COMMAND_ROWS = [
     {
         'id': 'Token',
         'group': '会话设置',
-        'command': 'Token',
+        'command': '接口令牌',
         'command_tpl': '私聊 {command} [UMO] [密钥]',
-        'desc': '会话设置 / Token，仅私聊配置群聊会话',
+        'desc': '会话设置 / 接口令牌，仅私聊配置群聊会话',
+    },
+    {
+        'id': '推送令牌',
+        'group': '会话设置',
+        'command': '推送令牌',
+        'command_tpl': '私聊 {command} [UMO] [密钥]',
+        'desc': '会话设置 / 推送令牌，仅私聊配置群聊会话',
     },
     {
         'id': '推栏',
@@ -901,7 +915,9 @@ WEB_COMMAND_DESCRIPTIONS = {
     "功能": "查看自主查询命令帮助图",
     "认领": "在私聊认领本插件的管理身份",
     "绑定": "为当前群聊绑定默认区服",
-    "查询令牌": "查询 JX3API Token 的等级、已用次数、剩余次数或到期时间",
+    "查询令牌": "查询接口令牌的等级、已用次数、剩余次数或到期时间",
+    "推送令牌": "为指定群聊会话配置 JX3API 推送令牌，仅私聊可用",
+    "查询推送令牌": "查询推送令牌的等级、已用次数、剩余次数或到期时间",
     "授权管理": "授权被 @ 的成员管理本会话通知",
     "查看管理": "查看本会话认领人与授权管理员",
     "删除管理": "按序号移除本会话授权管理员",
@@ -910,7 +926,7 @@ WEB_COMMAND_DESCRIPTIONS = {
     "通知管理": "查看和管理本会话主动推送事件",
     "打开": "开启指定事件的主动推送",
     "关闭": "关闭指定事件的主动推送",
-    "Token": "为指定群聊会话配置 JX3API Token，仅私聊可用",
+    "Token": "为指定群聊会话配置 JX3API 接口令牌，仅私聊可用",
     "推栏": "为指定群聊会话配置推栏标识，仅私聊可用",
     "新闻": "查询最新官方资讯",
     "维护": "标题含“版本更新”的公告，最新在前",
@@ -1016,6 +1032,7 @@ def help_rows(
     exclude_ids: set[str] | None = None,
 ) -> list[dict]:
     catalog = catalog or DEFAULT_COMMANDS
+    from .session_policy import NEED_TICKET, NEED_TOKEN
     group_order = []
     for item in DEFAULT_COMMAND_ROWS:
         if item["group"] not in group_order:
@@ -1036,6 +1053,12 @@ def help_rows(
             "word": new,
             "command": _replace_command_text(item["command_tpl"], old, new),
             "web_desc": _web_description(item, row, old, new),
+            "fee": (
+                "token_ticket"
+                if item["id"] in NEED_TICKET and item["id"] in NEED_TOKEN
+                else "token" if item["id"] in NEED_TOKEN
+                else ""
+            ),
         })
     return rows
 

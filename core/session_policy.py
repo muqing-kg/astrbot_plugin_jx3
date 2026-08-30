@@ -88,6 +88,14 @@ def resolve_query_server(explicit: str, bound: str) -> str:
     return UNBOUND_SERVER
 
 
+def can_bind_session(is_admin: bool, claim_identity: str, sender_id: str) -> bool:
+    if is_admin:
+        return True
+    claim_identity = str(claim_identity or "").strip()
+    sender_id = str(sender_id or "").strip()
+    return not claim_identity or claim_identity == sender_id
+
+
 MODE_TOKENS = {"22", "33", "55", "2v2", "3v3", "5v5"}
 
 
@@ -199,9 +207,11 @@ class AdminCommand:
 
 ADMIN_COMMAND_IDS = (
     "Token",
+    "推送令牌",
     "推栏",
     "认领",
     "查询令牌",
+    "查询推送令牌",
     "绑定",
     "打开",
     "关闭",
@@ -212,7 +222,7 @@ ADMIN_COMMAND_IDS = (
     "闭嘴",
 )
 
-PRIVATE_ONLY_COMMAND_IDS = {"认领", "Token", "推栏"}
+PRIVATE_ONLY_COMMAND_IDS = {"认领", "Token", "推送令牌", "推栏"}
 
 
 def remap_admin_parts(parts: list[str], catalog: dict | None) -> list[str]:
@@ -246,19 +256,27 @@ def parse_admin_command(
     if not parts:
         return AdminCommand(error="empty")
     cmd = parts[0]
-    if cmd in {"Token", "token", "推栏"}:
+    if cmd in {"Token", "token", "接口令牌", "推栏"}:
         if not is_private:
             return AdminCommand(error=GROUP_SECRET_FORBIDDEN)
         if len(parts) < 3:
             return AdminCommand(error="missing_secret_args")
-        action = "set_token" if cmd.lower() == "token" else "set_ticket"
+        action = "set_ticket" if cmd == "推栏" else "set_token"
         return AdminCommand(action=action, target=parts[1], value=" ".join(parts[2:]).strip())
+    if cmd == "推送令牌":
+        if not is_private:
+            return AdminCommand(error=GROUP_SECRET_FORBIDDEN)
+        if len(parts) < 3:
+            return AdminCommand(error="missing_secret_args")
+        return AdminCommand(action="set_push_token", target=parts[1], value=" ".join(parts[2:]).strip())
     if cmd == "认领":
         if not is_private:
             return AdminCommand(error="claim_private_only")
         return AdminCommand(action="claim", value=" ".join(parts[1:]).strip())
     if cmd == "查询令牌":
         return AdminCommand(action="token_stats")
+    if cmd == "查询推送令牌":
+        return AdminCommand(action="push_token_stats")
     if cmd in {"张嘴", "闭嘴"}:
         return AdminCommand(action="llm_enabled", value="1" if cmd == "张嘴" else "0")
     if cmd in {"授权管理", "查看管理", "删除管理"}:
@@ -279,12 +297,12 @@ def parse_admin_command(
         return AdminCommand(action="bind", value=" ".join(parts[1:]).strip())
     if cmd in {"打开", "关闭"}:
         arg = str(parts[1]).strip() if len(parts) > 1 else ""
-        kind = (push_args if push_args is not None else push_arg_map({})).get(arg, "")
-        if not kind:
+        action = (push_args if push_args is not None else push_arg_map({})).get(arg, "")
+        if not action:
             return AdminCommand(error="missing_push_type")
         return AdminCommand(
             action="open_push" if cmd == "打开" else "close_push",
-            value=kind,
+            value=action,
             label=arg,
         )
     return AdminCommand(error="unknown")
@@ -345,15 +363,29 @@ def hint_push_ok(kind: str, enabled: bool, catalog: dict | None = None, label: s
 def hint_need_token(catalog: dict | None = None) -> str:
     token_cmd = current_command_name(catalog, "Token")
     return (
-        "该功能需要 JX3API Token，当前会话尚未配置。\n"
-        "请前往 https://www.jx3api.com 购买 Token。\n"
+        "该功能需要 JX3API 接口令牌，当前会话尚未配置。\n"
+        "请前往 https://www.jx3api.com 购买接口令牌。\n"
         "\n"
-        "配置方式（请私聊机器人，不要在群里发送 Token）：\n"
+        "配置方式（请私聊机器人，不要在群里发送接口令牌）：\n"
         "1. 在目标群聊发送 sid ，复制该群 UMO\n"
-        f"2. 私聊发送：{token_cmd} <UMO> <你的Token>\n"
-        f"例如：{token_cmd} <UMO> <你的Token>\n"
+        f"2. 私聊发送：{token_cmd} <UMO> <你的接口令牌>\n"
+        f"例如：{token_cmd} <UMO> <你的接口令牌>\n"
         "\n"
-        "也可让机器人管理员在插件页面为该会话填写，或勾选「使用全局 Token」。"
+        "也可让机器人管理员在插件页面为该会话填写，或勾选「使用全局接口令牌」。"
+    )
+
+
+def hint_need_push_token(catalog: dict | None = None) -> str:
+    token_cmd = current_command_name(catalog, "推送令牌")
+    return (
+        "该事件需要 JX3API 推送令牌，当前会话尚未配置，也未启用可用的全局推送令牌。\n"
+        "免费事件档无需令牌；付费事件档请购买有效推送令牌。\n"
+        "\n"
+        "配置方式（请私聊机器人，不要在群里发送令牌）：\n"
+        "1. 在目标群聊发送 sid，复制该群 UMO\n"
+        f"2. 私聊发送：{token_cmd} <UMO> <你的推送令牌>\n"
+        "\n"
+        "也可让机器人管理员在插件页面为该会话填写，或勾选「使用全局推送令牌」。"
     )
 
 
@@ -376,7 +408,11 @@ def hint_group_secret() -> str:
 
 
 def hint_secret_saved(kind: str, umo: str) -> str:
-    label = "Token" if kind == "token" else "推栏标识"
+    label = {
+        "token": "接口令牌",
+        "push_token": "推送令牌",
+        "ticket": "推栏标识",
+    }.get(kind, "密钥")
     return (
         f"已为会话 {umo} 保存 {label}。\n"
         f"该 {label} 仅用于该会话，不会在聊天中展示。"

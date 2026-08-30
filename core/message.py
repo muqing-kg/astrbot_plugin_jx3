@@ -54,6 +54,11 @@ def build_page_meta(template: str, payload: dict) -> str:
     item_count = len(items) if isinstance(items, list) else None
     if filename == "notice.html":
         return " · ".join(part for part in [_meta_pick(payload, "display_name"), server] if part)
+    if filename == "helps.html":
+        return " · ".join(part for part in [
+            _meta_pick(payload, "display_name"),
+            server,
+        ] if part)
     if filename in {"juesheqiyu.html", "weizuoqiyu.html", "yanhuan.html", "jingnai.html", "chengjiu.html", "zili.html", "zhanji.html", "juesheliaotian.html"}:
         parts = [part for part in [server, role] if part]
         if filename == "zhanji.html" and mode:
@@ -450,9 +455,12 @@ class MessageBuilder:
         )
 
 
-    async def  helps(self, event: AstrMessageEvent):
+    async def  helps(self, event: AstrMessageEvent, display_name: str = "", server: str = ""):
         """ 功能"""
-        return await self.T2I_image_msg(event, self.jx3api.helps)
+        return await self.T2I_image_msg(
+            event,
+            lambda: self.jx3api.helps(display_name, server),
+        )
 
     async def  notice_manage(self, event: AstrMessageEvent, display_name: str = "", server: str = "", enabled=None):
         """ 通知管理 """
