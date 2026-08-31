@@ -250,7 +250,6 @@ class Jx3ApiPlugin(Star):
             "成就": self.jx3cmd.chengjiu,
             "角色": self.jx3cmd.jueshe,
             "在线": self.jx3cmd.unua_online,
-            "属性": self.jx3cmd.unua_attribute,
             "阵眼": self.jx3cmd.zhenyan,
             "配装": self.jx3cmd.peizhuang,
             "资历排行": self.jx3cmd.zilipaixing,
@@ -814,7 +813,7 @@ class Jx3ApiPlugin(Star):
         ids = self.jx3cmd.RANKING_IDS
         async def runner(choice: int, reply_event: AstrMessageEvent):
             await self._run_menu_choice(reply_event, choice, ids, [])
-        await self.jx3cmd.send_command_menu(event, "排行榜", ids, runner)
+        await self.jx3cmd.send_command_menu(event, "排行榜", ids, runner, timeout=20)
 
     async def _cmd_zhangong(self, event: AstrMessageEvent, args: list[str]):
         camp = (args[0] if args else "").strip()
@@ -1012,3 +1011,4 @@ class Jx3ApiPlugin(Star):
         except Exception:
             pass
         return event.request_llm(prompt=prompt)
+

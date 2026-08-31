@@ -1,10 +1,6 @@
-"""unua.top 推栏数据源：角色在线状态与属性查询。"""
+"""unua.top 推栏数据源：角色在线状态查询。"""
 
-import base64
-import hashlib
-import json
 import logging
-import mimetypes
 import secrets
 import time
 from typing import Any, Dict, Optional
@@ -14,48 +10,6 @@ import requests
 logger = logging.getLogger(__name__)
 
 UNUA_BASE = "https://jx3.unua.top"
-def _shrink_image(data: bytes, mime: str, max_w: int = 480, quality: int = 75) -> tuple[bytes, str]:
-    """按需缩放图片，控制 base64 后体积在合理范围。"""
-    if mime not in ("image/png", "image/jpeg", "image/webp"):
-        return data, mime
-    try:
-        from PIL import Image
-        import io
-        img = Image.open(io.BytesIO(data))
-        img = img.convert("RGB")
-        w, h = img.size
-        if w > max_w:
-            ratio = max_w / w
-            img = img.resize((max_w, int(h * ratio)), Image.LANCZOS)
-        buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=quality)
-        out = buf.getvalue()
-        if len(out) < len(data):
-            return out, "image/jpeg"
-    except Exception as e:
-        logger.warning(f"图片压缩失败: {e}")
-    return data, mime
-
-
-def url_to_data_uri(url: str, timeout: int = 8, shrink: bool = False) -> str:
-    """下载图片 URL 并转为 base64 data URI，失败时返回空串。不落盘，用完由调用方清理。"""
-    if not url or url.startswith("data:"):
-        return url
-    try:
-        r = requests.get(url, timeout=timeout)
-        r.raise_for_status()
-        mime = r.headers.get("Content-Type") or mimetypes.guess_type(url)[0] or "image/png"
-        if ";" in mime:
-            mime = mime.split(";")[0].strip()
-        content = r.content
-        if shrink:
-            content, mime = _shrink_image(content, mime)
-        b64 = base64.b64encode(content).decode("ascii")
-        return f"data:{mime};base64,{b64}"
-    except Exception as e:
-        logger.warning(f"图片转 base64 失败 ({url[:60]}): {e}")
-        return ""
-
 
 class UnuaService:
     """jx3.unua.top 推栏数据接口封装（含 proof 认证）。"""
@@ -187,72 +141,6 @@ class UnuaService:
             lines.append(f"所在地图：{map_name}")
         return_data["data"] = "\n".join(lines)
         return_data["code"] = 200
-        return return_data
-
-    async def role_attribute(self, server: str, name: str, template: str = "",
-                              tong_name: str = "", card_url: str = "") -> Dict[str, Any]:
-        """查询角色属性（取最近一场竞技场数据），返回模板渲染所需的结构化数据。"""
-        return_data: Dict[str, Any] = {"code": 0, "data": "", "msg": "功能函数未执行"}
-        data = self._post("/api/player/home-page", {"roleName": name, "server": server, "mode": "local"})
-        if not data:
-            return_data["msg"] = "未查询到该角色，请确认区服与角色名"
-            return return_data
-        profile = data.get("profile") or {}
-        matches = data.get("data") or []
-        if not matches:
-            return_data["msg"] = "未查询到该角色的战绩数据"
-            return return_data
-        player = None
-        match_id = None
-        for m in matches[:3]:
-            mid = m.get("match_id")
-            match = self._post("/api/match/detail", {"match_id": mid})
-            if not match:
-                continue
-            for team in match.get("teams") or []:
-                for p in team.get("players") or []:
-                    if p.get("name") == name:
-                        player = p
-                        match_id = mid
-                        break
-                if player:
-                    break
-            if player:
-                break
-        if not player:
-            return_data["msg"] = "未在最近战绩中找到该角色的属性数据"
-            return return_data
-        equipments = player.get("equipments") or []
-        talents = player.get("talents") or []
-        _equip_colors = {0: "#9ca3af", 1: "#9ca3af", 2: "#22c55e", 3: "#60a5fa", 4: "#c084fc", 5: "#fb923c"}
-        for eq in equipments:
-            eq["icon"] = url_to_data_uri(eq.get("icon") or "")
-            eq["color"] = _equip_colors.get(eq.get("quality", 0), "#9ca3af")
-        for t in talents:
-            t["icon"] = url_to_data_uri(t.get("icon") or "")
-        card_data_uri = url_to_data_uri(card_url, shrink=True) if card_url else ""
-        return_data["data"] = {
-            "roleName": name,
-            "server": profile.get("server") or "",
-            "zone": data.get("resolvedRole", {}).get("zone") or "",
-            "faction": profile.get("faction") or "",
-            "kungfu": profile.get("kungfu") or "",
-            "bodyType": profile.get("bodyType") or "",
-            "camp": profile.get("camp") or "",
-            "tongName": tong_name,
-            "cardUrl": card_data_uri,
-            "avatar": profile.get("avatar") or "",
-            "matchId": match_id,
-            "qualities": player.get("qualities") or [],
-            "equipments": equipments,
-            "talents": talents,
-            "stats": profile.get("stats") or [],
-            "playerStats": player.get("stats") or {},
-        }
-        return_data["code"] = 200
-        if template:
-            from .template import load_template
-            return_data["temp"] = await load_template(template)
         return return_data
 
     def close(self):

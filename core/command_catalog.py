@@ -278,13 +278,6 @@ DEFAULT_COMMAND_ROWS = [
         'desc': '角色资料 / 在线状态',
     },
     {
-        'id': '属性',
-        'group': '角色资料',
-        'command': '属性',
-        'command_tpl': '属性 [服务器] [角色]',
-        'desc': '角色资料 / 装备属性',
-    },
-    {
         'id': '名片',
         'group': '角色资料',
         'command': '名片',
@@ -476,9 +469,9 @@ DEFAULT_COMMAND_ROWS = [
     {
         'id': '试炼之地排行',
         'group': '排行榜单',
-        'command': '试炼之地排行',
-        'command_tpl': '试炼之地排行 [服务器] [心法]',
-        'desc': '排行榜单 / 试炼之地排行',
+        'command': '试炼之地',
+        'command_tpl': '试炼之地 [服务器] [心法]',
+        'desc': '排行榜单 / 试炼之地',
     },
     {
         'id': '赛季恶人战功榜',
@@ -1115,3 +1108,4 @@ def command_usage(command_id: str, catalog: dict | None = None) -> str:
     tpl = _replace_command_text(tpl, old, name)
     first = tpl.split("|")[0].strip()
     return first or name
+
