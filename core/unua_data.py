@@ -224,8 +224,10 @@ class UnuaService:
             return return_data
         equipments = player.get("equipments") or []
         talents = player.get("talents") or []
+        _equip_colors = {0: "#9ca3af", 1: "#9ca3af", 2: "#22c55e", 3: "#60a5fa", 4: "#c084fc", 5: "#fb923c"}
         for eq in equipments:
             eq["icon"] = url_to_data_uri(eq.get("icon") or "")
+            eq["color"] = _equip_colors.get(eq.get("quality", 0), "#9ca3af")
         for t in talents:
             t["icon"] = url_to_data_uri(t.get("icon") or "")
         card_data_uri = url_to_data_uri(card_url, shrink=True) if card_url else ""
@@ -258,6 +260,7 @@ class UnuaService:
             self._session.close()
         except Exception:
             pass
+
 
 
 

@@ -127,14 +127,14 @@
                 <div class="meta">{{ data.zone }} · {{ data.server }} · {{ data.kungfu }}诀</div>
             </div>
             <div class="equip-list">
-                {% set color_map = {0:'#9ca3af', 1:'#9ca3af', 2:'#22c55e', 3:'#60a5fa', 4:'#c084fc', 5:'#fb923c'} %}
+                
                 {% for eq in data.equipments %}
                 <div class="equip-item">
-                    <div class="equip-icon" style="background: {{ color_map.get(eq.quality, '#9ca3af') }}12; border: 2px solid {{ color_map.get(eq.quality, '#9ca3af') }}40;">
+                    <div class="equip-icon" style="background: {{ eq.color }}12; border: 2px solid {{ eq.color }}40;">
                         <img src="{{ eq.icon }}" alt="">
                     </div>
                     <div class="equip-info">
-                        <div class="equip-name" style="color: {{ color_map.get(eq.quality, '#9ca3af') }};">{{ eq.name }}</div>
+                        <div class="equip-name" style="color: {{ eq.color }};">{{ eq.name }}</div>
                         <div class="equip-sub">品质 {{ eq.quality }} · 强化 +{{ eq.strength_level }}</div>
                     </div>
                     <svg class="deco" style="right:38%;top:20%;width:8px;height:8px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#f9a8d4"/></svg><div class="equip-right">
@@ -185,4 +185,5 @@
     </div>
 </body>
 </html>
+
 
