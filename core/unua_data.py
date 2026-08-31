@@ -1,8 +1,10 @@
 """unua.top 推栏数据源：角色在线状态与属性查询。"""
 
+import base64
 import hashlib
 import json
 import logging
+import mimetypes
 import secrets
 import time
 from typing import Any, Dict, Optional
@@ -12,6 +14,21 @@ import requests
 logger = logging.getLogger(__name__)
 
 UNUA_BASE = "https://jx3.unua.top"
+def url_to_data_uri(url: str, timeout: int = 8) -> str:
+    """下载图片 URL 并转为 base64 data URI，失败时返回空串。不落盘，用完由调用方清理。"""
+    if not url or url.startswith("data:"):
+        return url
+    try:
+        r = requests.get(url, timeout=timeout)
+        r.raise_for_status()
+        mime = r.headers.get("Content-Type") or mimetypes.guess_type(url)[0] or "image/png"
+        if ";" in mime:
+            mime = mime.split(";")[0].strip()
+        b64 = base64.b64encode(r.content).decode("ascii")
+        return f"data:{mime};base64,{b64}"
+    except Exception as e:
+        logger.warning(f"图片转 base64 失败 ({url[:60]}): {e}")
+        return ""
 
 
 class UnuaService:
@@ -174,6 +191,13 @@ class UnuaService:
         if not player:
             return_data["msg"] = "未在最近战绩中找到该角色的属性数据"
             return return_data
+        equipments = player.get("equipments") or []
+        talents = player.get("talents") or []
+        for eq in equipments:
+            eq["icon"] = url_to_data_uri(eq.get("icon") or "")
+        for t in talents:
+            t["icon"] = url_to_data_uri(t.get("icon") or "")
+        card_data_uri = url_to_data_uri(card_url) if card_url else ""
         return_data["data"] = {
             "roleName": name,
             "server": profile.get("server") or "",
@@ -183,12 +207,12 @@ class UnuaService:
             "bodyType": profile.get("bodyType") or "",
             "camp": profile.get("camp") or "",
             "tongName": tong_name,
-            "cardUrl": card_url,
+            "cardUrl": card_data_uri,
             "avatar": profile.get("avatar") or "",
             "matchId": match_id,
             "qualities": player.get("qualities") or [],
-            "equipments": player.get("equipments") or [],
-            "talents": player.get("talents") or [],
+            "equipments": equipments,
+            "talents": talents,
             "stats": profile.get("stats") or [],
             "playerStats": player.get("stats") or {},
         }
@@ -203,3 +227,5 @@ class UnuaService:
             self._session.close()
         except Exception:
             pass
+
+
