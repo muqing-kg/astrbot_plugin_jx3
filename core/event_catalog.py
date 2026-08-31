@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
+import hashlib
+import json
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -181,42 +183,21 @@ KIND_ACTIONS = {
 
 
 def event_dedupe_key(action: int | str | None, payload: dict[str, Any] | None = None) -> str:
-    data = payload or {}
+    """Stable v2 fingerprint over the complete event payload."""
     try:
         code = int(action)
     except (TypeError, ValueError):
         code = 0
-    server = str(data.get("server") or "").strip()
-    names = data.get("name")
-    if isinstance(names, list):
-        names = "、".join(str(item) for item in names if str(item).strip())
-    tongs = data.get("tong_name", data.get("tong_names"))
-    if isinstance(tongs, list):
-        tongs = "、".join(str(item) for item in tongs if str(item).strip())
-    parts = [
-        str(code),
-        server,
-        str(data.get("status") if data.get("status") is not None else ""),
-        str(data.get("time") or data.get("date") or data.get("url") or data.get("title") or ""),
-        str(data.get("map_name") or data.get("event") or data.get("horse") or data.get("item_name") or ""),
-        str(names or data.get("role_name") or data.get("capture_role_name") or data.get("auction_role_name") or ""),
-    ]
-    if code in {1114, 1117, 1118, 1122}:
-        parts.extend((
-            str(data.get("camp_name") or ""),
-            str(data.get("castle_name") or ""),
-            str(tongs or ""),
-            str(data.get("chief_tong_name") or ""),
-            str(data.get("split_amount") or ""),
-        ))
-    if code == 2003:
-        parts.extend((
-            str(data.get("now_version") or ""),
-            str(data.get("new_version") or ""),
-            str(data.get("package_num") or ""),
-            str(data.get("package_size") or ""),
-        ))
-    return ":".join(parts)
+
+    canonical = json.dumps(
+        payload if payload is not None else {},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
+    digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return f"v2:{code}:{digest}"
 
 
 def resolve_push_kind(action: int | str | None) -> str:
