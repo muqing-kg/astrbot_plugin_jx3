@@ -12,6 +12,7 @@ from .core.group_info import ensure_group_display_name
 from .core.jx3api_data import JX3APIService
 from .core.aijx3_data import AIJX3Service
 from .core.jx3box_data import JX3BOXService
+from .core.unua_data import UnuaService
 from .core.async_task import AsyncTask
 from .core.message import MessageBuilder
 from .core.fun_basic import load_as_base64
@@ -160,6 +161,7 @@ class Jx3ApiPlugin(Star):
         self.jx3api = JX3APIService(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.aijx3 = AIJX3Service(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.jx3box = JX3BOXService(self.conf, self.plugin_sql_db, self.local_sql_db)
+        self.unua = UnuaService()
         self.jx3at = AsyncTask(
             cast(Context, self.context),
             self.conf,
@@ -167,7 +169,7 @@ class Jx3ApiPlugin(Star):
             self.jx3box,
             self.sessions,
         )
-        self.jx3cmd = MessageBuilder("", self.jx3api, self.aijx3, self.jx3box, self.jx3at, self.icons)
+        self.jx3cmd = MessageBuilder("", self.jx3api, self.aijx3, self.jx3box, self.unua, self.jx3at, self.icons)
         self.settings = PluginSettings(self.local_sql_db)
         self.command_catalog = apply_command_overrides({})
         self.server_catalog = apply_alias_overrides({})
@@ -247,6 +249,8 @@ class Jx3ApiPlugin(Star):
             "百战": self.jx3cmd.baizhan,
             "成就": self.jx3cmd.chengjiu,
             "角色": self.jx3cmd.jueshe,
+            "在线": self.jx3cmd.unua_online,
+            "属性": self.jx3cmd.unua_attribute,
             "阵眼": self.jx3cmd.zhenyan,
             "配装": self.jx3cmd.peizhuang,
             "资历排行": self.jx3cmd.zilipaixing,

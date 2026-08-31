@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ data.roleName }} - 角色属性</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background: #faf5f7;
+            padding: 18px;
+            width: 960px;
+        }
+        .deco { position: absolute; pointer-events: none; opacity: 0.1; z-index: 0; }
+        .container { display: flex; gap: 14px; max-width: 924px; margin: 0 auto; }
+        .sidebar { width: 240px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
+        .card {
+            position: relative; overflow: hidden;
+            background: #fff; border: 1px solid #f0e0e8;
+            border-radius: 14px; padding: 14px 16px;
+            box-shadow: 0 2px 8px rgba(200, 160, 180, 0.08);
+        }
+        .role-name { font-size: 22px; font-weight: 600; color: #9d174d; text-align: center; }
+        .role-sub { font-size: 11px; color: #c4a0b0; text-align: center; margin-top: 3px; }
+        .section-title {
+            font-size: 13px; font-weight: 600; color: #9d174d;
+            margin-bottom: 8px; padding-left: 7px; border-left: 3px solid #d4a0b8;
+        }
+        .attr-row { display: flex; justify-content: space-between; padding: 2.5px 0; font-size: 12.5px; }
+        .attr-row .label { color: #8b7a82; }
+        .attr-row .value { color: #8b7a82; }
+        .card-img { width: 100%; border-radius: 10px; display: block; margin-top: 4px; }
+        .main-area { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+        .page-title {
+            position: relative; overflow: hidden;
+            text-align: center; padding: 12px; border-radius: 14px;
+            background: #fff; border: 1px solid #f0e0e8;
+            box-shadow: 0 2px 8px rgba(200, 160, 180, 0.08);
+        }
+        .page-title .kicker { font-size: 9px; color: #d4a0b8; letter-spacing: 5px; text-transform: uppercase; }
+        .page-title h1 { font-size: 24px; color: #9d174d; font-weight: 700; margin-top: 2px; }
+        .page-title .meta { font-size: 11px; color: #c4a0b0; margin-top: 4px; }
+        .equip-list { display: flex; flex-direction: column; gap: 5px; }
+        .equip-item {
+            display: flex; align-items: center; gap: 10px;
+            background: #fff; border: 1px solid #f0e0e8;
+            border-radius: 12px; padding: 8px 12px;
+            box-shadow: 0 1px 4px rgba(200, 160, 180, 0.05);
+        }
+        .equip-icon {
+            width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .equip-icon img { width: 36px; height: 36px; border-radius: 8px; }
+        .equip-info { flex: 1; min-width: 0; }
+        .equip-name { font-size: 13px; font-weight: 700; }
+        .equip-sub { font-size: 10.5px; color: #a08a94; margin-top: 1px; }
+        .equip-right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+        .stars { font-size: 12px; color: #fbbf24; letter-spacing: 1.5px; }
+        .talent-card {
+            position: relative; overflow: hidden;
+            background: #fff; border: 1px solid #f0e0e8;
+            border-radius: 14px; padding: 10px 14px; text-align: center;
+            box-shadow: 0 2px 8px rgba(200, 160, 180, 0.08);
+        }
+        .talent-row { display: flex; gap: 8px; justify-content: center; }
+        .talent-item { text-align: center; width: 58px; }
+        .talent-item img { width: 44px; height: 44px; border-radius: 10px; border: 2px solid #f0e0e8; }
+        .talent-item .tname { font-size: 9.5px; color: #8b7a82; margin-top: 2px; }
+        .footer-note { text-align: center; font-size: 9.5px; color: #d4a0b8; opacity: 0.4; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="card" style="text-align: center; padding: 18px 14px;">
+                <svg class="deco" style="right:-6px;top:-8px;width:28px;height:28px" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ec4899"/></svg>
+                <svg class="deco" style="left:8px;bottom:4px;width:16px;height:16px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#f9a8d4"/></svg>
+                <div class="role-name">{{ data.roleName }}</div>
+                <div class="role-sub">{{ data.server }} · 竞技对抗</div>
+            </div>
+            <div class="card">
+                <svg class="deco" style="right:-4px;top:-6px;width:20px;height:20px" viewBox="0 0 24 24"><path d="M12 2L9 12h7l-5 8 1-6h-6l3-8z" fill="#f9a8d4"/></svg>
+                <svg class="deco" style="right:14px;top:45%;width:14px;height:14px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#ec4899"/></svg><svg class="deco" style="right:50%;bottom:10px;width:10px;height:10px" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#f9a8d4"/></svg>
+                <div class="section-title">角色信息</div>
+                <div class="attr-row"><span class="label">门派</span><span class="value">{{ data.faction }}</span></div>
+                <div class="attr-row"><span class="label">心法</span><span class="value">{{ data.kungfu }}</span></div>
+                <div class="attr-row"><span class="label">体型</span><span class="value">{{ data.bodyType }}</span></div>
+                <div class="attr-row"><span class="label">阵营</span><span class="value">{{ data.camp }}</span></div>
+                {% if data.tongName %}
+                <div class="attr-row"><span class="label">帮会</span><span class="value">{{ data.tongName }}</span></div>
+                {% endif %}
+            </div>
+            <div class="card">
+                <svg class="deco" style="right:10px;bottom:-4px;width:18px;height:18px" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#f9a8d4"/></svg><svg class="deco" style="left:45%;top:55%;width:12px;height:12px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#f9a8d4"/></svg>
+                <div class="section-title">基础属性</div>
+                {% for q in data.qualities %}
+                {% if q.label in ['会心', '破防', '无双', '破招'] %}
+                <div class="attr-row"><span class="label">{{ q.label }}</span><span class="value">{{ q.value }}</span></div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            <div class="card">
+                <svg class="deco" style="left:-4px;top:40%;width:14px;height:14px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ec4899"/></svg>
+                <svg class="deco" style="right:12px;bottom:10px;width:10px;height:10px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#f9a8d4"/></svg><svg class="deco" style="right:35%;top:30%;width:10px;height:10px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="#ec4899"/></svg><svg class="deco" style="left:60%;bottom:35%;width:9px;height:9px" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ec4899"/></svg>
+                <div class="section-title">详细属性</div>
+                {% for q in data.qualities %}
+                {% if q.label not in ['会心', '破防', '无双', '破招'] %}
+                <div class="attr-row"><span class="label">{{ q.label }}</span><span class="value">{{ q.value }}</span></div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% if data.cardUrl %}
+            <div class="card">
+                <div class="section-title">角色名片</div>
+                <img class="card-img" src="{{ data.cardUrl }}" alt="" onerror="this.style.display='none'">
+            </div>
+            {% endif %}
+        </div>
+        <div class="main-area">
+            <div class="page-title">
+                <svg class="deco" style="right:20px;top:8px;width:22px;height:22px" viewBox="0 0 24 24"><path d="M12 2L9 12h7l-5 8 1-6h-6l3-8z" fill="#f9a8d4"/></svg>
+                <svg class="deco" style="left:16px;bottom:6px;width:14px;height:14px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#ec4899"/></svg><svg class="deco" style="right:38%;top:12px;width:10px;height:10px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="#f9a8d4"/></svg>
+                <div class="kicker">JX3 · Character Archive · 角色档案</div>
+                <h1>装备档案</h1>
+                <div class="meta">{{ data.zone }} · {{ data.server }} · {{ data.kungfu }}诀</div>
+            </div>
+            <div class="equip-list">
+                {% set color_map = {0:'#9ca3af', 1:'#9ca3af', 2:'#22c55e', 3:'#60a5fa', 4:'#c084fc', 5:'#fb923c'} %}
+                {% for eq in data.equipments %}
+                <div class="equip-item">
+                    <div class="equip-icon" style="background: {{ color_map.get(eq.quality, '#9ca3af') }}12; border: 2px solid {{ color_map.get(eq.quality, '#9ca3af') }}40;">
+                        <img src="{{ eq.icon }}" alt="">
+                    </div>
+                    <div class="equip-info">
+                        <div class="equip-name" style="color: {{ color_map.get(eq.quality, '#9ca3af') }};">{{ eq.name }}</div>
+                        <div class="equip-sub">品质 {{ eq.quality }} · 强化 +{{ eq.strength_level }}</div>
+                    </div>
+                    <svg class="deco" style="right:38%;top:20%;width:8px;height:8px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#f9a8d4"/></svg><div class="equip-right">
+                        <div class="stars">{% for i in range(eq.strength_level|default(0)|int) %}★{% endfor %}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if data.talents %}
+            <div class="talent-card">
+                <svg class="deco" style="left:10px;top:6px;width:16px;height:16px" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#f9a8d4"/></svg>
+                <svg class="deco" style="right:14px;bottom:4px;width:12px;height:12px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#ec4899"/></svg>
+                <div class="section-title" style="text-align: center; border: none; padding: 0;">奇穴</div>
+                <div class="talent-row">
+                    {% for t in data.talents %}
+                    <div class="talent-item">
+                        <img src="{{ t.icon }}" alt="{{ t.name }}">
+                        <div class="tname">{{ t.name }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            <div class="card" style="margin-top: 0;">
+                <svg class="deco" style="right:8px;top:8px;width:18px;height:18px" viewBox="0 0 24 24"><path d="M12 2L9 12h7l-5 8 1-6h-6l3-8z" fill="#ec4899"/></svg>
+                <svg class="deco" style="left:10px;bottom:6px;width:10px;height:10px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#f9a8d4"/></svg><svg class="deco" style="right:42%;top:40%;width:11px;height:11px" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#f9a8d4"/></svg>
+                <div class="section-title">竞技场战绩</div>
+                <div style="display: flex; gap: 12px; justify-content: space-around;">
+                    {% for s in data.stats %}
+                    <div style="text-align: center;">
+                        <div style="font-size: 11px; color: #8b7a82;">{{ s.mode }}</div>
+                        <div style="font-size: 16px; font-weight: 600; color: #9d174d;">{{ s.score }}</div>
+                        <div style="font-size: 10px; color: #a08a94;">{{ s.wins }}胜/{{ s.total }}场</div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if data.playerStats %}
+                <div style="display: flex; gap: 8px; justify-content: center; margin-top: 8px; flex-wrap: wrap;">
+                    <span style="font-size: 10.5px; color: #8b7a82;">近期: KDA {{ data.playerStats.kda }}</span>
+                    <span style="font-size: 10.5px; color: #8b7a82;">伤害 {{ data.playerStats.damage }}</span>
+                    <span style="font-size: 10.5px; color: #8b7a82;">治疗 {{ data.playerStats.heal }}</span>
+                    <span style="font-size: 10.5px; color: #8b7a82;">胜率 {{ data.playerStats.wins }}/{{ data.playerStats.total }}</span>
+                </div>
+                {% endif %}
+            </div>
+            <div class="footer-note">数据来源：推栏 · 最近竞技场快照</div>
+        </div>
+    </div>
+</body>
+</html>
+
