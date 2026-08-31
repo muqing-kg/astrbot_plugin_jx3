@@ -130,7 +130,6 @@ class MessageBuilder:
         "江湖浪客榜", "决斗挑战榜", "资历排行", "名士排行", "江湖排行",
         "兵甲排行", "名师排行", "阵营排行", "薪火排行", "家园排行",
         "浩气神兵排行", "恶人神兵排行", "浩气爱心排行", "恶人爱心排行",
-        "试炼之地排行",
     )
     ZHANGONG_ALL = (
         "本周恶人战功榜", "上周恶人战功榜", "赛季恶人战功榜",
@@ -322,7 +321,7 @@ class MessageBuilder:
         text = str(menu_text).rstrip()
         resolved = False
         if "发送序号即可" not in text:
-            text += "\n\n发送序号即可，10 秒后自动选 1"
+            text += f"\n\n发送序号即可，{timeout} 秒后自动选 1"
         await event.send(event.plain_result(text))
         user_id = event.get_sender_id()
 
@@ -375,9 +374,10 @@ class MessageBuilder:
         title: str,
         ids: tuple[str, ...],
         runner,
+        timeout: int = 10,
     ):
         lines = "\n".join(f"{index}. {self._cmd_display_name(item)}" for index, item in enumerate(ids, 1))
-        await self._send_choice_and_wait(event, f"{title}\n{lines}", len(ids), runner)
+        await self._send_choice_and_wait(event, f"{title}\n{lines}", len(ids), runner, timeout=timeout)
 
     async def send_command_menu(
         self,
@@ -385,8 +385,9 @@ class MessageBuilder:
         title: str,
         ids: tuple[str, ...],
         runner,
+        timeout: int = 10,
     ):
-        await self._send_command_menu(event, title, ids, runner)
+        await self._send_command_menu(event, title, ids, runner, timeout=timeout)
 
     async def handler_plain_image_msg(self, event: AstrMessageEvent, action1, action2):
         """两轮会话：先发文字序号列表，选择后返回正文与图片"""
@@ -732,31 +733,6 @@ class MessageBuilder:
             pass
         return await self.plain_msg(event, lambda: self.unua.role_online(server, name, tong_name))
 
-    async def  unua_attribute(self, event: AstrMessageEvent, server: str, name: str):
-        """ 属性 服务器 角色名 """
-        tong_name = ""
-        card_url = ""
-        try:
-            detail = await self.jx3api._base_request(
-                "/role/detail", {"server": server, "name": name, "history": 0, "token": self.jx3api.token}
-            )
-            if isinstance(detail, dict):
-                tong_name = str(detail.get("tongName") or "").strip()
-        except Exception:
-            pass
-        try:
-            card = await self.jx3api._base_request(
-                "/card/cached", {"server": server, "name": name, "token": self.jx3api.token}
-            )
-            if isinstance(card, dict):
-                card_url = str(card.get("showAvatar") or "").strip()
-        except Exception:
-            pass
-        return await self.raw_image_msg(
-            event, lambda: self.unua.role_attribute(server, name, template="standalone/unua_attribute.html",
-                                                     tong_name=tong_name, card_url=card_url)
-        )
-
     async def  zhenyan(self, event: AstrMessageEvent, name: str):
         """ 阵眼 心法"""
         return await self.plain_msg(event, lambda: self.jx3api.zhenyan(name))
@@ -882,3 +858,5 @@ class MessageBuilder:
     async def  jiaoyihang(self, event: AstrMessageEvent,server: str, Name: str):
         """ 交易行 物品名称 服务器"""     
         return await self.T2I_image_msg(event, lambda: self.jx3box.jiaoyihang(Name,server))
+
+
