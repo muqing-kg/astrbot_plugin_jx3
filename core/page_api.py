@@ -6,6 +6,7 @@ from typing import Any
 
 from astrbot.api import logger
 
+from .group_info import refresh_missing_group_display_names
 from .page_payload import read_json_payload
 from .session_policy import is_group_umo
 
@@ -59,6 +60,7 @@ class SessionPageAPI:
     async def list_sessions(self):
         await self.plugin.sessions.mark_astrbot_admin_claims(self.plugin._astrbot_admin_ids())
         rows = await self.plugin.sessions.list_bound()
+        rows = await refresh_missing_group_display_names(self.plugin.context, self.plugin.sessions, rows)
         has_global_ticket = bool(self.plugin._global_ticket())
         has_global_token = bool(self.plugin._global_token())
         has_global_push_token = bool(self.plugin._global_push_token())
