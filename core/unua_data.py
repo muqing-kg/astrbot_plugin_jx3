@@ -103,12 +103,17 @@ class UnuaService:
         data = self._post("/api/player/home-page", {"roleName": name, "server": server, "mode": "local"})
         if not data:
             return None
-        rr = data.get("resolvedRole")
+        rr = data.get("resolvedRole") or {}
+        profile = data.get("profile") or {}
+        result = dict(rr)
+        if isinstance(profile, dict):
+            for key in ("faction", "bodyType", "camp", "kungfu"):
+                if not result.get(key) and profile.get(key):
+                    result[key] = profile[key]
         if isinstance(rr, dict) and rr.get("roleid"):
-            return rr
-        profile = data.get("profile")
+            return result
         if isinstance(profile, dict) and profile.get("roleid"):
-            return profile
+            return result
         return None
 
     async def role_online(self, server: str, name: str, tong_name: str = "") -> Dict[str, Any]:
@@ -227,5 +232,6 @@ class UnuaService:
             self._session.close()
         except Exception:
             pass
+
 
 
