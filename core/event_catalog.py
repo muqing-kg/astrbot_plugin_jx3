@@ -209,6 +209,13 @@ def event_dedupe_key(action: int | str | None, payload: dict[str, Any] | None = 
             str(data.get("chief_tong_name") or ""),
             str(data.get("split_amount") or ""),
         ))
+    if code == 2003:
+        parts.extend((
+            str(data.get("now_version") or ""),
+            str(data.get("new_version") or ""),
+            str(data.get("package_num") or ""),
+            str(data.get("package_size") or ""),
+        ))
     return ":".join(parts)
 
 
