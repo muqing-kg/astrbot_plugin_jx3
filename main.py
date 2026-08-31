@@ -8,6 +8,7 @@ from astrbot.api import logger
 from astrbot.api import AstrBotConfig
 
 from .core.sqlite import AsyncSQLiteDB
+from .core.group_info import ensure_group_display_name
 from .core.jx3api_data import JX3APIService
 from .core.aijx3_data import AIJX3Service
 from .core.jx3box_data import JX3BOXService
@@ -867,6 +868,7 @@ class Jx3ApiPlugin(Star):
             self._event_display_name(event),
             is_private=self._is_private(event),
         )
+        row = await ensure_group_display_name(self.context, self.sessions, umo, row)
         if self._is_astrbot_admin(event):
             await self.sessions.reconcile_astrbot_admin_session(
                 umo,
