@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 
 from .event_catalog import push_arg_map
 
@@ -83,12 +84,27 @@ def valid_display_name(value: object) -> bool:
     return bool(text and text.upper() not in {"N/A", "NULL", "NONE"})
 
 
-def resolve_display_name(event_name: object, fallback: object = "") -> str:
+def is_placeholder_display_name(value: object, group_id: object = "") -> bool:
+    text = str(value or "").strip()
+    if not valid_display_name(text):
+        return True
+    normalized = re.sub(r"[\s:：]+", "", text).lower()
+    target = re.sub(r"[\s:：]+", "", str(group_id or "")).lower()
+    if target and normalized == target:
+        return True
+    return bool(re.fullmatch(r"群(?:组)?[:：\s]*\d+", text, re.IGNORECASE))
+
+
+def resolve_display_name(
+    event_name: object,
+    fallback: object = "",
+    group_id: object = "",
+) -> str:
     event = str(event_name or "").strip()
-    if valid_display_name(event):
+    if not is_placeholder_display_name(event, group_id):
         return event
     stored = str(fallback or "").strip()
-    return stored if valid_display_name(stored) else ""
+    return "" if is_placeholder_display_name(stored, group_id) else stored
 
 
 def resolve_query_server(explicit: str, bound: str) -> str:

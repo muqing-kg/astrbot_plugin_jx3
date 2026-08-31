@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from .session_policy import is_group_umo, parse_umo, valid_display_name
+from .session_policy import (
+    is_group_umo,
+    is_placeholder_display_name,
+    parse_umo,
+)
 
 
 def _group_info_payload(response: Any) -> dict[str, Any]:
@@ -30,7 +34,7 @@ async def fetch_group_display_name(context: Any, umo: str) -> str:
         name = str(info.get("group_name") or info.get("name") or "").strip()
     except Exception:
         return ""
-    return name if valid_display_name(name) and name != group_id else ""
+    return "" if is_placeholder_display_name(name, group_id) else name
 
 
 async def ensure_group_display_name(
@@ -39,8 +43,9 @@ async def ensure_group_display_name(
     umo: str,
     row: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Reuse the event name when present, otherwise query and persist it."""
-    if valid_display_name((row or {}).get("display_name")):
+    """Reuse a real event name, and replace legacy ID placeholders."""
+    _, _, group_id = parse_umo(umo)
+    if not is_placeholder_display_name((row or {}).get("display_name"), group_id):
         return row or {}
     name = await fetch_group_display_name(context, umo)
     if not name:
@@ -56,12 +61,13 @@ async def refresh_missing_group_display_names(
     """Backfill missing display names while listing persisted sessions."""
     for index, row in enumerate(rows):
         umo = str(row.get("umo") or "")
-        if valid_display_name(row.get("display_name")):
+        _, _, group_id = parse_umo(umo)
+        if not is_placeholder_display_name(row.get("display_name"), group_id):
             continue
         name = await fetch_group_display_name(context, umo)
         if not name:
             continue
-        updated = await ensure_group_display_name(context, sessions, umo, row)
+        updated = await sessions.ensure(umo, name, is_private=False)
         if updated:
             rows[index] = updated
     return rows

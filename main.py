@@ -387,7 +387,11 @@ class Jx3ApiPlugin(Star):
         try:
             group_id = str(event.get_group_id() or "").strip()
             if group_id:
-                return resolve_display_name(self._group_display_name(event), fallback)
+                return resolve_display_name(
+                    self._group_display_name(event),
+                    fallback,
+                    group_id,
+                )
             sender = str(event.get_sender_id() or "").strip()
             name = self._sender_name(event)
             if name and name != sender:
