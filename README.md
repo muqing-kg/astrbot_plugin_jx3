@@ -326,7 +326,7 @@ flowchart LR
 
 - `session_config`：每个群聊的区服绑定和密钥。历史私聊会话会在初始化时清理。
 - `session_push_events`：每个群聊的独立推送事件开关，按官方 action 保存。
-- `push_state`：记录主动通知与赤兔轮询的去重状态，避免重复推送。
+- `push_state`：记录主动通知与赤兔轮询的去重状态；当前使用完整 payload 的 canonical SHA-256 指纹，避免字段缺失时把不同事件误判为重复。
 - `achievement_cache`：JSON 基础数据缓存及更新时间。
 
 随后连接随包的 `plugin_data.db`、启动已配置的后台任务，最后建立指令映射。插件停用时会关闭调度器、三个 HTTP Session 和两个 SQLite 连接。
@@ -441,7 +441,7 @@ AstrBot 的渲染接口接收完整 HTML 字符串，因此插件不会依赖渲
 - 本地旧状态；
 - 最近请求得到的新状态。
 
-调度任务取得业务数据后读取其中的 `status`。状态发生变化时，向所有 `umos` 发送 `data` 文本，并将新状态写回 `push_state` 表。插件卸载时会移除全部任务并以非等待方式关闭调度器。
+调度任务取得业务数据后生成版本化去重指纹。状态发生变化时，向所有 `umos` 发送 `data` 文本，并将新状态写回 `push_state` 表；旧版粗粒度指纹不参与新判断，后续新状态会覆盖旧状态。插件卸载时会移除全部任务并以非等待方式关闭调度器。
 
 开服与新闻任务使用 `JX3APIService`；刷马与赤兔任务使用 `JX3BOXService.machangxiaoxi()` 请求 Next2 马场消息接口，分别传入 `horse/foreshow` 和 `chitu-horse/share_msg`，并把最新消息 ID 作为状态值避免重复推送。
 

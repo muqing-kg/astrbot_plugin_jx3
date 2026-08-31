@@ -197,7 +197,10 @@ class AsyncTask:
         data = await self.jx3box.machangxiaoxi(server, "chitu-horse", "share_msg")
         if not isinstance(data, dict):
             return
-        status = str(data.get("status"))
+        status = event_dedupe_key(
+            action,
+            {"status": data.get("status"), "data": data.get("data")},
+        )
         old = await self.sessions.get_push_state(action, server)
         if old == status:
             return
