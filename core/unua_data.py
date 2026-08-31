@@ -94,7 +94,7 @@ class UnuaService:
             return profile
         return None
 
-    def role_online(self, server: str, name: str, tong_name: str = "") -> Dict[str, Any]:
+    async def role_online(self, server: str, name: str, tong_name: str = "") -> Dict[str, Any]:
         """查询角色在线状态。 tong_name 由调用方从 JX3API 补充。"""
         return_data: Dict[str, Any] = {"code": 0, "data": "", "msg": "功能函数未执行"}
         rr = self._resolve_role(server, name)
