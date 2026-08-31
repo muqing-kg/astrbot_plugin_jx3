@@ -752,7 +752,7 @@ class MessageBuilder:
                 card_url = str(card.get("showAvatar") or "").strip()
         except Exception:
             pass
-        return await self.T2I_image_msg(
+        return await self.raw_image_msg(
             event, lambda: self.unua.role_attribute(server, name, template="standalone/unua_attribute.html",
                                                      tong_name=tong_name, card_url=card_url)
         )
