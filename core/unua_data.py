@@ -14,7 +14,30 @@ import requests
 logger = logging.getLogger(__name__)
 
 UNUA_BASE = "https://jx3.unua.top"
-def url_to_data_uri(url: str, timeout: int = 8) -> str:
+def _shrink_image(data: bytes, mime: str, max_w: int = 480, quality: int = 75) -> tuple[bytes, str]:
+    """按需缩放图片，控制 base64 后体积在合理范围。"""
+    if mime not in ("image/png", "image/jpeg", "image/webp"):
+        return data, mime
+    try:
+        from PIL import Image
+        import io
+        img = Image.open(io.BytesIO(data))
+        img = img.convert("RGB")
+        w, h = img.size
+        if w > max_w:
+            ratio = max_w / w
+            img = img.resize((max_w, int(h * ratio)), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=quality)
+        out = buf.getvalue()
+        if len(out) < len(data):
+            return out, "image/jpeg"
+    except Exception as e:
+        logger.warning(f"图片压缩失败: {e}")
+    return data, mime
+
+
+def url_to_data_uri(url: str, timeout: int = 8, shrink: bool = False) -> str:
     """下载图片 URL 并转为 base64 data URI，失败时返回空串。不落盘，用完由调用方清理。"""
     if not url or url.startswith("data:"):
         return url
@@ -24,7 +47,10 @@ def url_to_data_uri(url: str, timeout: int = 8) -> str:
         mime = r.headers.get("Content-Type") or mimetypes.guess_type(url)[0] or "image/png"
         if ";" in mime:
             mime = mime.split(";")[0].strip()
-        b64 = base64.b64encode(r.content).decode("ascii")
+        content = r.content
+        if shrink:
+            content, mime = _shrink_image(content, mime)
+        b64 = base64.b64encode(content).decode("ascii")
         return f"data:{mime};base64,{b64}"
     except Exception as e:
         logger.warning(f"图片转 base64 失败 ({url[:60]}): {e}")
@@ -202,7 +228,7 @@ class UnuaService:
             eq["icon"] = url_to_data_uri(eq.get("icon") or "")
         for t in talents:
             t["icon"] = url_to_data_uri(t.get("icon") or "")
-        card_data_uri = url_to_data_uri(card_url) if card_url else ""
+        card_data_uri = url_to_data_uri(card_url, shrink=True) if card_url else ""
         return_data["data"] = {
             "roleName": name,
             "server": profile.get("server") or "",
@@ -232,6 +258,10 @@ class UnuaService:
             self._session.close()
         except Exception:
             pass
+
+
+
+
 
 
 
