@@ -60,7 +60,7 @@ def build_page_meta(template: str, payload: dict) -> str:
             _meta_pick(payload, "display_name"),
             server,
         ] if part)
-    if filename in {"juesheqiyu.html", "weizuoqiyu.html", "yanhuan.html", "jingnai.html", "chengjiu.html", "zili.html", "zhanji.html", "juesheliaotian.html"}:
+    if filename in {"card_gallery.html", "juesheqiyu.html", "weizuoqiyu.html", "yanhuan.html", "jingnai.html", "chengjiu.html", "zili.html", "zhanji.html", "juesheliaotian.html"}:
         parts = [part for part in [server, role] if part]
         if filename == "zhanji.html" and mode:
             parts.append(f"{_meta_mode_label(mode)} 模式")
