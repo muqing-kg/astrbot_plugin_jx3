@@ -83,6 +83,8 @@ button.danger[data-armed="true"] {
 }
 .status.error { color: #8b3b3b; }
 .cards { display: grid; gap: 12px; }
+.global-credentials { margin-bottom: 16px; }
+.global-card { margin-bottom: 12px; }
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -168,11 +170,6 @@ button.danger[data-armed="true"] {
   gap: 8px;
   font-size: 13px;
 }
-.credential-note {
-  color: #8a6d1f;
-  font-size: 12px;
-  line-height: 1.5;
-}
 .credential-pool {
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -209,6 +206,14 @@ button.danger[data-armed="true"] {
 .credential-empty {
   color: var(--muted);
   font-size: 12px;
+}
+.credential-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+.credential-actions button {
+  min-height: 30px;
+  padding: 4px 10px;
 }
 .empty {
   padding: 28px;

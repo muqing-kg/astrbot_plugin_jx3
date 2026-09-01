@@ -459,7 +459,7 @@ def hint_need_token(catalog: dict | None = None) -> str:
         f"2. 私聊发送：{token_cmd} <UMO> <你的接口令牌>\n"
         f"例如：{token_cmd} <UMO> <你的接口令牌>\n"
         "\n"
-        "也可让机器人管理员在插件页面为该会话填写，或勾选「使用全局接口令牌」。"
+        "也可让机器人管理员在插件页面为该会话填写，或在全局凭据区维护接口令牌。"
     )
 
 
@@ -481,7 +481,7 @@ def hint_need_ticket(catalog: dict | None = None) -> str:
     ticket_cmd = current_command_name(catalog, "推栏")
     return (
         "该功能需要推栏标识，当前未配置。\n"
-        "推栏默认使用全局配置；如需本会话单独使用，请私聊机器人（不要在群里发送）：\n"
+        "可在插件页面维护全局推栏标识池；如需本会话单独使用，请私聊机器人（不要在群里发送）：\n"
         "1. 在目标群聊发送 sid ，复制该群 UMO\n"
         f"2. 私聊发送：{ticket_cmd} <UMO> <你的推栏标识>\n"
         f"例如：{ticket_cmd} <UMO> <你的推栏标识>"

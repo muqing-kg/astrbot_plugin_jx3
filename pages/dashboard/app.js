@@ -1,4 +1,5 @@
 const statusEl = document.getElementById("status");
+const globalCredentialsEl = document.getElementById("globalCredentials");
 const cardsEl = document.getElementById("cards");
 const commandListEl = document.getElementById("commandList");
 const pushListEl = document.getElementById("pushList");
@@ -108,6 +109,71 @@ function credentialPool(title, items, emptyText, removed = false) {
   `;
 }
 
+function globalCredentialItem(item, kind) {
+  const skipped = item.status === "skipped";
+  const state = skipped ? "已跳过" : "可用";
+  const reason = item.failure_reason || "";
+  const time = skipped ? item.skipped_at : item.updated_at;
+  return `
+    <div class="credential-item${skipped ? " removed" : ""}">
+      <code>${escapeHtml(item.value || "")}</code>
+      <div class="credential-meta">
+        ${escapeHtml(state)}${reason ? ` · ${escapeHtml(reason)}` : ""}${time ? ` · ${escapeHtml(time)}` : ""}
+      </div>
+      <div class="credential-actions">
+        <button data-act="global-delete" data-id="${escapeHtml(item.id)}" data-kind="${escapeHtml(kind)}" class="ghost" type="button">移除</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderGlobalCredentials(payload) {
+  const tokens = payload.tokens || [];
+  const tickets = payload.tickets || [];
+  globalCredentialsEl.innerHTML = `
+    <article class="card global-card">
+      <div class="card-head">
+        <div>
+          <h2 class="card-title">全局凭据</h2>
+          <p class="umo">多条全局凭据自动轮询；未配置群属凭据的类型会使用这里。</p>
+        </div>
+      </div>
+      <div class="rows">
+        <div class="row">
+          <label class="field">
+            <span>添加全局接口令牌</span>
+            <input data-k="global-token" placeholder="一次添加一条" />
+          </label>
+          <div class="row-actions">
+            <button data-act="global-token" type="button">添加令牌</button>
+          </div>
+        </div>
+        <div class="credential-pool">
+          <div class="pool-title">全局接口令牌</div>
+          <div class="pool-items">
+            ${tokens.map((item) => globalCredentialItem(item, "token")).join("") || `<div class="credential-empty">未配置</div>`}
+          </div>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>添加全局推栏标识</span>
+            <input data-k="global-ticket" placeholder="一次添加一条" />
+          </label>
+          <div class="row-actions">
+            <button data-act="global-ticket" type="button">添加推栏</button>
+          </div>
+        </div>
+        <div class="credential-pool">
+          <div class="pool-title">全局推栏标识</div>
+          <div class="pool-items">
+            ${tickets.map((item) => globalCredentialItem(item, "ticket")).join("") || `<div class="credential-empty">未配置</div>`}
+          </div>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
 function setView(view) {
   currentView = view;
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -167,7 +233,6 @@ function sessionCard(row) {
         ${pill(row.server || "未绑定区服", Boolean(row.server))}
         ${sourcePill("接口令牌：" + TOKEN_SOURCE_TEXT[row.token_source || "none"], row.token_source || "none")}
         ${sourcePill("推送令牌：" + TOKEN_SOURCE_TEXT[row.push_token_source || "none"], row.push_token_source || "none")}
-        ${row.group_credentials_enabled ? pill("群属凭据已启用", true) : ""}
         ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
         ${pill(row.bot_enabled === false ? "机器人已关闭" : "机器人开启", row.bot_enabled !== false)}
         ${pill(
@@ -187,10 +252,6 @@ function sessionCard(row) {
         启用该会话机器人
       </label>
       <label class="toggle">
-        <input data-k="use_global" type="checkbox" ${row.group_credentials_enabled ? `disabled title="该群已启用群属凭据"` : ""} ${!row.group_credentials_enabled && row.use_global_token ? "checked" : ""} />
-        使用全局接口令牌
-      </label>
-      <label class="toggle">
         <input data-k="use_global_push_token" type="checkbox" ${row.use_global_push_token ? "checked" : ""} />
         使用全局推送令牌
       </label>
@@ -208,11 +269,11 @@ function sessionCard(row) {
       </div>
       <div class="row">
         <label class="field">
-          <span>${row.group_credentials_enabled ? "添加接口令牌" : "JX3API 接口令牌"}</span>
-          <input data-k="token" data-initial="${escapeHtml(row.group_credentials_enabled ? "" : row.token_display_value || "")}" value="${escapeHtml(row.group_credentials_enabled ? "" : row.token_display_value || "")}" placeholder="一次添加一条" />
+          <span>添加接口令牌</span>
+          <input data-k="token" data-initial="" value="" placeholder="一次添加一条" />
         </label>
         <div class="row-actions">
-          <button data-act="token" type="button">${row.group_credentials_enabled ? "添加令牌" : "保存令牌"}</button>
+          <button data-act="token" type="button">添加令牌</button>
           <button data-act="clear-token" class="ghost" type="button">清空可用令牌</button>
         </div>
       </div>
@@ -228,15 +289,14 @@ function sessionCard(row) {
       </div>
       <div class="row">
         <label class="field">
-          <span>${row.group_credentials_enabled ? "添加推栏标识" : "推栏标识"}</span>
-          <input data-k="ticket" data-initial="${escapeHtml(row.group_credentials_enabled ? "" : row.ticket_display_value || "")}" value="${escapeHtml(row.group_credentials_enabled ? "" : row.ticket_display_value || "")}" placeholder="一次添加一条" />
+          <span>添加推栏标识</span>
+          <input data-k="ticket" data-initial="" value="" placeholder="一次添加一条" />
         </label>
         <div class="row-actions">
-          <button data-act="ticket" type="button">${row.group_credentials_enabled ? "添加推栏" : "保存推栏"}</button>
+          <button data-act="ticket" type="button">添加推栏</button>
           <button data-act="clear-ticket" class="ghost" type="button">清空可用推栏</button>
         </div>
       </div>
-      ${row.group_credentials_enabled ? `<div class="credential-note">该群已启用群属凭据，全局接口令牌和推栏标识不可勾选。</div>` : ""}
       <div class="row">
         <label class="field">
           <span>授权管理 ID</span>
@@ -327,18 +387,6 @@ function sessionCard(row) {
     }
   });
 
-  card.querySelector('[data-k="use_global"]').addEventListener("change", async (ev) => {
-    const enabled = ev.target.checked;
-    try {
-      if (!row.umo) throw new Error("当前会话缺少标识");
-      await bridge.apiPost("page/sessions/use-global", { umo: row.umo, enabled, kind: "token" });
-      setStatus(enabled ? "已启用全局接口令牌" : "已关闭全局接口令牌");
-      await loadSessions();
-    } catch (err) {
-      ev.target.checked = !enabled;
-      setStatus(err.message || "保存失败", true);
-    }
-  });
   card.querySelector('[data-k="use_global_push_token"]').addEventListener("change", async (ev) => {
     const enabled = ev.target.checked;
     try {
@@ -490,6 +538,36 @@ async function loadSessions() {
   renderSessions(await bridge.apiGet("page/sessions"));
 }
 
+async function loadGlobalCredentials() {
+  renderGlobalCredentials(await bridge.apiGet("page/credentials"));
+}
+
+globalCredentialsEl.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest("button");
+  if (!btn) return;
+  const act = btn.dataset.act;
+  try {
+    if (act === "global-token" || act === "global-ticket") {
+      const input = globalCredentialsEl.querySelector(`[data-k="${act}"]`);
+      const value = (input?.value || "").trim();
+      if (!value) throw new Error(act === "global-token" ? "请填写全局接口令牌" : "请填写全局推栏标识");
+      await bridge.apiPost("page/credentials/add", {
+        kind: act === "global-token" ? "token" : "ticket",
+        value,
+      });
+      if (input) input.value = "";
+      setStatus("已保存");
+      await Promise.all([loadSessions(), loadGlobalCredentials()]);
+    } else if (act === "global-delete") {
+      await bridge.apiPost("page/credentials/delete", { id: Number(btn.dataset.id) });
+      setStatus("已移除全局凭据");
+      await Promise.all([loadSessions(), loadGlobalCredentials()]);
+    }
+  } catch (err) {
+    setStatus(err.message || "保存失败", true);
+  }
+});
+
 async function loadCommands() {
   renderCommands(await bridge.apiGet("page/commands"));
 }
@@ -506,7 +584,7 @@ async function loadCurrent() {
   if (currentView === "commands") return loadCommands();
   if (currentView === "push") return loadPush();
   if (currentView === "servers") return loadServers();
-  return loadSessions();
+  return Promise.all([loadSessions(), loadGlobalCredentials()]);
 }
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {

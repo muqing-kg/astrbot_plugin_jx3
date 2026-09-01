@@ -28,12 +28,15 @@ class SessionPageAPI:
         self.request = request
         routes = [
             ("/page/sessions", self.list_sessions, ["GET"], "列出会话绑定"),
+            ("/page/credentials", self.list_global_credentials, ["GET"], "列出全局凭据"),
+            ("/page/credentials/add", self.add_global_credential, ["POST"], "添加全局凭据"),
+            ("/page/credentials/delete", self.delete_global_credential, ["POST"], "删除全局凭据"),
             ("/page/sessions/bind", self.bind_session, ["POST"], "绑定会话区服"),
             ("/page/sessions/clear-server", self.clear_server, ["POST"], "清除会话区服"),
             ("/page/sessions/token", self.set_token, ["POST"], "设置会话接口令牌"),
             ("/page/sessions/push-token", self.set_push_token, ["POST"], "设置会话推送令牌"),
             ("/page/sessions/ticket", self.set_ticket, ["POST"], "设置会话推栏"),
-            ("/page/sessions/use-global", self.set_use_global, ["POST"], "设置是否使用全局接口/推送令牌"),
+            ("/page/sessions/use-global", self.set_use_global, ["POST"], "设置是否使用全局推送令牌"),
             ("/page/sessions/clear-secret", self.clear_secret, ["POST"], "清除会话密钥"),
             ("/page/sessions/bot", self.set_bot, ["POST"], "设置会话是否启用机器人"),
             ("/page/sessions/claim", self.clear_claim, ["POST"], "取消认领资格"),
@@ -61,8 +64,10 @@ class SessionPageAPI:
         await self.plugin.sessions.mark_astrbot_admin_claims(self.plugin._astrbot_admin_ids())
         rows = await self.plugin.sessions.list_bound()
         rows = await refresh_missing_group_display_names(self.plugin.context, self.plugin.sessions, rows)
-        has_global_ticket = bool(self.plugin._global_ticket())
-        has_global_token = bool(self.plugin._global_token())
+        global_tokens = await self.plugin.sessions.list_global_credentials("token", "active")
+        global_tickets = await self.plugin.sessions.list_global_credentials("ticket", "active")
+        has_global_ticket = bool(global_tickets)
+        has_global_token = bool(global_tokens)
         has_global_push_token = bool(self.plugin._global_push_token())
         sessions = []
         for row in rows:
@@ -85,17 +90,26 @@ class SessionPageAPI:
             tokens = await self.plugin.sessions.list_credentials(row.get("umo") or "", "token", "active")
             removed_tokens = await self.plugin.sessions.list_credentials(row.get("umo") or "", "token", "removed")
             tickets = await self.plugin.sessions.list_credentials(row.get("umo") or "", "ticket", "active")
-            group_enabled = bool(row.get("group_credentials_enabled"))
             item["tokens"] = tokens
             item["removed_tokens"] = removed_tokens
             item["tickets"] = tickets
-            item["group_credentials_enabled"] = group_enabled
-            if group_enabled:
-                item["token_source"] = "group" if tokens else "none"
-                item["token_status"] = f"{len(tokens)} 枚群属令牌" if tokens else "未配置"
-                item["has_token"] = bool(tokens)
-                item["ticket_status"] = f"{len(tickets)} 枚群属推栏标识" if tickets else "未配置"
-                item["has_ticket"] = bool(tickets)
+            if tokens:
+                item["token_source"] = "group"
+                item["token_status"] = f"{len(tokens)} 枚群属令牌"
+            elif has_global_token:
+                item["token_source"] = "global"
+                item["token_status"] = "已配置全局"
+            else:
+                item["token_source"] = "none"
+                item["token_status"] = "未配置"
+            item["has_token"] = bool(tokens or has_global_token)
+            if tickets:
+                item["ticket_status"] = f"{len(tickets)} 枚群属推栏标识"
+            elif has_global_ticket:
+                item["ticket_status"] = "使用全局"
+            else:
+                item["ticket_status"] = "未配置"
+            item["has_ticket"] = bool(tickets or has_global_ticket)
             sessions.append(item)
         return self.json_response({
             "sessions": sessions,
@@ -107,6 +121,67 @@ class SessionPageAPI:
 
     async def _payload(self) -> dict[str, Any]:
         return await read_json_payload(self.request)
+
+    async def list_global_credentials(self):
+        tokens = await self.plugin.sessions.list_global_credentials("token")
+        tickets = await self.plugin.sessions.list_global_credentials("ticket")
+        return self.json_response({
+            "tokens": tokens,
+            "tickets": tickets,
+            "skipped_tokens": await self.plugin.sessions.list_skipped_global_credentials(),
+        })
+
+    async def add_global_credential(self):
+        data = await self._payload()
+        kind = str(data.get("kind") or "").strip()
+        value = str(data.get("value") or "").strip()
+        if kind not in {"token", "ticket"}:
+            return self.error_response("不支持的凭据类型", status_code=400)
+        if not value:
+            label = "接口令牌" if kind == "token" else "推栏标识"
+            return self.error_response(f"缺少全局{label}", status_code=400)
+        if "," in value or "，" in value:
+            return self.error_response("一次只能添加一条全局凭据。", status_code=400)
+        existing = await self.plugin.sessions.get_global_credential(kind, value)
+        if existing and existing.get("status") == "active":
+            label = "接口令牌" if kind == "token" else "推栏标识"
+            return self.error_response(f"该全局{label}已在可用池中。", status_code=400)
+        if kind == "token":
+            from .credentials import validate_pool_token
+
+            ok, message, _remaining = await validate_pool_token(self.plugin.jx3api, value)
+            if not ok:
+                return self.error_response(f"全局接口令牌 {mask_for_user(value)} 校验失败：{message}", status_code=400)
+            if existing and existing.get("status") == "skipped":
+                await self.plugin.sessions.restore_global_token(value)
+            else:
+                await self.plugin.sessions.add_global_credential("token", value)
+        else:
+            pool_tokens = await self.plugin.sessions.list_active_global_credentials("token")
+            if not pool_tokens:
+                return self.error_response("校验全局推栏标识需要一条可用的全局接口令牌。", status_code=400)
+            from .credentials import validate_pool_ticket
+
+            ok, message, _retryable = await validate_pool_ticket(
+                self.plugin.jx3api, value, pool_tokens[0]
+            )
+            if not ok:
+                return self.error_response(f"全局推栏标识 {mask_for_user(value)} 校验失败：{message}", status_code=400)
+            await self.plugin.sessions.add_global_credential("ticket", value)
+        return self.json_response({"ok": True})
+
+    async def delete_global_credential(self):
+        data = await self._payload()
+        try:
+            credential_id = int(data.get("id") or 0)
+        except (TypeError, ValueError):
+            credential_id = 0
+        if credential_id <= 0:
+            return self.error_response("缺少凭据 ID", status_code=400)
+        deleted = await self.plugin.sessions.delete_global_credential(credential_id)
+        if not deleted:
+            return self.error_response("未找到该全局凭据", status_code=404)
+        return self.json_response({"ok": True})
 
     async def bind_session(self):
         data = await self._payload()
@@ -154,7 +229,6 @@ class SessionPageAPI:
         added = await self.plugin.sessions.add_active_credential(umo, "token", token)
         if not added:
             return self.error_response("该接口令牌已在可用池中。", status_code=400)
-        await self._disable_global_credentials(umo)
         return self.json_response({"ok": True})
 
     async def set_push_token(self):
@@ -187,7 +261,9 @@ class SessionPageAPI:
         if "," in ticket or "，" in ticket:
             return self.error_response("一次只能添加一条推栏标识。", status_code=400)
         pool_tokens = await self.plugin.sessions.list_active_credentials(umo, "token")
-        probe_token = pool_tokens[0] if pool_tokens else self.plugin._global_token()
+        if not pool_tokens:
+            pool_tokens = await self.plugin.sessions.list_active_global_credentials("token")
+        probe_token = pool_tokens[0] if pool_tokens else ""
         from .credentials import validate_pool_ticket
         ok, message, _ = await validate_pool_ticket(self.plugin.jx3api, ticket, probe_token)
         if not ok:
@@ -198,11 +274,7 @@ class SessionPageAPI:
         added = await self.plugin.sessions.add_active_credential(umo, "ticket", ticket)
         if not added:
             return self.error_response("该推栏标识已在可用池中。", status_code=400)
-        await self._disable_global_credentials(umo)
         return self.json_response({"ok": True})
-
-    async def _disable_global_credentials(self, umo: str):
-        await self.plugin._disable_global_credentials(umo)
 
     async def set_use_global(self):
         data = await self._payload()
@@ -219,10 +291,7 @@ class SessionPageAPI:
             await self.plugin.sessions.set_use_global_push_token(umo, enabled)
             await self.plugin.jx3at.refresh_jobs()
         else:
-            row = await self.plugin.sessions.get(umo)
-            if row and row.get("group_credentials_enabled"):
-                return self.error_response("该群已启用群属凭据，只能使用群属令牌。", status_code=400)
-            await self.plugin.sessions.set_use_global_token(umo, enabled)
+            return self.error_response("接口令牌会自动按群属池、全局池回退，无需手动切换。", status_code=400)
         return self.json_response({"ok": True})
 
     async def clear_secret(self):
