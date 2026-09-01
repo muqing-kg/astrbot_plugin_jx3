@@ -463,11 +463,14 @@ class JX3APIService:
             return return_data
         catalog = getattr(self, "command_catalog", None)
         page_meta = " · ".join(part for part in (display_name, server) if part)
+        update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        page_meta = " · ".join(part for part in (page_meta, update_time) if part)
         return_data["data"] = {
             "rows": help_rows(catalog, exclude_ids=HELP_EXCLUDED_COMMAND_IDS),
             "display_name": display_name,
             "server": server,
             "page_meta": page_meta,
+            "update_time": update_time,
         }
         return_data["code"] = 200
    
@@ -487,6 +490,7 @@ class JX3APIService:
         view = build_notice_view(display_name, server, enabled, getattr(self, "push_names", {}) or {})
         view["open_command"] = current_command_name(getattr(self, "command_catalog", None), "打开")
         view["close_command"] = current_command_name(getattr(self, "command_catalog", None), "关闭")
+        view["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         return_data["data"] = view
         return_data["code"] = 200
         return return_data
@@ -731,6 +735,7 @@ class JX3APIService:
             return_data["data"] = data
             return_data["data"]["server"] = server
             return_data["data"]["roleName"] = name
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             return_data["data"]["mode"] = mode
             return_data["data"]["mode_label"] = self._arena_mode_label(mode)
             
@@ -1288,6 +1293,7 @@ class JX3APIService:
                 "images": images,
                 "server": server,
                 "role": name,
+                "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
 
         return await self._request_api(
@@ -1328,6 +1334,7 @@ class JX3APIService:
             return_data["data"]["jsqy"] = []
             return_data["data"]["name"] = name
             return_data["data"]["server"] = server
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             for item in data:
                 try:
@@ -1460,7 +1467,7 @@ class JX3APIService:
                 "skill_stamina": data.get("skillStamina", ""),
                 "skill_count": data.get("skillCount", len(items)),
                 "items": items,
-                "update_time": format_time( data.get("updateTime"))
+                "update_time": format_time(data.get("updateTime")) or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             }
 
         return await self._request_api(
