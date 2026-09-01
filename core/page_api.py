@@ -8,7 +8,7 @@ from astrbot.api import logger
 
 from .group_info import refresh_missing_group_display_names
 from .page_payload import read_json_payload
-from .session_policy import is_group_umo
+from .session_policy import is_group_umo, mask_for_user
 
 PLUGIN_NAME = "astrbot_plugin_jx3"
 
@@ -82,6 +82,20 @@ class SessionPageAPI:
                 }
                 for manager in await self.plugin.sessions.list_managers(row.get("umo") or "")
             ]
+            tokens = await self.plugin.sessions.list_credentials(row.get("umo") or "", "token", "active")
+            removed_tokens = await self.plugin.sessions.list_credentials(row.get("umo") or "", "token", "removed")
+            tickets = await self.plugin.sessions.list_credentials(row.get("umo") or "", "ticket", "active")
+            group_enabled = bool(row.get("group_credentials_enabled"))
+            item["tokens"] = tokens
+            item["removed_tokens"] = removed_tokens
+            item["tickets"] = tickets
+            item["group_credentials_enabled"] = group_enabled
+            if group_enabled:
+                item["token_source"] = "group" if tokens else "none"
+                item["token_status"] = f"{len(tokens)} 枚群属令牌" if tokens else "未配置"
+                item["has_token"] = bool(tokens)
+                item["ticket_status"] = f"{len(tickets)} 枚群属推栏标识" if tickets else "未配置"
+                item["has_ticket"] = bool(tickets)
             sessions.append(item)
         return self.json_response({
             "sessions": sessions,
@@ -128,19 +142,19 @@ class SessionPageAPI:
             return self.error_response("缺少 umo 或接口令牌", status_code=400)
         if not is_group_umo(umo):
             return self.error_response("本插件只支持群聊会话", status_code=400)
-        values = [part.strip() for part in token.replace("，", ",").split(",") if part.strip()]
-        if not values:
-            return self.error_response("接口令牌不能为空", status_code=400)
-        for index, value in enumerate(values, 1):
-            result = await self.plugin.jx3api.token_stats(value)
-            if result.get("code") != 200 or result.get("valid") is False:
-                detail = str(result.get("msg") or "接口令牌不可用")
-                message = self.plugin.jx3api._token_error_message(detail)
-                return self.error_response(
-                    f"第 {index} 个接口令牌校验失败：{message}",
-                    status_code=400,
-                )
-        await self.plugin.sessions.set_token(umo, token)
+        if "," in token or "，" in token:
+            return self.error_response("一次只能添加一条接口令牌。", status_code=400)
+        from .credentials import validate_pool_token
+        ok, message, remaining = await validate_pool_token(self.plugin.jx3api, token)
+        if not ok:
+            return self.error_response(f"接口令牌 {mask_for_user(token)} 校验失败：{message}", status_code=400)
+        existing = await self.plugin.sessions.get_credential(umo, "token", token)
+        if existing and existing.get("status") == "active":
+            return self.error_response("该接口令牌已在可用池中。", status_code=400)
+        added = await self.plugin.sessions.add_active_credential(umo, "token", token)
+        if not added:
+            return self.error_response("该接口令牌已在可用池中。", status_code=400)
+        await self._disable_global_credentials(umo)
         return self.json_response({"ok": True})
 
     async def set_push_token(self):
@@ -151,20 +165,13 @@ class SessionPageAPI:
             return self.error_response("缺少 umo 或推送令牌", status_code=400)
         if not is_group_umo(umo):
             return self.error_response("本插件只支持群聊会话", status_code=400)
-        values = [part.strip() for part in token.replace("，", ",").split(",") if part.strip()]
-        if not values:
-            return self.error_response("推送令牌不能为空", status_code=400)
-        if len(values) > 1:
-            return self.error_response("推送令牌一次只能配置一枚；如需更换，请保存新的推送令牌。", status_code=400)
-        for index, value in enumerate(values, 1):
-            result = await self.plugin.jx3api.token_stats(value)
-            if result.get("code") != 200 or result.get("valid") is False:
-                detail = str(result.get("msg") or "推送令牌不可用")
-                message = self.plugin.jx3api._token_error_message(detail)
-                return self.error_response(
-                    f"第 {index} 个推送令牌校验失败：{message}",
-                    status_code=400,
-                )
+        if "," in token or "，" in token:
+            return self.error_response("推送令牌一次只能配置一枚。", status_code=400)
+        result = await self.plugin.jx3api.token_stats(token)
+        if result.get("code") != 200 or result.get("valid") is False:
+            detail = str(result.get("msg") or "推送令牌不可用")
+            message = self.plugin.jx3api._token_error_message(detail)
+            return self.error_response(f"推送令牌校验失败：{message}", status_code=400)
         await self.plugin.sessions.set_push_token(umo, token)
         await self.plugin.jx3at.refresh_jobs()
         return self.json_response({"ok": True})
@@ -177,25 +184,25 @@ class SessionPageAPI:
             return self.error_response("缺少 umo 或推栏标识", status_code=400)
         if not is_group_umo(umo):
             return self.error_response("本插件只支持群聊会话", status_code=400)
-        values = [part.strip() for part in ticket.replace("，", ",").split(",") if part.strip()]
-        if not values:
-            return self.error_response("推栏标识不能为空", status_code=400)
-        row = await self.plugin.sessions.get(umo)
-        from .session_policy import CREDENTIAL_MISSING
-        probe_token = self.plugin.sessions.resolve_token(row or {}, self.plugin._global_token())
-        if probe_token == CREDENTIAL_MISSING:
-            probe_token = ""
-        elif "," in probe_token:
-            probe_token = probe_token.split(",", 1)[0].strip()
-        for index, value in enumerate(values, 1):
-            ok, msg = await self.plugin.jx3api.validate_ticket(value, probe_token)
-            if not ok:
-                return self.error_response(
-                    f"第 {index} 个推栏标识校验失败：{msg}",
-                    status_code=400,
-                )
-        await self.plugin.sessions.set_ticket(umo, ticket)
+        if "," in ticket or "，" in ticket:
+            return self.error_response("一次只能添加一条推栏标识。", status_code=400)
+        pool_tokens = await self.plugin.sessions.list_active_credentials(umo, "token")
+        probe_token = pool_tokens[0] if pool_tokens else self.plugin._global_token()
+        from .credentials import validate_pool_ticket
+        ok, message, _ = await validate_pool_ticket(self.plugin.jx3api, ticket, probe_token)
+        if not ok:
+            return self.error_response(f"推栏标识 {mask_for_user(ticket)} 校验失败：{message}", status_code=400)
+        existing = await self.plugin.sessions.get_credential(umo, "ticket", ticket)
+        if existing and existing.get("status") == "active":
+            return self.error_response("该推栏标识已在可用池中。", status_code=400)
+        added = await self.plugin.sessions.add_active_credential(umo, "ticket", ticket)
+        if not added:
+            return self.error_response("该推栏标识已在可用池中。", status_code=400)
+        await self._disable_global_credentials(umo)
         return self.json_response({"ok": True})
+
+    async def _disable_global_credentials(self, umo: str):
+        await self.plugin._disable_global_credentials(umo)
 
     async def set_use_global(self):
         data = await self._payload()
@@ -212,6 +219,9 @@ class SessionPageAPI:
             await self.plugin.sessions.set_use_global_push_token(umo, enabled)
             await self.plugin.jx3at.refresh_jobs()
         else:
+            row = await self.plugin.sessions.get(umo)
+            if row and row.get("group_credentials_enabled"):
+                return self.error_response("该群已启用群属凭据，只能使用群属令牌。", status_code=400)
             await self.plugin.sessions.set_use_global_token(umo, enabled)
         return self.json_response({"ok": True})
 
@@ -225,7 +235,13 @@ class SessionPageAPI:
             return self.error_response("不支持的密钥类型", status_code=400)
         if not is_group_umo(umo):
             return self.error_response("本插件只支持群聊会话", status_code=400)
-        await self.plugin.sessions.clear_secret(umo, kind)
+        if kind in {"token", "ticket"}:
+            await self.plugin.sessions.sql.execute(
+                "DELETE FROM session_credentials WHERE umo=? AND kind=? AND status='active'",
+                (umo, kind),
+            )
+        else:
+            await self.plugin.sessions.clear_secret(umo, kind)
         if kind == "push_token":
             await self.plugin.jx3at.refresh_jobs()
         return self.json_response({"ok": True})

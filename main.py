@@ -25,6 +25,7 @@ from .core.session_policy import (
     UNBOUND_SERVER,
     UNKNOWN_SERVER,
     is_group_umo,
+    mask_for_user,
     CLAIM_PHRASE,
     resolve_display_name,
     hint_authorize_usage,
@@ -58,6 +59,8 @@ from .core.session_policy import (
     match_system_prefix,
     strip_command_prefix,
 )
+from .core.credential_runtime import execute_query_with_credentials
+from .core.credentials import CredentialRuntimeError
 from .core.credentials import reset_request_credentials, set_request_credentials
 from .core.mentions import mentioned_bot, mentioned_target, message_text_without_bot_mentions
 from .core.page_api import SessionPageAPI
@@ -88,6 +91,7 @@ class Jx3ApiPlugin(Star):
         self.load_local_base64()
         self.create_all()
         self.command_map = {}
+        self._credential_cursors: dict[str, int] = {}
         logger.info("jx3api插件初始化完成")
 
     async def initialize(self):
@@ -461,6 +465,82 @@ class Jx3ApiPlugin(Star):
             or ""
         ).strip()
 
+    def _group_credentials_enabled(self, row: dict | None) -> bool:
+        return bool((row or {}).get("group_credentials_enabled"))
+
+    async def _validation_token_for_group(self, row: dict | None) -> str:
+        umo = str((row or {}).get("umo") or "").strip()
+        if umo:
+            values = await self.sessions.list_active_credentials(umo, "token")
+            if values:
+                return values[0]
+        return self._global_token()
+
+    async def _disable_global_credentials(self, umo: str) -> None:
+        self.conf["jx3api_token"] = ""
+        self.conf["jx3api_ticket"] = ""
+        await self.sessions.set_use_global_token(umo, False)
+        save = getattr(self.conf, "save_config_async", None)
+        if callable(save):
+            await save()
+
+    async def _call_handler_with_credentials(
+        self,
+        event: AstrMessageEvent,
+        cmd_id: str,
+        handler,
+        args: list[str],
+        row: dict | None,
+    ):
+        token_required = cmd_id in NEED_TOKEN
+        ticket_required = cmd_id in NEED_TICKET
+        used_credentials = {"token": "", "ticket": ""}
+
+        async def runner(token: str, ticket: str):
+            used_credentials["token"] = token
+            used_credentials["ticket"] = ticket
+            creds = set_request_credentials(token or None, ticket or None)
+            try:
+                return await self._call_with_auto_args(handler, event, args)
+            finally:
+                reset_request_credentials(creds)
+
+        async def notify(message: str):
+            await event.send(event.plain_result(message))
+
+        if self._group_credentials_enabled(row):
+            return await execute_query_with_credentials(
+                runner,
+                jx3api=self.jx3api,
+                sessions=self.sessions,
+                umo=self._event_umo(event),
+                cursors=self._credential_cursors,
+                token_required=token_required,
+                ticket_required=ticket_required,
+                token_missing=hint_need_token(self.command_catalog),
+                ticket_missing=hint_need_ticket(self.command_catalog),
+                notify=notify,
+            )
+
+        token = self.sessions.resolve_token(row, self._global_token())
+        if token_required and token == CREDENTIAL_MISSING:
+            return hint_need_token(self.command_catalog)
+        if token == CREDENTIAL_MISSING:
+            token = ""
+
+        ticket = self.sessions.resolve_ticket(row, self._global_ticket())
+        if ticket_required and ticket == CREDENTIAL_MISSING:
+            return hint_need_ticket(self.command_catalog)
+        if ticket == CREDENTIAL_MISSING:
+            ticket = ""
+
+        try:
+            return await runner(token, ticket)
+        except CredentialRuntimeError as exc:
+            label = "接口令牌" if exc.kind == "token" else "推栏标识"
+            value = used_credentials.get(exc.kind, "")
+            return f"{label} {mask_for_user(value)}：{exc.reason}"
+
     async def _handle_admin_command(self, event: AstrMessageEvent, parts: list[str]):
         parsed = parse_admin_command(
             remap_admin_parts(parts, self.command_catalog),
@@ -542,6 +622,24 @@ class Jx3ApiPlugin(Star):
             if not await self._is_plugin_admin(event, umo=umo):
                 return event.plain_result(hint_need_claim(self.command_catalog))
             row = await self.sessions.get(umo)
+            if self._group_credentials_enabled(row):
+                pool_tokens = await self.sessions.list_active_credentials(umo, "token")
+                removed_tokens = await self.sessions.list_credentials(umo, "token", "removed")
+                blocks = []
+                for index, token in enumerate(pool_tokens, 1):
+                    data = await self.jx3api.token_stats(token)
+                    body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
+                    blocks.append(f"【群属接口令牌 {index}】\n{body}")
+                for row_data in removed_tokens:
+                    blocks.append(
+                        "【移除池接口令牌】\n"
+                        f"凭据：{mask_for_user(str(row_data.get('value') or ''))}\n"
+                        f"原因：{row_data.get('failure_reason') or '已移除'}\n"
+                        f"时间：{row_data.get('removed_at') or '未知'}"
+                    )
+                if not blocks:
+                    return event.plain_result(hint_need_token(self.command_catalog))
+                return event.plain_result("\n\n".join(blocks))
             session_token = ((row or {}).get("token") or "").strip()
             global_token = self._global_token()
             use_global = bool((row or {}).get("use_global_token"))
@@ -658,33 +756,42 @@ class Jx3ApiPlugin(Star):
             row = await self.sessions.get(target)
             if not row:
                 return event.plain_result(hint_umo_invalid())
-            values = [part.strip() for part in parsed.value.replace("，", ",").split(",") if part.strip()]
-            if not values:
+            value = parsed.value.strip()
+            if not value:
                 label = "接口令牌" if parsed.action == "set_token" else "推栏标识"
                 return event.plain_result(f"请填写需要保存的 {label}。")
+            if "," in value or "，" in value:
+                return event.plain_result("一次只能添加一条，请分次添加。")
+            existing = await self.sessions.get_credential(target, "token" if parsed.action == "set_token" else "ticket", value)
+            if existing and existing.get("status") == "active":
+                label = "接口令牌" if parsed.action == "set_token" else "推栏标识"
+                return event.plain_result(f"该{label}已在可用池中。")
             if parsed.action == "set_token":
-                for index, value in enumerate(values, 1):
-                    data = await self.jx3api.token_stats(value)
-                    if data.get("code") != 200 or data.get("valid") is False:
-                        detail = str(data.get("msg") or "接口令牌不可用")
-                        if "过期" in detail:
-                            detail = "JX3API 接口令牌已过期，请更换后再试。"
-                        elif any(key in detail for key in ("次数", "余额", "额度", "不足", "用尽")):
-                            detail = "JX3API 接口令牌次数已用尽，请更换或续费后再试。"
-                        return event.plain_result(f"第 {index} 个接口令牌校验失败：{detail}")
-                await self.sessions.set_token(target, parsed.value)
-                return event.plain_result(hint_secret_saved("token", target) + "\n已通过 JX3API 校验。")
-            probe_token = self.sessions.resolve_token(row, self._global_token())
-            if probe_token == CREDENTIAL_MISSING:
-                probe_token = ""
-            elif "," in probe_token:
-                probe_token = probe_token.split(",", 1)[0].strip()
-            for index, value in enumerate(values, 1):
-                ok, msg = await self.jx3api.validate_ticket(value, probe_token)
+                from .credentials import validate_pool_token
+
+                ok, message, _remaining = await validate_pool_token(self.jx3api, value)
                 if not ok:
-                    return event.plain_result(f"第 {index} 个推栏标识校验失败：{msg}")
-            await self.sessions.set_ticket(target, parsed.value)
-            return event.plain_result(hint_secret_saved("ticket", target) + "\n已通过真实接口校验。")
+                    return event.plain_result(f"接口令牌 {mask_for_user(value)} 校验失败：{message}")
+                await self.sessions.add_active_credential(target, "token", value)
+                await self._disable_global_credentials(target)
+                return event.plain_result(
+                    hint_secret_saved("token", target)
+                    + "\n已通过 JX3API 校验，并加入群属接口令牌池。"
+                )
+            from .credentials import validate_pool_ticket
+
+            probe_token = await self._validation_token_for_group(row)
+            if not probe_token:
+                return event.plain_result("校验推栏标识需要可用的 JX3API 接口令牌。")
+            ok, message, _retryable = await validate_pool_ticket(self.jx3api, value, probe_token)
+            if not ok:
+                return event.plain_result(f"推栏标识 {mask_for_user(value)} 校验失败：{message}")
+            await self.sessions.add_active_credential(target, "ticket", value)
+            await self._disable_global_credentials(target)
+            return event.plain_result(
+                hint_secret_saved("ticket", target)
+                + "\n已通过真实接口校验，并加入群属推栏标识池。"
+            )
         if parsed.action == "set_push_token":
             target = parsed.target.strip()
             if not is_group_umo(target):
@@ -783,32 +890,13 @@ class Jx3ApiPlugin(Star):
             return event.plain_result(hint_unknown_server())
         args = injected
 
-        if cmd_id in NEED_TOKEN:
-            token = self.sessions.resolve_token(row, self._global_token())
-            if token == CREDENTIAL_MISSING:
-                return event.plain_result(hint_need_token(self.command_catalog))
-        else:
-            token = self.sessions.resolve_token(row, self._global_token())
-            if token == CREDENTIAL_MISSING:
-                token = ""
-
-        if cmd_id in NEED_TICKET:
-            ticket = self.sessions.resolve_ticket(row, self._global_ticket())
-            if ticket == CREDENTIAL_MISSING:
-                return event.plain_result(hint_need_ticket(self.command_catalog))
-        else:
-            ticket = self.sessions.resolve_ticket(row, self._global_ticket())
-            if ticket == CREDENTIAL_MISSING:
-                ticket = ""
-
-        creds = set_request_credentials(token or None, ticket or None)
         try:
-            return await self._call_with_auto_args(handler, event, args)
+            return await self._call_handler_with_credentials(
+                event, cmd_id, handler, args, row
+            )
         except Exception as e:
             logger.exception(f"菜单子命令执行失败: {cmd_id}, error={e}")
             return event.plain_result(format_command_error(cmd_id, e, self.command_catalog))
-        finally:
-            reset_request_credentials(creds)
 
     async def _cmd_ranking(self, event: AstrMessageEvent, args: list[str]):
         ids = self.jx3cmd.RANKING_IDS
@@ -960,44 +1048,21 @@ class Jx3ApiPlugin(Star):
             return
         args = injected
 
-        if cmd in NEED_TOKEN:
-            token = self.sessions.resolve_token(row, self._global_token())
-            if token == CREDENTIAL_MISSING:
-                event.stop_event()
-                yield event.plain_result(hint_need_token(self.command_catalog))
-                return
-        else:
-            token = self.sessions.resolve_token(row, self._global_token())
-            if token == CREDENTIAL_MISSING:
-                token = ""
-
-        if cmd in NEED_TICKET:
-            ticket = self.sessions.resolve_ticket(row, self._global_ticket())
-            if ticket == CREDENTIAL_MISSING:
-                event.stop_event()
-                yield event.plain_result(hint_need_ticket(self.command_catalog))
-                return
-        else:
-            ticket = self.sessions.resolve_ticket(row, self._global_ticket())
-            if ticket == CREDENTIAL_MISSING:
-                ticket = ""
-
         if cmd == "名片":
             event.stop_event()
             yield await self._cmd_card(event, args)
             return
 
-        creds = set_request_credentials(token or None, ticket or None)
         try:
             event.stop_event()
-            ret = await self._call_with_auto_args(handler, event, args)
+            ret = await self._call_handler_with_credentials(
+                event, cmd, handler, args, row
+            )
             if ret is not None:
                 yield ret
         except Exception as e:
             logger.exception(f"指令执行失败: {cmd}, error={e}")
             yield event.plain_result(format_command_error(cmd, e, self.command_catalog))
-        finally:
-            reset_request_credentials(creds)
 
     def _forced_llm(self, event: AstrMessageEvent, text: str):
         """被 @ 后强制走 LLM 回话，并屏蔽默认链路避免重复回复。"""

@@ -71,6 +71,7 @@ class SessionStore:
             """
         )
         extra_columns = [
+            "group_credentials_enabled INTEGER DEFAULT 0",
             "push_token TEXT DEFAULT ''",
             "use_global_push_token INTEGER DEFAULT 0",
             "bot_enabled INTEGER DEFAULT 1",
@@ -158,6 +159,78 @@ class SessionStore:
             )
             """
         )
+        await self.sql.execute(
+            """
+            CREATE TABLE IF NOT EXISTS session_credentials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                umo TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                value TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                failure_reason TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                removed_at TEXT DEFAULT ''
+            )
+            """
+        )
+        await self.sql.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_session_credentials_active_value
+            ON session_credentials (umo, kind, value)
+            WHERE status='active'
+            """
+        )
+        await self.sql.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_session_credentials_pool
+            ON session_credentials (umo, kind, status)
+            """
+        )
+        credential_migration_row = await self.sql.select_one(
+            "schema_migrations", "name=?", ("session_credential_pools_v1",)
+        )
+        if not credential_migration_row:
+            rows = await self.list_all()
+            for row in rows:
+                umo = str(row.get("umo") or "")
+                if not umo or not is_group_umo(umo):
+                    continue
+                added = False
+                for kind, field in (("token", "token"), ("ticket", "ticket")):
+                    raw_values = str(row.get(field) or "").replace("，", ",")
+                    for value in [item.strip() for item in raw_values.split(",") if item.strip()]:
+                        try:
+                            await self.sql.execute(
+                                """
+                                INSERT OR IGNORE INTO session_credentials
+                                (umo, kind, value, status, created_at, updated_at)
+                                VALUES (?, ?, ?, 'active', ?, ?)
+                                """,
+                                (umo, kind, value, _now(), _now()),
+                            )
+                            added = True
+                        except Exception:
+                            continue
+                if added:
+                    await self.sql.execute(
+                        """
+                        UPDATE session_config
+                        SET group_credentials_enabled=1,
+                            use_global_token=0,
+                            token='',
+                            ticket=''
+                        WHERE umo=?
+                        """,
+                        (umo,),
+                    )
+            await self.sql.execute(
+                """
+                INSERT OR IGNORE INTO schema_migrations (name, completed_at)
+                VALUES (?, ?)
+                """,
+                ("session_credential_pools_v1", _now()),
+            )
         event_columns = {
             str(row.get("name") or "")
             for row in await self.sql.fetch_all("PRAGMA table_info(session_push_events)")
@@ -509,6 +582,7 @@ class SessionStore:
                 await self.sql.execute("DELETE FROM session_config WHERE umo=?", (umo,))
                 await self.sql.execute("DELETE FROM session_managers WHERE umo=?", (umo,))
                 await self.sql.execute("DELETE FROM session_push_events WHERE umo=?", (umo,))
+                await self.sql.execute("DELETE FROM session_credentials WHERE umo=?", (umo,))
                 for state in await self.sql.select_all("push_state"):
                     action = str(state.get("kind") or "")
                     server = str(state.get("server") or "")
@@ -630,6 +704,120 @@ class SessionStore:
             return CREDENTIAL_MISSING
         global_token = (global_push_token or "").strip()
         return global_token or CREDENTIAL_MISSING
+
+    async def list_credentials(
+        self,
+        umo: str,
+        kind: str,
+        status: str = "active",
+    ) -> list[dict[str, Any]]:
+        if not is_group_umo(umo) or kind not in {"token", "ticket"}:
+            return []
+        return await self.sql.fetch_all(
+            """
+            SELECT * FROM session_credentials
+            WHERE umo=? AND kind=? AND status=?
+            ORDER BY id
+            """,
+            (umo, kind, status),
+        )
+
+    async def list_active_credentials(self, umo: str, kind: str) -> list[str]:
+        rows = await self.list_credentials(umo, kind, "active")
+        return [str(row.get("value") or "").strip() for row in rows if str(row.get("value") or "").strip()]
+
+    async def list_removed_credentials(self, kind: str) -> list[dict[str, Any]]:
+        if kind not in {"token", "ticket"}:
+            return []
+        return await self.sql.fetch_all(
+            """
+            SELECT * FROM session_credentials
+            WHERE kind=? AND status='removed'
+            ORDER BY removed_at, id
+            """,
+            (kind,),
+        )
+
+    async def get_credential(self, umo: str, kind: str, value: str) -> dict[str, Any] | None:
+        value = (value or "").strip()
+        if not value:
+            return None
+        return await self.sql.select_one(
+            "session_credentials",
+            "umo=? AND kind=? AND value=?",
+            (umo, kind, value),
+        )
+
+    async def add_active_credential(self, umo: str, kind: str, value: str) -> bool:
+        value = (value or "").strip()
+        if not is_group_umo(umo) or kind not in {"token", "ticket"} or not value:
+            return False
+        existing = await self.get_credential(umo, kind, value)
+        if existing and existing.get("status") == "active":
+            return False
+        now = _now()
+        if existing:
+            await self.sql.update(
+                "session_credentials",
+                {
+                    "status": "active",
+                    "failure_reason": "",
+                    "removed_at": "",
+                    "updated_at": now,
+                },
+                "id=?",
+                (existing.get("id"),),
+            )
+        else:
+            await self.sql.execute(
+                """
+                INSERT INTO session_credentials
+                (umo, kind, value, status, created_at, updated_at)
+                VALUES (?, ?, ?, 'active', ?, ?)
+                """,
+                (umo, kind, value, now, now),
+            )
+        await self.ensure(umo)
+        await self.sql.update(
+            "session_config",
+            {
+                "group_credentials_enabled": 1,
+                "use_global_token": 0,
+                "updated_at": now,
+            },
+            "umo=?",
+            (umo,),
+        )
+        return True
+
+    async def remove_pool_token(self, umo: str, value: str, reason: str) -> bool:
+        value = (value or "").strip()
+        row = await self.get_credential(umo, "token", value)
+        if not row or row.get("status") != "active":
+            return False
+        await self.sql.update(
+            "session_credentials",
+            {
+                "status": "removed",
+                "failure_reason": str(reason or "").strip()[:500],
+                "removed_at": _now(),
+                "updated_at": _now(),
+            },
+            "id=?",
+            (row.get("id"),),
+        )
+        return True
+
+    async def delete_pool_ticket(self, umo: str, value: str) -> bool:
+        value = (value or "").strip()
+        row = await self.get_credential(umo, "ticket", value)
+        if not row or row.get("status") != "active":
+            return False
+        await self.sql.execute(
+            "DELETE FROM session_credentials WHERE id=?",
+            (row.get("id"),),
+        )
+        return True
 
     async def push_targets(self, action: str, server: str = "") -> list[dict[str, Any]]:
         action = str(action or "").strip()

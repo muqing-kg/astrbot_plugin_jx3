@@ -56,11 +56,9 @@ class JX3BOXService:
         self._sql_db = sqlite
         self._cache_db = cache_sqlite or sqlite
 
-        self._global_token = self._config.get("jx3api_token", "") or ""
-
     @property
     def token(self) -> str:
-        return current_token(self._global_token)
+        return current_token(str(self._config.get("jx3api_token", "") or ""))
 
     async def close(self):
         """释放底层 APIClient 资源"""

@@ -87,6 +87,15 @@ class APIClient:
         """处理响应：自动识别二进制或JSON"""
         try:
             logger.debug(f"响应状态: {response.status}")
+            if response.status in (401, 403):
+                try:
+                    detail = (await response.text()).strip()
+                except Exception:
+                    detail = ""
+                return {
+                    "_error": detail or f"HTTP {response.status}",
+                    "_code": response.status,
+                }
             response.raise_for_status()
 
             content_type = response.headers.get('Content-Type', '').lower()
