@@ -168,6 +168,48 @@ button.danger[data-armed="true"] {
   gap: 8px;
   font-size: 13px;
 }
+.credential-note {
+  color: #8a6d1f;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.credential-pool {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+.credential-pool.removed-pool {
+  border-style: dashed;
+  background: #f7f8fa;
+}
+.pool-title {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.pool-items { display: grid; gap: 8px; }
+.credential-item {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.credential-item code {
+  color: var(--ink);
+  font-size: 12px;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+.credential-item.removed code { color: #a63b46; }
+.credential-meta {
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.credential-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
 .empty {
   padding: 28px;
   text-align: center;

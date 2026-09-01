@@ -90,6 +90,24 @@ function sourcePill(label, state) {
   return `<span class="pill source-${escapeHtml(state || "none")}">${escapeHtml(label)}</span>`;
 }
 
+function credentialPool(title, items, emptyText, removed = false) {
+  const rows = (items || []).map((item) => `
+    <div class="credential-item${removed ? " removed" : ""}">
+      <code>${escapeHtml(item.value || "")}</code>
+      <div class="credential-meta">
+        ${escapeHtml(item.failure_reason || (removed ? "已移除" : "可用"))}
+        ${escapeHtml(item.removed_at || item.updated_at || "")}
+      </div>
+    </div>
+  `).join("");
+  return `
+    <div class="credential-pool${removed ? " removed-pool" : ""}">
+      <div class="pool-title">${escapeHtml(title)}</div>
+      <div class="pool-items">${rows || `<div class="credential-empty">${escapeHtml(emptyText)}</div>`}</div>
+    </div>
+  `;
+}
+
 function setView(view) {
   currentView = view;
   document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -149,6 +167,7 @@ function sessionCard(row) {
         ${pill(row.server || "未绑定区服", Boolean(row.server))}
         ${sourcePill("接口令牌：" + TOKEN_SOURCE_TEXT[row.token_source || "none"], row.token_source || "none")}
         ${sourcePill("推送令牌：" + TOKEN_SOURCE_TEXT[row.push_token_source || "none"], row.push_token_source || "none")}
+        ${row.group_credentials_enabled ? pill("群属凭据已启用", true) : ""}
         ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
         ${pill(row.bot_enabled === false ? "机器人已关闭" : "机器人开启", row.bot_enabled !== false)}
         ${pill(
@@ -168,7 +187,7 @@ function sessionCard(row) {
         启用该会话机器人
       </label>
       <label class="toggle">
-        <input data-k="use_global" type="checkbox" ${row.use_global_token ? "checked" : ""} />
+        <input data-k="use_global" type="checkbox" ${row.group_credentials_enabled ? `disabled title="该群已启用群属凭据"` : ""} ${!row.group_credentials_enabled && row.use_global_token ? "checked" : ""} />
         使用全局接口令牌
       </label>
       <label class="toggle">
@@ -189,12 +208,12 @@ function sessionCard(row) {
       </div>
       <div class="row">
         <label class="field">
-          <span>JX3API 接口令牌</span>
-          <input data-k="token" data-initial="${escapeHtml(row.token_display_value || "")}" value="${escapeHtml(row.token_display_value || "")}" placeholder="多个用逗号分隔" />
+          <span>${row.group_credentials_enabled ? "添加接口令牌" : "JX3API 接口令牌"}</span>
+          <input data-k="token" data-initial="${escapeHtml(row.group_credentials_enabled ? "" : row.token_display_value || "")}" value="${escapeHtml(row.group_credentials_enabled ? "" : row.token_display_value || "")}" placeholder="一次添加一条" />
         </label>
         <div class="row-actions">
-          <button data-act="token" type="button">保存令牌</button>
-          <button data-act="clear-token" class="ghost" type="button">清除令牌</button>
+          <button data-act="token" type="button">${row.group_credentials_enabled ? "添加令牌" : "保存令牌"}</button>
+          <button data-act="clear-token" class="ghost" type="button">清空可用令牌</button>
         </div>
       </div>
       <div class="row">
@@ -209,14 +228,18 @@ function sessionCard(row) {
       </div>
       <div class="row">
         <label class="field">
-          <span>推栏标识</span>
-          <input data-k="ticket" data-initial="${escapeHtml(row.ticket_display_value || "")}" value="${escapeHtml(row.ticket_display_value || "")}" placeholder="多个用逗号分隔" />
+          <span>${row.group_credentials_enabled ? "添加推栏标识" : "推栏标识"}</span>
+          <input data-k="ticket" data-initial="${escapeHtml(row.group_credentials_enabled ? "" : row.ticket_display_value || "")}" value="${escapeHtml(row.group_credentials_enabled ? "" : row.ticket_display_value || "")}" placeholder="一次添加一条" />
         </label>
         <div class="row-actions">
-          <button data-act="ticket" type="button">保存推栏</button>
-          <button data-act="clear-ticket" class="ghost" type="button">清除推栏</button>
+          <button data-act="ticket" type="button">${row.group_credentials_enabled ? "添加推栏" : "保存推栏"}</button>
+          <button data-act="clear-ticket" class="ghost" type="button">清空可用推栏</button>
         </div>
       </div>
+      ${row.group_credentials_enabled ? `<div class="credential-note">该群已启用群属凭据，全局接口令牌和推栏标识不可勾选。</div>` : ""}
+      ${credentialPool("可用接口令牌", row.tokens, "未配置")}
+      ${credentialPool("可用推栏标识", row.tickets, "未配置")}
+      ${credentialPool("移除池令牌", row.removed_tokens, "暂无", true)}
       <div class="row">
         <label class="field">
           <span>授权管理 ID</span>

@@ -101,6 +101,13 @@ class AsyncTask:
             self.scheduler.start()
             logger.info("后台监控调度器已启动")
         await self.refresh_jobs()
+        if self.scheduler.get_job("credential_pool_recheck") is None:
+            self.scheduler.add_job(
+                self._credential_pool_recheck,
+                IntervalTrigger(hours=24),
+                id="credential_pool_recheck",
+                max_instances=1,
+            )
 
     async def refresh_jobs(self):
         enabled = set(await self.sessions.enabled_push_actions())
@@ -127,6 +134,18 @@ class AsyncTask:
             args=[action, name],
         )
         logger.info(f"{name}后台任务启动成功，周期：{interval}s")
+
+    async def _credential_pool_recheck(self):
+        try:
+            from .credential_runtime import restore_recoverable_tokens
+
+            restored = await restore_recoverable_tokens(self.jx3api, self.sessions)
+            if restored:
+                logger.info(f"已恢复 {len(restored)} 枚移除池接口令牌")
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("移除池接口令牌每日检查失败")
 
     async def _job(self, action: str, name: str):
         try:

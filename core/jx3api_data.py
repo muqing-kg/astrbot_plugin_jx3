@@ -15,7 +15,13 @@ from .request import APIClient
 from .sqlite import AsyncSQLiteDB
 from .fun_basic import week_to_num,compare_date_str,format_time,format_duration,format_short_time
 from .template import load_template
-from .credentials import current_token, current_ticket
+from .credentials import (
+    CredentialRuntimeError,
+    credential_failure,
+    credential_message,
+    current_token,
+    current_ticket,
+)
 from .session_policy import camp_code
 
 
@@ -42,12 +48,11 @@ class JX3APIService:
         self._sql_db = sqlite
         self._cache_db = cache_sqlite or sqlite
 
-        # 获取配置中的 Token
-        self._global_token = self._config.get("jx3api_token", "") or ""
-        self._global_ticket = self._config.get("jx3api_ticket", "") or ""
-        if not self._global_token:
+        global_token = self._config.get("jx3api_token", "") or ""
+        global_ticket = self._config.get("jx3api_ticket", "") or ""
+        if not global_token:
             logger.warning("未配置全局接口令牌，未勾选使用全局接口令牌的会话将无法使用付费查询")
-        if not self._global_ticket:
+        if not global_ticket:
             logger.warning("未配置全局推栏标识，需要推栏的功能将依赖全局或会话自定义配置")
         self.command_catalog: dict | None = None
         self.push_names: dict[str, str] = {}
@@ -55,11 +60,11 @@ class JX3APIService:
 
     @property
     def token(self) -> str:
-        return current_token(self._global_token)
+        return current_token(str(self._config.get("jx3api_token", "") or ""))
 
     @property
     def ticket(self) -> str:
-        return current_ticket(self._global_ticket)
+        return current_ticket(str(self._config.get("jx3api_ticket", "") or ""))
 
     async def close(self):
         """释放底层 APIClient 资源"""
@@ -120,6 +125,12 @@ class JX3APIService:
 
         data = await self._base_request(path, params)
         if isinstance(data, dict) and data.get("_error"):
+            credential_kind, credential_raw = credential_failure(data.get("_error"))
+            if credential_kind:
+                raise CredentialRuntimeError(
+                    credential_kind,
+                    credential_message(credential_kind, credential_raw),
+                )
             return_data["msg"] = self._token_error_message(data.get("_error"))
             return return_data
         if data is None:
@@ -2465,6 +2476,7 @@ class JX3APIService:
             lines.append("到期：永久")
         result["code"] = 200
         result["data"] = "\n".join(lines)
+        result["detail"] = payload
         return result
 
     async def view_managers(self, display_name: str, rows: list[dict]) -> Dict[str, Any]:
@@ -2527,3 +2539,31 @@ class JX3APIService:
         if not data:
             return False, "推栏标识校验失败，请检查网络后更换重试。"
         return True, "推栏标识校验通过"
+
+    async def validate_ticket_ex(self, ticket: str, token: str = "") -> tuple[bool, str, bool]:
+        """Validate one ticket and mark network failures as retryable."""
+        ticket = (ticket or "").strip()
+        if not ticket:
+            return False, "未提供推栏标识。", False
+        if "," in ticket or "，" in ticket:
+            return False, "推栏标识需要逐个校验。", False
+        token = (token or "").strip()
+        if not token:
+            return False, "校验推栏标识需要可用的 JX3API Token。", False
+        data = await self._base_request(
+            "/school/skills",
+            {"name": "毒经", "token": token, "ticket": ticket},
+        )
+        if data is None:
+            return False, "推栏标识校验请求失败，请稍后重试。", True
+        if isinstance(data, dict) and data.get("_error"):
+            error = str(data["_error"])
+            lowered = error.lower()
+            token_error = any(
+                key in lowered
+                for key in ("token", "expire", "expired", "quota", "limit", "remaining", "insufficient", "count")
+            ) or any(key in error for key in ("令牌", "过期", "次数", "余额", "额度", "用尽", "不足"))
+            if token_error:
+                return False, self._token_error_message(error), False
+            return False, "推栏标识校验失败，可能是标识已过期或无效。", False
+        return True, "推栏标识校验通过", False

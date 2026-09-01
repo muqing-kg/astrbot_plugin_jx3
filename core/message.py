@@ -12,6 +12,7 @@ from .jx3box_data import JX3BOXService
 from .unua_data import UnuaService
 from .async_task import AsyncTask
 from .decorations import build_decorated_payload, estimate_body_length, fetch_poem_line
+from .credentials import CredentialRuntimeError
 from .render_meta import build_page_meta, limit_image_rows
 
 class MessageBuilder:
@@ -102,6 +103,8 @@ class MessageBuilder:
                 await event.send( event.plain_result(data["data"]))
             else:
                 await event.send(event.plain_result(data["msg"])) 
+        except CredentialRuntimeError:
+            raise
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
             await event.send(event.plain_result("处理失败，请稍后再试"))
@@ -154,6 +157,8 @@ class MessageBuilder:
             else:
                 await event.send(event.plain_result(data["msg"])) 
 
+        except CredentialRuntimeError:
+            raise
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
             await event.send(event.plain_result("渲染图片失败，请稍后再试"))
@@ -174,6 +179,8 @@ class MessageBuilder:
                 await event.send(event.image_result(url))
             else:
                 await event.send(event.plain_result(data["msg"]))
+        except CredentialRuntimeError:
+            raise
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
             await event.send(event.plain_result("渲染图片失败，请稍后再试"))
@@ -187,6 +194,8 @@ class MessageBuilder:
                 await event.send(event.chain_result(data["data"]))
             else:
                 await event.send(event.plain_result(data["msg"])) 
+        except CredentialRuntimeError:
+            raise
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
             await event.send(event.plain_result("渲染图片失败，请稍后再试"))
