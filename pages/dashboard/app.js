@@ -237,9 +237,6 @@ function sessionCard(row) {
         </div>
       </div>
       ${row.group_credentials_enabled ? `<div class="credential-note">该群已启用群属凭据，全局接口令牌和推栏标识不可勾选。</div>` : ""}
-      ${credentialPool("可用接口令牌", row.tokens, "未配置")}
-      ${credentialPool("可用推栏标识", row.tickets, "未配置")}
-      ${credentialPool("移除池令牌", row.removed_tokens, "暂无", true)}
       <div class="row">
         <label class="field">
           <span>授权管理 ID</span>
@@ -249,6 +246,7 @@ function sessionCard(row) {
           <button data-act="save-managers" type="button">保存管理</button>
         </div>
       </div>
+      ${credentialPool("移除池令牌", row.removed_tokens, "暂无", true)}
     </div>
   `;
 
