@@ -525,6 +525,8 @@ class JX3APIService:
 
                 return_data["data"]["items"] = items
                 return_data["data"]["today"] = today
+                return_data["data"]["scope"] = f"未来 {num} 天"
+                return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 return
 
             weekly = data.get("weekly") or {}
@@ -560,6 +562,7 @@ class JX3APIService:
                         item["desc"] = self._clean_newlines(item.get("desc"))
             return_data["data"]["items"] = data
             return_data["data"]["name"] = name
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         return await self._request_api(
             path="/active/celebs",
@@ -630,6 +633,8 @@ class JX3APIService:
 
             return_data["data"]["list"] = data
             return_data["data"]["server"] = server
+            return_data["data"]["item_name"] = name
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             return_data["data"]["roleName"] = name
             
         return await self._request_api(
@@ -739,6 +744,8 @@ class JX3APIService:
 
     async def mingjianpaihang(self, limit: str, mode:str) -> Dict[str, Any]:
         """名剑排行"""
+        requested_limit = int(limit)
+        limit = max(1, min(requested_limit, 100))
         # 数据处理
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
             if isinstance(data, list):
@@ -746,6 +753,9 @@ class JX3APIService:
                     if isinstance(item, dict) and not item.get("score") and item.get("matchScore"):
                         item["score"] = item["matchScore"]
             return_data["data"]["lists"] = data
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if requested_limit > 100:
+                return_data["data"]["page_note"] = "仅展示前 100 条"
             
         return await self._request_api(
             path="/arena/awesome",
@@ -764,6 +774,7 @@ class JX3APIService:
                 "mode": mode,
                 "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
+            return_data["data"]["mode_label"] = self._arena_mode_label(mode)
             
         return await self._request_api(
             path="/arena/schools",
@@ -910,6 +921,7 @@ class JX3APIService:
                 item["item_color"] = f"item-color-{sum(ord(char) for char in name_text) % 6}" if name_text else "item-color-0"
             return_data["data"]["list"] = data
             return_data["data"]["server"] = server
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
         return await self._request_api(
             path="/auction/records",
@@ -962,6 +974,7 @@ class JX3APIService:
                     item["lowest_price"] = "-"
             return_data["data"]["items"] = items
             return_data["data"]["server"] = server
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
         return await self._request_api(
             path="/trade/demon",
@@ -976,6 +989,10 @@ class JX3APIService:
         # 数据处理
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
             return_data["data"] = data
+            if isinstance(return_data["data"], dict):
+                return_data["data"]["item_name"] = Name
+                return_data["data"]["server"] = server
+                return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
         return await self._request_api(
             path="/trade/records",
@@ -990,6 +1007,10 @@ class JX3APIService:
         # 数据处理
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
             return_data["data"] = data
+            if isinstance(return_data["data"], dict):
+                return_data["data"]["item_name"] = Name
+                return_data["data"]["server"] = server
+                return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             
         return await self._request_api(
             path="/trade/manufacture",
@@ -1476,6 +1497,7 @@ class JX3APIService:
             return_data["data"] = data
             return_data["data"]["start"] = format_time(data["start"])
             return_data["data"]["end"] = format_time(data["end"])
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             layers = data.get("list") or []
             if isinstance(layers, list) and layers:
                 root = int(len(layers) ** 0.5)
@@ -1495,6 +1517,10 @@ class JX3APIService:
         """成就查询"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
             return_data["data"] = data
+            if isinstance(return_data["data"], dict):
+                return_data["data"]["server"] = server
+                return_data["data"]["roleName"] = role
+                return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         return await self._request_api(
             path="/role/achievement",
@@ -1765,6 +1791,7 @@ class JX3APIService:
         """小吃小药"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
             result = {}
+            query_name = name
 
             for item in data:
                 k = item["kungfu"]
@@ -1790,6 +1817,8 @@ class JX3APIService:
                     result[k]["blue"][cls] = cell_value
 
             return_data["data"]["items"] = list(result.values())
+            return_data["data"]["xiaoyao_name"] = query_name
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         return await self._request_api(
             path="/food/list",
@@ -1804,6 +1833,9 @@ class JX3APIService:
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
             return_data["data"]["data"] = data
             return_data["data"]["server"] = server
+            return_data["data"]["flower_name"] = name
+            return_data["data"]["map_name"] = map
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         return await self._request_api(
             path="/home/flower",
@@ -1821,6 +1853,8 @@ class JX3APIService:
                     if isinstance(item, dict) and item.get("tip"):
                         item["tip"] = self._clean_newlines(item.get("tip"))
             return_data["data"]["data"] = data
+            return_data["data"]["item_name"] = name
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         return await self._request_api(
             path="/home/furniture",
@@ -1925,11 +1959,15 @@ class JX3APIService:
     async def tuanduizhaomu(self, server: str, label:int, keyword: str, limit:int) -> Dict[str, Any]:
         """团队招募"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
+            recruit_type = {1: "招募", 2: "团长", 3: "团牌"}.get(label, "招募")
             for item in data:
                 item["createTime"] = format_time(item["createTime"])   
                 item["maxMemberCount"] = f"{item['currentMemberCount']}/{item['maxMemberCount']}"
                 return_data["data"]["list"] = data
             return_data["data"]["server"] = server
+            return_data["data"]["recruit_type"] = recruit_type
+            return_data["data"]["keyword"] = keyword
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         return await self._request_api(
             path="/recruit/search",
@@ -2149,19 +2187,25 @@ class JX3APIService:
             title = f"跨服名剑 {mode_name}"
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
             self._set_table(return_data, title, ["排名", "战队", "战队等级", "区服", "总场次", "胜率"], rows, subtitle, "暂无排行数据")
+            if return_data.get("data"):
+                return_data["data"]["server"] = server
+                return_data["data"]["rank_name"] = "跨服名剑榜"
+                return_data["data"]["mode_label"] = mode_name.upper()
+                return_data["data"]["update_time"] = self._now_text()
 
         params = {"mode": mode_code, "token": self.token}
         if server:
             params["server"] = server
         return await self._request_api("/rank/arena", params, processor, "data_list.html")
 
-    async def wulinzhengba(self, server: str = "", camp: str = "恶人") -> Dict[str, Any]:
+    async def wulinzhengba(self, camp: str = "恶人") -> Dict[str, Any]:
         """武林争霸赛"""
         camp_id = camp_code(camp)
         camp_name = "恶人谷" if camp_id == 2 else "浩气盟"
 
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            items = self._rank_items(data, inherit=False)[:50]
+            raw_items = self._rank_items(data, inherit=False)
+            items = raw_items[:100]
             rows = []
             for index, item in enumerate(items, 1):
                 rows.append([
@@ -2172,16 +2216,17 @@ class JX3APIService:
                     self._pick(item, "score", "totalScore", "titlePoint", "value"),
                 ])
             title = f"武林争霸赛 · {camp_name}"
-            subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
+            subtitle = "全服 · 更新时间：{0}".format(self._now_text())
             self._set_table(return_data, title, ["排名", "帮会", "帮主", "区服", "积分"], rows, subtitle, "暂无排行数据")
             if return_data.get("data"):
-                return_data["data"]["note"] = "排行榜仅展示前 50 名"
+                if len(raw_items) > 100:
+                    return_data["data"]["note"] = "仅展示前 100 名"
                 return_data["data"]["camp_name"] = camp_name
                 return_data["data"]["camp_class"] = "camp-eren" if camp_id == 2 else "camp-haoqi"
+                return_data["data"]["rank_name"] = "武林争霸"
+                return_data["data"]["update_time"] = self._now_text()
 
         params = {"camp": camp_id, "token": self.token}
-        if server:
-            params["server"] = server
         return await self._request_api("/rank/championship", params, processor, "data_list.html")
 
     async def bukuai(self, server: str = "") -> Dict[str, Any]:
@@ -2199,6 +2244,10 @@ class JX3APIService:
                 ])
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
             self._set_table(return_data, "捕快荣誉", ["排名", "角色", "门派", "区服", "积分"], rows, subtitle, "暂无排行数据")
+            if return_data.get("data"):
+                return_data["data"]["server"] = server
+                return_data["data"]["rank_name"] = "捕快荣誉榜"
+                return_data["data"]["update_time"] = self._now_text()
 
         params = {"token": self.token}
         if server:
@@ -2220,6 +2269,10 @@ class JX3APIService:
                 ])
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
             self._set_table(return_data, "江湖浪客", ["排名", "角色", "门派", "区服", "积分"], rows, subtitle, "暂无排行数据")
+            if return_data.get("data"):
+                return_data["data"]["server"] = server
+                return_data["data"]["rank_name"] = "江湖浪客榜"
+                return_data["data"]["update_time"] = self._now_text()
 
         params = {"token": self.token}
         if server:
@@ -2245,6 +2298,10 @@ class JX3APIService:
             title = f"决斗挑战 {mode_name}"
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
             self._set_table(return_data, title, ["排名", "角色", "门派", "区服", "赏金"], rows, subtitle, "暂无排行数据")
+            if return_data.get("data"):
+                return_data["data"]["server"] = server
+                return_data["data"]["rank_name"] = "决斗挑战榜"
+                return_data["data"]["update_time"] = self._now_text()
 
         params = {"mode": mode_code, "token": self.token}
         if server:
@@ -2314,6 +2371,8 @@ class JX3APIService:
                 "groups": groups,
                 "server": server,
                 "role_name": role,
+                "update_time": self._now_text(),
+                "disable_row_limit": True,
                 "title": f"{role} 资历分布",
                 "subtitle": f"{server} · 更新时间：{self._now_text()}",
             }
@@ -2338,6 +2397,10 @@ class JX3APIService:
                 ])
             subtitle = f"关键词：{name} · 更新时间：{self._now_text()}"
             self._set_table(return_data, "外观搜索", ["名称", "别名", "分类", "参考价", "时间"], rows, subtitle, "暂无外观搜索结果")
+            if return_data.get("data"):
+                return_data["data"]["rank_name"] = "外观搜索"
+                return_data["data"]["search_name"] = name
+                return_data["data"]["update_time"] = self._now_text()
 
         return await self._request_api("/trade/item/search", {"name": name, "token": self.token}, processor, "data_list.html")
 
@@ -2425,6 +2488,14 @@ class JX3APIService:
             subtitle=display_name or "插件管理员",
             note="认领人不可被删除；授权管理员可管理通知开关与查询接口令牌。",
         )
+        return_data["data"]["display_name"] = display_name or "插件管理员"
+        return_data["data"]["update_time"] = self._now_text()
+        return_data["data"]["disable_row_limit"] = True
+        return_data["data"]["page_meta"] = " · ".join(part for part in (
+            "授权管理",
+            str(return_data["data"].get("display_name") or "").strip(),
+            str(return_data["data"].get("update_time") or "").strip(),
+        ) if str(part or "").strip())
         return_data["code"] = 200
         return return_data
 

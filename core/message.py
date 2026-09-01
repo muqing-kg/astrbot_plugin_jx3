@@ -1,7 +1,5 @@
 from astrbot.core import html_renderer
 from astrbot.api import logger
-import re
-from typing import Any
 from astrbot.api.event import AstrMessageEvent, MessageChain
 from astrbot.core.utils.session_waiter import (
     SessionController,
@@ -14,114 +12,7 @@ from .jx3box_data import JX3BOXService
 from .unua_data import UnuaService
 from .async_task import AsyncTask
 from .decorations import build_decorated_payload, estimate_body_length, fetch_poem_line
-
-
-
-PAGE_META_NONE = {
-    "helps.html",
-    "xiaoyao.html",
-    "baizhan.html",
-    "xingxiashijian.html",
-    "mingjiantongji.html",
-    "mingjianpaihang.html",
-}
-
-def _meta_pick(payload: dict, *keys: str) -> str:
-    for key in keys:
-        value = payload.get(key)
-        if value not in (None, ""):
-            return str(value).strip()
-    return ""
-
-def _meta_mode_label(mode: Any) -> str:
-    text = str(mode or "").strip().lower()
-    if text in {"0", "2", "22", "2v2"}:
-        return "2V2"
-    if text in {"2", "5", "55", "5v5"}:
-        return "5V5"
-    return "3V3"
-
-def build_page_meta(template: str, payload: dict) -> str:
-    match = re.search(r"<body[^>]*jx3-template--([a-z0-9_]+)", template or "")
-    page_id = match.group(1) if match else ""
-    filename = f"{page_id}.html" if page_id else ""
-    if filename in PAGE_META_NONE:
-        return ""
-    server = _meta_pick(payload, "server", "serverName")
-    role = _meta_pick(payload, "roleName", "role_name", "role", "name")
-    mode = _meta_pick(payload, "mode")
-    total = payload.get("total")
-    items = payload.get("items") or payload.get("list") or payload.get("lists")
-    item_count = len(items) if isinstance(items, list) else None
-    if filename == "notice.html":
-        return " · ".join(part for part in [_meta_pick(payload, "display_name"), server] if part)
-    if filename == "helps.html":
-        return " · ".join(part for part in [
-            _meta_pick(payload, "display_name"),
-            server,
-        ] if part)
-    if filename in {"card_gallery.html", "juesheqiyu.html", "weizuoqiyu.html", "yanhuan.html", "jingnai.html", "chengjiu.html", "zili.html", "zhanji.html", "juesheliaotian.html"}:
-        parts = [part for part in [server, role] if part]
-        if filename == "zhanji.html" and mode:
-            parts.append(f"{_meta_mode_label(mode)} 模式")
-        if filename == "juesheliaotian.html" and total not in (None, ""):
-            parts.append(f"{total} 条")
-        return " · ".join(parts)
-    if filename in {"jinjia.html", "huajia.html", "jiaoyihang.html", "qiyuhuizong.html", "jinqiqiyu.html", "qiyuliebiao.html", "bangzhanjilu.html", "zhueevent.html", "dilujilu.html", "zhengyingpaimai.html", "tuanduizhaomu.html", "shitu.html", "diaoluo.html"}:
-        parts = [part for part in [server] if part]
-        if filename == "bangzhanjilu.html":
-            match_count = payload.get("match_count") or item_count
-            if match_count:
-                parts.append(f"{match_count} 场")
-            ongoing = payload.get("ongoing_count")
-            if ongoing not in (None, ""):
-                parts.append(f"进行中 {ongoing}")
-            short_time = _meta_pick(payload, "short_time")
-            if short_time:
-                parts.append(short_time)
-        elif filename == "shitu.html":
-            title = _meta_pick(payload, "title")
-            if title:
-                parts.append(title)
-            if item_count:
-                parts.append(f"{item_count} 人")
-            update_time = _meta_pick(payload, "update_time")
-            if update_time:
-                parts.append(update_time)
-        elif filename == "qiyuliebiao.html":
-            qname = _meta_pick(payload, "qiyuname", "name")
-            if qname:
-                parts.append(qname)
-        elif filename in {"diaoluo.html", "zhengyingpaimai.html", "jiaoyihang.html", "huajia.html"}:
-            item_name = _meta_pick(payload, "name", "keyword")
-            if item_name and item_name != server:
-                parts.append(item_name)
-        elif item_count:
-            parts.append(f"{item_count} 条")
-        return " · ".join(parts)
-    if filename in {"jineng.html", "qixue.html"}:
-        return _meta_pick(payload, "name")
-    if filename in {"zhuangshi.html", "qiwu.html", "wujia.html", "chengbeng.html"}:
-        return _meta_pick(payload, "name")
-    if filename == "zilipaixing.html":
-        return " · ".join(part for part in [server, _meta_pick(payload, "school")] if part)
-    if filename == "rank_role.html" or filename.startswith("rank_"):
-        rank_name = _meta_pick(payload, "rank_name")
-        parts = [part for part in [server] if part]
-        if "恶人" in rank_name:
-            parts.append("恶人谷")
-        elif "浩气" in rank_name:
-            parts.append("浩气盟")
-        if rank_name:
-            parts.append(rank_name)
-        short_time = _meta_pick(payload, "update_time")
-        if short_time:
-            parts.append(short_time)
-        return " · ".join(parts)
-    if filename == "data_list.html" and payload.get("groups"):
-        return " · ".join(part for part in [_meta_pick(payload, "server", "serverName"), _meta_pick(payload, "role_name", "roleName")] if part)
-    return ""
-
+from .render_meta import build_page_meta, limit_image_rows
 
 class MessageBuilder:
     """回复消息构建"""
@@ -235,13 +126,15 @@ class MessageBuilder:
                     quote = await self.jx3api.shaohua()
                     if quote.get("code") == 200 and quote.get("data"):
                         data["data"]["page_quote"] = str(quote["data"]).strip()
+                data["data"] = limit_image_rows(data["temp"], data["data"])
                 if not data["data"].get("page_meta"):
                     data["data"]["page_meta"] = build_page_meta(data.get("temp") or "", data["data"])
                 note = str(data["data"].get("note") or "").strip()
+                page_note = str(data["data"].get("page_note") or "").strip()
                 if note:
-                    meta = str(data["data"].get("page_meta") or "").strip()
-                    if note not in meta:
-                        data["data"]["page_meta"] = " · ".join(part for part in (meta, note) if part)
+                    page_note = " · ".join(part for part in (page_note, note) if part)
+                if page_note:
+                    data["data"]["page_note"] = page_note
                 url = await self.html_render(data["temp"], data["data"], options=options)
                 await event.send(event.image_result(url)) 
             else:
@@ -447,6 +340,12 @@ class MessageBuilder:
             body_length = estimate_body_length(data.get("temp") or "", data["data"], self.icons)
             poem_line = await fetch_poem_line()
             data["data"].update(build_decorated_payload(self.icons, body_length, poem_line))
+            data["data"]["page_meta"] = " · ".join(part for part in (
+                str(data["data"].get("server") or "").strip(),
+                str(data["data"].get("role_name") or "").strip(),
+                str(data["data"].get("title") or "").strip(),
+                str(data["data"].get("update_time") or "").strip(),
+            ) if str(part or "").strip())
             url = await self.html_render(data["temp"], data["data"], options=options)
             await reply_event.send(reply_event.image_result(url))
 
@@ -608,9 +507,9 @@ class MessageBuilder:
         """ 跨服名剑 [服务器] [模式] """
         return await self.T2I_image_msg(event, lambda: self.jx3api.kuafumingjian(server, mode))
 
-    async def  wulinzhengba(self, event: AstrMessageEvent, server: str = "", camp: str = "恶人"):
-        """ 武林争霸赛 [服务器] [阵营] """
-        return await self.T2I_image_msg(event, lambda: self.jx3api.wulinzhengba(server, camp))
+    async def  wulinzhengba(self, event: AstrMessageEvent, camp: str = "恶人"):
+        """ 武林争霸赛 [阵营] """
+        return await self.T2I_image_msg(event, lambda: self.jx3api.wulinzhengba(camp))
 
     async def  bukuai(self, event: AstrMessageEvent, server: str = ""):
         """ 捕快 [服务器] """

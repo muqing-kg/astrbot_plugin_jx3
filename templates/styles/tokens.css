@@ -36,10 +36,6 @@
     --jx3-font: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
 }
 
-.jx3-template--mingjiantongji {
-    --jx3-page-width: 640px;
-}
-
 .jx3-template--xingxiashijian {
     --jx3-page-width: 900px;
 }

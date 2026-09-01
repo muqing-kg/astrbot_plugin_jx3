@@ -9,6 +9,7 @@ from astrbot.api import AstrBotConfig
 from .request import APIClient
 from .sqlite import AsyncSQLiteDB
 from .fun_basic import gold_to_parts
+from .html_safe import sanitize_html
 from .template import load_template
 from .credentials import current_token
 
@@ -178,12 +179,19 @@ class JX3BOXService:
             return return_data
         
         # 提取dwID
-        dwID = data[0]["dwID"]
+        first = data[0] if isinstance(data, list) and data and isinstance(data[0], dict) else {}
+        dwID = first.get("dwID")
+        if not dwID:
+            return_data["msg"] = "获取奇遇标识失败"
+            return return_data
         data1 = await self._base_request(
             "node",
             f"/serendipity/{dwID}/achievement",
             out=None,
         )
+        if not isinstance(data1, dict) or data1.get("_error") or not data1.get("achievement_id"):
+            return_data["msg"] = "获取攻略数据异常"
+            return return_data
 
         # 获取奇遇攻略
         data2 = await self._base_request(
@@ -200,7 +208,10 @@ class JX3BOXService:
             content = data2["post"]["content"]
             content = re.sub(r"<h1(?=[\s>])", "<h2", content, flags=re.IGNORECASE)
             content = re.sub(r"</h1>", "</h2>", content, flags=re.IGNORECASE)
+            content = sanitize_html(content)
             return_data["data"]["content"] = content
+            return_data["data"]["qiyuname"] = name
+            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             return_data["temp"] = await load_template("qiyugonglue.html")
         except Exception:
             logger.exception("处理返回数据失败")
@@ -423,19 +434,23 @@ class JX3BOXService:
     async def _get_achievement_base_data(self, cache_key: str, api_path: str) -> Optional[Dict[str, Any]]:
         """获取资历菜单或点数数据，优先使用未过期缓存"""
         cached, expired = await self._load_achievement_cache(cache_key)
-        if cached and not expired:
+        if isinstance(cached, dict) and not expired and self._valid_achievement_payload(cache_key, cached):
             return cached
 
         data: Optional[Dict[str, Any]] = await self._base_request("node", api_path)
-        if data and isinstance(data, dict):
+        if data and isinstance(data, dict) and not data.get("_error") and self._valid_achievement_payload(cache_key, data):
             await self._save_achievement_cache(cache_key, data)
             return data
 
-        if cached:
+        if isinstance(cached, dict) and self._valid_achievement_payload(cache_key, cached):
             logger.warning(f"资历基础数据接口失败，使用旧缓存: {cache_key}")
             return cached
 
         return None
+
+    def _valid_achievement_payload(self, cache_key: str, data: Dict[str, Any]) -> bool:
+        required_key = "menus" if cache_key == "achievement_menus" else "points"
+        return isinstance(data.get(required_key), dict)
 
 
     async def _get_trade_item_groups(self) -> Optional[List[Dict[str, Any]]]:

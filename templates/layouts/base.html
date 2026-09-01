@@ -18,6 +18,9 @@
                 <div class="jx3-kicker">JX3 · <!--__PAGE_KICKER__--> · <!--__PAGE_TITLE__--></div>
                 <h1 class="jx3-title"><!--__PAGE_TITLE__--></h1>
                 <p class="jx3-meta"><!--__PAGE_META__--></p>
+                {% if page_note %}
+                <p class="jx3-note">{{ page_note }}</p>
+                {% endif %}
             </div>
             {% if deco_caption %}
             <div class="jx3-bot-panel">{{ deco_caption | default('') }}</div>

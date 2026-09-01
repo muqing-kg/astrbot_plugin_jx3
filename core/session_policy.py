@@ -56,13 +56,23 @@ SERVER_ARITY = {
     "精耐": 1, "成就": 2, "角色": 1, "在线": 1, "资历排行": 0, "聊天": 1, "统战": 0,
     "花价": 0, "拜师": 0, "收徒": 0, "招募": 0, "团长": 0, "团牌": 0,
     "开服": 0, "资历": 1, "交易行": 1,
-    "跨服名剑榜": 0, "武林争霸赛": 0, "捕快荣誉榜": 0, "江湖浪客榜": 0, "决斗挑战榜": 0,
+    "跨服名剑榜": 0,
     "资历分布": 1,
 }
 
 # 跨服/全服榜单：不强制注入绑定区服，缺省查询返回各自真实区服。
 CROSS_SERVER_COMMANDS = frozenset({
-    "跨服名剑榜", "武林争霸赛", "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
+    "跨服名剑榜",
+})
+
+# 区服选填榜单：缺省用绑定区服，未绑定则查全服。
+OPTIONAL_SERVER_COMMANDS = frozenset({
+    "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
+})
+
+# 临时全服命令：不传服务器，但保留“全服”作为无操作参数。
+IGNORED_ALL_SERVER_COMMANDS = frozenset({
+    "武林争霸赛",
 })
 
 SERVER_SECOND_COMMANDS = frozenset({
@@ -178,6 +188,29 @@ def canonicalize_server_token(value: str, resolver=None) -> str:
     return official or ""
 
 
+def inject_optional_server_args(cmd: str, args: list[str], bound: str, resolver=None) -> list[str] | str:
+    bound = (bound or "").strip()
+    if callable(resolver):
+        official_bound = resolver(bound)
+        if official_bound:
+            bound = official_bound
+    args = list(args)
+    core = list(args)
+    tail = []
+    while core and _is_optional_tail(cmd, core[-1]):
+        tail.insert(0, core.pop())
+
+    if not core:
+        return [bound, *tail] if bound else ["", *tail]
+    if core[0] == "全服":
+        return [""] + core[1:] + tail
+
+    official = canonicalize_server_token(core[0], resolver) if core else ""
+    if official:
+        return [official] + core[1:] + tail
+    return UNKNOWN_SERVER
+
+
 def inject_server_args(cmd: str, args: list[str], bound: str, resolver=None) -> list[str] | str:
     bound = (bound or "").strip()
     if callable(resolver):
@@ -186,6 +219,11 @@ def inject_server_args(cmd: str, args: list[str], bound: str, resolver=None) -> 
             bound = official_bound
     args = list(args)
 
+    if cmd in IGNORED_ALL_SERVER_COMMANDS:
+        if args and args[0] == "全服":
+            return args[1:]
+        return args
+
     if cmd in CROSS_SERVER_COMMANDS:
         core = list(args)
         tail = []
@@ -193,10 +231,15 @@ def inject_server_args(cmd: str, args: list[str], bound: str, resolver=None) -> 
             tail.insert(0, core.pop())
         if not core:
             return ["", tail[0]] if tail else []
+        if core[0] == "全服":
+            return [""] + core[1:] + tail
         official = canonicalize_server_token(core[0], resolver)
         if official:
             return [official] + core[1:] + tail
         return core + tail
+
+    if cmd in OPTIONAL_SERVER_COMMANDS:
+        return inject_optional_server_args(cmd, args, bound, resolver)
 
     if cmd in SERVER_ARITY:
         core = list(args)
