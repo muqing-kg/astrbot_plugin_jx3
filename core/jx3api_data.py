@@ -51,9 +51,9 @@ class JX3APIService:
         global_token = self._config.get("jx3api_token", "") or ""
         global_ticket = self._config.get("jx3api_ticket", "") or ""
         if not global_token:
-            logger.warning("未配置全局接口令牌，未勾选使用全局接口令牌的会话将无法使用付费查询")
+            logger.warning("旧版全局接口令牌为空，未配置群属接口令牌的会话将无法使用付费查询")
         if not global_ticket:
-            logger.warning("未配置全局推栏标识，需要推栏的功能将依赖全局或会话自定义配置")
+            logger.warning("旧版全局推栏标识为空，需要推栏的功能将依赖全局凭据池或群属凭据池")
         self.command_catalog: dict | None = None
         self.push_names: dict[str, str] = {}
         

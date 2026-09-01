@@ -187,6 +187,32 @@ class SessionStore:
             ON session_credentials (umo, kind, status)
             """
         )
+        await self.sql.execute(
+            """
+            CREATE TABLE IF NOT EXISTS global_credentials (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                kind TEXT NOT NULL,
+                value TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'active',
+                failure_reason TEXT DEFAULT '',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                skipped_at TEXT DEFAULT ''
+            )
+            """
+        )
+        await self.sql.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_global_credentials_value
+            ON global_credentials (kind, value)
+            """
+        )
+        await self.sql.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_global_credentials_pool
+            ON global_credentials (kind, status)
+            """
+        )
         credential_migration_row = await self.sql.select_one(
             "schema_migrations", "name=?", ("session_credential_pools_v1",)
         )
@@ -816,6 +842,149 @@ class SessionStore:
         await self.sql.execute(
             "DELETE FROM session_credentials WHERE id=?",
             (row.get("id"),),
+        )
+        return True
+
+    async def list_global_credentials(
+        self,
+        kind: str,
+        status: str = "active",
+    ) -> list[dict[str, Any]]:
+        if kind not in {"token", "ticket"}:
+            return []
+        return await self.sql.fetch_all(
+            """
+            SELECT * FROM global_credentials
+            WHERE kind=? AND status=?
+            ORDER BY id
+            """,
+            (kind, status),
+        )
+
+    async def list_active_global_credentials(self, kind: str) -> list[str]:
+        rows = await self.list_global_credentials(kind, "active")
+        return [str(row.get("value") or "").strip() for row in rows if str(row.get("value") or "").strip()]
+
+    async def list_skipped_global_credentials(self) -> list[dict[str, Any]]:
+        return await self.sql.fetch_all(
+            """
+            SELECT * FROM global_credentials
+            WHERE kind='token' AND status='skipped'
+            ORDER BY skipped_at, id
+            """
+        )
+
+    async def get_global_credential(self, kind: str, value: str) -> dict[str, Any] | None:
+        value = (value or "").strip()
+        if not value:
+            return None
+        return await self.sql.select_one(
+            "global_credentials",
+            "kind=? AND value=?",
+            (kind, value),
+        )
+
+    async def add_global_credential(self, kind: str, value: str) -> bool:
+        value = (value or "").strip()
+        if kind not in {"token", "ticket"} or not value:
+            return False
+        existing = await self.get_global_credential(kind, value)
+        now = _now()
+        if existing:
+            if existing.get("status") == "active":
+                return False
+            await self.sql.update(
+                "global_credentials",
+                {
+                    "status": "active",
+                    "failure_reason": "",
+                    "skipped_at": "",
+                    "updated_at": now,
+                },
+                "id=?",
+                (existing.get("id"),),
+            )
+            return True
+        await self.sql.execute(
+            """
+            INSERT INTO global_credentials
+            (kind, value, status, created_at, updated_at)
+            VALUES (?, ?, 'active', ?, ?)
+            """,
+            (kind, value, now, now),
+        )
+        return True
+
+    async def migrate_global_credentials(
+        self,
+        global_token: str = "",
+        global_ticket: str = "",
+    ) -> bool:
+        added = False
+        for kind, raw_value in (("token", global_token), ("ticket", global_ticket)):
+            for value in [
+                item.strip()
+                for item in str(raw_value or "").replace("，", ",").split(",")
+                if item.strip()
+            ]:
+                if await self.add_global_credential(kind, value):
+                    added = True
+        return added
+
+    async def skip_global_token(self, value: str, reason: str) -> bool:
+        value = (value or "").strip()
+        row = await self.get_global_credential("token", value)
+        if not row or row.get("status") != "active":
+            return False
+        await self.sql.update(
+            "global_credentials",
+            {
+                "status": "skipped",
+                "failure_reason": str(reason or "").strip()[:500],
+                "skipped_at": _now(),
+                "updated_at": _now(),
+            },
+            "id=?",
+            (row.get("id"),),
+        )
+        return True
+
+    async def restore_global_token(self, value: str) -> bool:
+        value = (value or "").strip()
+        row = await self.get_global_credential("token", value)
+        if not row or row.get("status") != "skipped":
+            return False
+        await self.sql.update(
+            "global_credentials",
+            {
+                "status": "active",
+                "failure_reason": "",
+                "skipped_at": "",
+                "updated_at": _now(),
+            },
+            "id=?",
+            (row.get("id"),),
+        )
+        return True
+
+    async def delete_global_ticket(self, value: str) -> bool:
+        value = (value or "").strip()
+        row = await self.get_global_credential("ticket", value)
+        if not row:
+            return False
+        await self.sql.execute(
+            "DELETE FROM global_credentials WHERE id=?",
+            (row.get("id"),),
+        )
+        return True
+
+    async def delete_global_credential(self, credential_id: int) -> bool:
+        row = await self.sql.select_one("global_credentials", "id=?", (credential_id,))
+        if not row:
+            return False
+        await self.sql.execute(
+            "DELETE FROM global_credentials WHERE id=?",
+            (credential_id,),
         )
         return True
 

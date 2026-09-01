@@ -18,16 +18,16 @@
     }
   },
   "jx3api_token": {
-    "description": "全局 JX3API Token",
+    "description": "旧版全局 JX3API Token",
     "type": "string",
     "default": "",
-    "hint": "前往 https://www.jx3api.com 购买。仅当会话未启用群属凭据且勾选「使用全局 Token」时才会使用。"
+    "hint": "兼容旧配置；启动时会迁移到 WebUI 的全局凭据池并清空。"
   },
   "jx3api_ticket": {
-    "description": "全局推栏标识",
+    "description": "旧版全局推栏标识",
     "type": "string",
     "default": "",
-    "hint": "仅作为未启用群属凭据会话的全局推栏标识；群属凭据池优先。"
+    "hint": "兼容旧配置；启动时会迁移到 WebUI 的全局推栏标识池并清空。"
   },
   "jx3api_ws_url": {
     "description": "JX3API 事件通道地址",
