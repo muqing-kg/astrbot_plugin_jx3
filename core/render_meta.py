@@ -74,10 +74,10 @@ def build_page_meta(template: str, payload: dict) -> str:
     update_time = _meta_update_time(payload)
 
     if filename == "notice.html":
-        return _meta_join(_meta_pick(payload, "display_name"), server)
+        return _meta_join(_meta_pick(payload, "display_name"), server, update_time)
 
     if filename == "helps.html":
-        return _meta_join(_meta_pick(payload, "display_name"), server)
+        return _meta_join(_meta_pick(payload, "display_name"), server, update_time)
 
     if filename == "baizhan.html":
         return _meta_join(
@@ -96,6 +96,7 @@ def build_page_meta(template: str, payload: dict) -> str:
             parts.append(f"{_meta_mode_label(mode)} 模式")
         if filename == "juesheliaotian.html" and total not in (None, ""):
             parts.append(f"{total} 条")
+        parts.append(update_time)
         return _meta_join(*parts)
 
     if filename in {
@@ -150,7 +151,7 @@ def build_page_meta(template: str, payload: dict) -> str:
         return _meta_join(*parts)
 
     if filename in {"jineng.html", "qixue.html"}:
-        return _meta_pick(payload, "name")
+        return _meta_join(_meta_pick(payload, "name"), update_time)
 
     if filename == "mingjiantongji.html":
         return _meta_join(
@@ -197,10 +198,6 @@ def build_page_meta(template: str, payload: dict) -> str:
     if filename == "rank_role.html" or filename.startswith("rank_"):
         rank_name = _meta_pick(payload, "rank_name")
         parts = [server]
-        if "恶人" in rank_name:
-            parts.append("恶人谷")
-        elif "浩气" in rank_name:
-            parts.append("浩气盟")
         parts.append(rank_name)
         parts.append(update_time)
         return _meta_join(*parts)
