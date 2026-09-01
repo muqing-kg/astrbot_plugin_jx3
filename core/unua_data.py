@@ -1,6 +1,9 @@
 """unua.top 推栏数据源：角色在线状态查询。"""
 
+import asyncio
 import logging
+import hashlib
+import json
 import secrets
 import time
 from typing import Any, Dict, Optional
@@ -19,6 +22,7 @@ class UnuaService:
         self._session.headers.update({"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
         self._proof_ctx: Optional[dict] = None
         self._proof_ts = 0.0
+        self._request_lock = asyncio.Lock()
 
     def _sha256hex(self, data) -> str:
         if isinstance(data, str):
@@ -99,7 +103,8 @@ class UnuaService:
     async def role_online(self, server: str, name: str, tong_name: str = "") -> Dict[str, Any]:
         """查询角色在线状态。 tong_name 由调用方从 JX3API 补充。"""
         return_data: Dict[str, Any] = {"code": 0, "data": "", "msg": "功能函数未执行"}
-        rr = self._resolve_role(server, name)
+        async with self._request_lock:
+            rr = await asyncio.to_thread(self._resolve_role, server, name)
         if not rr:
             return_data["msg"] = "未查询到该角色，请确认区服与角色名"
             return return_data
@@ -112,7 +117,8 @@ class UnuaService:
             "zone": rr.get("zone"),
             "centerId": rr.get("personNum"),
         }
-        data = self._post("/api/player/role-online", payload)
+        async with self._request_lock:
+            data = await asyncio.to_thread(self._post, "/api/player/role-online", payload)
         if not data or not data.get("success"):
             return_data["msg"] = "在线状态查询失败"
             return return_data
@@ -143,9 +149,10 @@ class UnuaService:
         return_data["code"] = 200
         return return_data
 
-    def close(self):
+    async def close(self):
         try:
-            self._session.close()
+            async with self._request_lock:
+                await asyncio.to_thread(self._session.close)
         except Exception:
             pass
 

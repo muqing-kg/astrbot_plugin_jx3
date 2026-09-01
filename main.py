@@ -122,6 +122,7 @@ class Jx3ApiPlugin(Star):
             self.jx3api.close if self.jx3api else None,
             self.aijx3.close if self.aijx3 else None,
             self.jx3box.close if self.jx3box else None,
+            self.unua.close if self.unua else None,
             self.local_sql_db.close if self.local_sql_db else None,
             self.plugin_sql_db.close if self.plugin_sql_db else None,
         ):

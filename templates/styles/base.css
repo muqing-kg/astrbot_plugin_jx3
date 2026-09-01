@@ -208,6 +208,14 @@ body.jx3-template {
 
 .jx3-meta:empty { display: none; }
 
+.jx3-note {
+    position: relative;
+    z-index: 1;
+    margin: 4px 0 0;
+    color: #b58a95;
+    font-size: 13px;
+}
+
 .jx3-card--body {
     padding: 18px 20px 16px;
     background: #fefcfd;
