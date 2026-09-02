@@ -613,6 +613,10 @@ def format_command_error(cmd: str, error: BaseException, catalog: dict | None = 
     detail = str(error or "").strip()
     if detail.startswith("缺少参数") or "required" in detail.lower():
         return hint_command_usage(cmd, catalog)
+    from .credentials import CredentialRuntimeError
+
+    if not isinstance(error, CredentialRuntimeError):
+        return hint_command_usage(cmd, catalog)
     if detail:
         return f"{hint_command_usage(cmd, catalog)}\n{detail}"
     return hint_command_usage(cmd, catalog)
