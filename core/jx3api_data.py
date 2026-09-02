@@ -2041,9 +2041,9 @@ class JX3APIService:
     async def heshengme(self) -> Dict[str, Any]:
         """喝什么"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            return_data["data"] = (
-                f"{', '.join(data or [])}\n"
-            )
+            items = data or []
+            lines = [f"{i}. {item}" for i, item in enumerate(items, 1)]
+            return_data["data"] = "喝什么推荐：\n" + "\n".join(lines)
 
         return await self._request_api(
             path="/saohua/drink",
@@ -2056,9 +2056,9 @@ class JX3APIService:
     async def chishengme(self) -> Dict[str, Any]:
         """吃什么"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            return_data["data"] = (
-                f"{', '.join(data or [])}\n"
-            )
+            items = data or []
+            lines = [f"{i}. {item}" for i, item in enumerate(items, 1)]
+            return_data["data"] = "吃什么推荐：\n" + "\n".join(lines)
 
         return await self._request_api(
             path="/saohua/eat",
