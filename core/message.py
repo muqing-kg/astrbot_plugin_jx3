@@ -1,5 +1,3 @@
-import json as _json
-import hashlib
 import time
 from xml.sax.saxutils import escape as _xml_escape
 
@@ -219,7 +217,7 @@ class MessageBuilder:
         if self._is_wechat_session(event):
             await self._send_wechat_appmsg(event, payload)
         elif self._is_qq_session(event):
-            await self._send_qq_json_card(event, payload)
+                    await self._send_qq_card(event, payload)
         else:
             segment = Share(
                 url=payload["url"],
@@ -322,58 +320,21 @@ class MessageBuilder:
         }
         await self._send_onebot_segments(event, [segment])
 
-    async def _send_qq_json_card(self, event: AstrMessageEvent, payload: dict):
+    async def _send_qq_card(self, event: AstrMessageEvent, payload: dict):
         title = str(payload.get("title") or "攻略").strip()
         desc = str(payload.get("desc") or "").strip()
         url = str(payload.get("url") or "").strip()
         cover = str(payload.get("image") or "").strip()
-        now = int(time.time())
-        token = hashlib.md5(f"{url}:{title}".encode("utf-8")).hexdigest()
-        card = {
-            "app": "com.tencent.structmsg",
-            "desc": "攻略",
-            "view": "news",
-            "ver": "0.0.0.1",
-            "prompt": title,
-            "config": {
-                "ctime": now,
-                "forward": True,
-                "token": token,
-                "type": "normal",
-                "autosize": True,
-            },
-            "extra": {
-                "app_type": 1,
-                "appid": 100951776,
-                "msg_seq": now * 1000000,
-                "uin": 0,
-            },
-            "meta": {
-                "news": {
-                    "action": "",
-                    "android_pkg_name": "",
-                    "app_type": 1,
-                    "appid": 100951776,
-                    "ctime": now,
-                    "desc": desc,
-                    "jumpUrl": url,
-                    "preview": cover,
-                    "source_icon": "",
-                    "source_url": "",
-                    "tag": str(payload.get("author") or "隐元秘鉴"),
-                    "time": now,
-                    "title": title,
-                }
-            },
-        }
         segment = {
-            "type": "json",
+            "type": "music",
             "data": {
-                "data": _json.dumps(
-                    card,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                )
+                "type": "custom",
+                "id": None,
+                "url": url,
+                "audio": "",
+                "title": title,
+                "image": cover,
+                "content": desc,
             },
         }
         await self._send_onebot_segments(event, [segment])
