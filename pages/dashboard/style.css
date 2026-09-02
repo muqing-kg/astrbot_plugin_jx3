@@ -193,10 +193,16 @@ button.danger[data-armed="true"] {
 .pool-items { display: grid; gap: 8px; }
 .credential-item {
   display: grid;
-  gap: 4px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "code actions"
+    "meta actions";
+  gap: 2px 12px;
+  align-items: center;
   min-width: 0;
 }
 .credential-item code {
+  grid-area: code;
   color: var(--ink);
   font-size: 12px;
   word-break: break-all;
@@ -204,6 +210,7 @@ button.danger[data-armed="true"] {
 }
 .credential-item.removed code { color: #a63b46; }
 .credential-meta {
+  grid-area: meta;
   color: var(--muted);
   font-size: 12px;
   overflow-wrap: anywhere;
@@ -213,7 +220,9 @@ button.danger[data-armed="true"] {
   font-size: 12px;
 }
 .credential-actions {
+  grid-area: actions;
   display: flex;
+  align-self: center;
   justify-content: flex-end;
 }
 .credential-actions button {
