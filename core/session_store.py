@@ -890,6 +890,24 @@ class SessionStore:
             )
         return True
 
+    async def delete_credential(self, umo: str, kind: str, value: str) -> bool:
+        value = (value or "").strip()
+        row = await self.get_credential(umo, kind, value)
+        if not row:
+            return False
+        await self.sql.execute(
+            "DELETE FROM session_credentials WHERE id=?",
+            (row.get("id"),),
+        )
+        if kind == "ticket" and not await self.list_active_credentials(umo, kind):
+            await self.sql.update(
+                "session_config",
+                {"use_global_ticket": 1, "updated_at": _now()},
+                "umo=?",
+                (umo,),
+            )
+        return True
+
     async def list_global_credentials(
         self,
         kind: str,

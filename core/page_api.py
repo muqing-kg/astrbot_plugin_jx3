@@ -39,6 +39,7 @@ class SessionPageAPI:
             ("/page/sessions/push-token", self.set_push_token, ["POST"], "设置会话推送令牌"),
             ("/page/sessions/ticket", self.set_ticket, ["POST"], "设置会话推栏"),
             ("/page/sessions/use-global", self.set_use_global, ["POST"], "设置是否使用全局凭据"),
+            ("/page/sessions/credential/delete", self.delete_credential, ["POST"], "移除单条会话凭据"),
             ("/page/sessions/clear-secret", self.clear_secret, ["POST"], "清除会话密钥"),
             ("/page/sessions/bot", self.set_bot, ["POST"], "设置会话是否启用机器人"),
             ("/page/sessions/claim", self.clear_claim, ["POST"], "取消认领资格"),
@@ -343,6 +344,24 @@ class SessionPageAPI:
         if enabled and await self.plugin.sessions.list_active_credentials(umo, kind):
             return self.error_response("群属可用池不为空，不能启用全局凭据。", status_code=400)
         await self.plugin.sessions.set_use_global_credential(umo, kind, enabled)
+        if kind == "push_token":
+            await self.plugin.jx3at.refresh_jobs()
+        return self.json_response({"ok": True})
+
+    async def delete_credential(self):
+        data = await self._payload()
+        umo = str(data.get("umo") or "").strip()
+        kind = str(data.get("kind") or "").strip()
+        value = str(data.get("value") or "").strip()
+        if not umo or not value:
+            return self.error_response("缺少 umo 或凭据值", status_code=400)
+        if kind not in {"token", "push_token", "ticket"}:
+            return self.error_response("不支持的凭据类型", status_code=400)
+        if not is_group_umo(umo):
+            return self.error_response("本插件只支持群聊会话", status_code=400)
+        deleted = await self.plugin.sessions.delete_credential(umo, kind, value)
+        if not deleted:
+            return self.error_response("未找到该凭据", status_code=404)
         if kind == "push_token":
             await self.plugin.jx3at.refresh_jobs()
         return self.json_response({"ok": True})

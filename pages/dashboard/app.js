@@ -91,7 +91,21 @@ function sourcePill(label, state) {
   return `<span class="pill source-${escapeHtml(state || "none")}">${escapeHtml(label)}</span>`;
 }
 
-function credentialPool(title, items, emptyText, removed = false) {
+function groupCredentialAction(item) {
+  return `
+    <div class="credential-actions">
+      <button
+        data-act="credential-delete"
+        data-kind="${escapeHtml(item.kind || "")}"
+        data-value="${escapeHtml(item.value || "")}"
+        class="ghost"
+        type="button"
+      >移除</button>
+    </div>
+  `;
+}
+
+function credentialPool(title, items, emptyText, removed = false, itemAction = "") {
   const rows = (items || []).map((item) => `
     <div class="credential-item${removed ? " removed" : ""}">
       <code>${escapeHtml(item.value || "")}</code>
@@ -99,6 +113,7 @@ function credentialPool(title, items, emptyText, removed = false) {
         ${escapeHtml(item.failure_reason || (removed ? "失效" : "可用"))}
         ${escapeHtml(item.removed_at || item.updated_at || "")}
       </div>
+      ${itemAction ? itemAction(item) : ""}
     </div>
   `).join("");
   return `
@@ -306,7 +321,7 @@ function sessionCard(row) {
     </div>
     <div class="quick-actions">
       <button data-act="delete" class="danger" type="button">删除会话</button>
-      ${row.claim_type === "claimant" && row.claim_identity ? `<button data-act="clear-claim" class="ghost" type="button">取消认领资格</button>` : ""}
+      ${row.claim_type === "claimant" && row.claim_identity ? `<button data-act="clear-claim" class="ghost" type="button">取消认领</button>` : ""}
     </div>
     <div class="switches">
       <label class="toggle">
@@ -329,22 +344,11 @@ function sessionCard(row) {
     <div class="rows">
       <div class="row">
         <label class="field">
-          <span>区服</span>
-          <input data-k="server" placeholder="例如梦江南" value="${escapeHtml(row.server || "")}" />
-        </label>
-        <div class="row-actions">
-          <button data-act="bind" type="button">保存区服</button>
-          <button data-act="clear-server" class="ghost" type="button">清除区服</button>
-        </div>
-      </div>
-      <div class="row">
-        <label class="field">
           <span>添加接口令牌</span>
           <input data-k="token" data-initial="" value="" placeholder="一次添加一条" />
         </label>
         <div class="row-actions">
           <button data-act="token" type="button">添加令牌</button>
-          <button data-act="clear-token" class="ghost" type="button">清空可用令牌</button>
         </div>
       </div>
       <div class="row">
@@ -353,8 +357,7 @@ function sessionCard(row) {
           <input data-k="push-token" data-initial="" value="" placeholder="一次添加一条" />
         </label>
         <div class="row-actions">
-          <button data-act="push-token" type="button">添加令牌</button>
-          <button data-act="clear-push-token" class="ghost" type="button">清除令牌</button>
+          <button data-act="push-token" type="button">添加推送</button>
         </div>
       </div>
       <div class="row">
@@ -364,7 +367,6 @@ function sessionCard(row) {
         </label>
         <div class="row-actions">
           <button data-act="ticket" type="button">添加推栏</button>
-          <button data-act="clear-ticket" class="ghost" type="button">清空可用推栏</button>
         </div>
       </div>
       <div class="row">
@@ -376,8 +378,11 @@ function sessionCard(row) {
           <button data-act="save-managers" type="button">保存管理</button>
         </div>
       </div>
-      ${credentialPool("失效池接口令牌", row.removed_tokens, "暂无", true)}
-      ${credentialPool("失效池推送令牌", row.removed_push_tokens, "暂无", true)}
+      ${(row.tokens || []).length ? credentialPool("群属接口令牌 · 可用池", row.tokens, "暂无", false, groupCredentialAction) : ""}
+      ${(row.push_tokens || []).length ? credentialPool("群属推送令牌 · 可用池", row.push_tokens, "暂无", false, groupCredentialAction) : ""}
+      ${(row.tickets || []).length ? credentialPool("群属推栏标识 · 可用池", row.tickets, "暂无", false, groupCredentialAction) : ""}
+      ${(row.removed_tokens || []).length ? credentialPool("群属接口令牌 · 失效池", row.removed_tokens, "暂无", true, groupCredentialAction) : ""}
+      ${(row.removed_push_tokens || []).length ? credentialPool("群属推送令牌 · 失效池", row.removed_push_tokens, "暂无", true, groupCredentialAction) : ""}
     </div>
   `;
 
@@ -395,16 +400,12 @@ function sessionCard(row) {
     const btn = ev.target.closest("button");
     if (!btn) return;
     const act = btn.dataset.act;
-    const server = card.querySelector('[data-k="server"]').value.trim();
     const token = card.querySelector('[data-k="token"]').value.trim();
     const pushToken = card.querySelector('[data-k="push-token"]').value.trim();
     const ticket = card.querySelector('[data-k="ticket"]').value.trim();
     const managerEl = card.querySelector('[data-k="managers"]');
     const managers = managerEl ? managerEl.value.trim() : "";
-    if (act === "bind") {
-      if (!row.umo || !server) return setStatus("请填写区服", true);
-      await run(() => bridge.apiPost("page/sessions/bind", { umo: row.umo, server }));
-    } else if (act === "token") {
+    if (act === "token") {
       if (!row.umo || !token) return setStatus("请填写接口令牌", true);
       if (token === (card.querySelector('[data-k="token"]').dataset.initial || "")) {
         return setStatus("接口令牌未修改，保持当前配置");
@@ -424,14 +425,15 @@ function sessionCard(row) {
       await run(() => bridge.apiPost("page/sessions/managers", { umo: row.umo, managers }));
     } else if (act === "clear-claim") {
       await run(() => bridge.apiPost("page/sessions/claim", { identity: row.claim_identity }));
-    } else if (act === "clear-server") {
-      await run(() => bridge.apiPost("page/sessions/clear-server", { umo: row.umo }));
-    } else if (act === "clear-token") {
-      await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "token" }));
-    } else if (act === "clear-push-token") {
-      await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "push_token" }));
-    } else if (act === "clear-ticket") {
-      await run(() => bridge.apiPost("page/sessions/clear-secret", { umo: row.umo, kind: "ticket" }));
+    } else if (act === "credential-delete") {
+      const kind = btn.dataset.kind;
+      const value = btn.dataset.value;
+      if (!row.umo || !kind || !value) return setStatus("缺少移除凭据信息", true);
+      await run(() => bridge.apiPost("page/sessions/credential/delete", {
+        umo: row.umo,
+        kind,
+        value,
+      }));
     } else if (act === "delete") {
       if (btn.dataset.armed !== "true") {
         btn.dataset.armed = "true";
