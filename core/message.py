@@ -210,13 +210,16 @@ class MessageBuilder:
         try:
             if data["code"] == 200:
                 payload = data["data"]
-                segment = Share(
-                    url=payload["url"],
-                    title=payload["title"],
-                    content=payload.get("desc") or "",
-                    image=payload.get("image") or "",
-                )
-                await event.send(event.chain_result([segment]))
+                if self._is_wechat_session(event):
+                    await self._send_wechat_appmsg(event, payload)
+                else:
+                    segment = Share(
+                        url=payload["url"],
+                        title=payload["title"],
+                        content=payload.get("desc") or "",
+                        image=payload.get("image") or "",
+                    )
+                    await event.send(event.chain_result([segment]))
             else:
                 await event.send(event.plain_result(data["msg"]))
         except CredentialRuntimeError:
@@ -228,6 +231,41 @@ class MessageBuilder:
                 await event.send(event.plain_result(f'{fallback["title"]}\n{fallback["url"]}'))
             else:
                 await event.send(event.plain_result("发送卡片失败，请稍后再试"))
+
+    @staticmethod
+    def _is_wechat_session(event: AstrMessageEvent) -> bool:
+        """WeChatBridge 的群 ID 带 @chatroom；私聊 wxid 通常不是纯数字。"""
+        group_id = str(event.get_group_id() or "").strip()
+        if group_id:
+            return group_id.endswith("@chatroom")
+        session_id = str(event.get_session_id() or "").strip()
+        return bool(session_id) and not session_id.isdigit()
+
+    @staticmethod
+    async def _send_wechat_appmsg(event: AstrMessageEvent, payload: dict):
+        segment = {
+            "type": "wechat_appmsg",
+            "data": {
+                "title": str(payload.get("title") or "").strip(),
+                "desc": str(payload.get("desc") or "").strip(),
+                "url": str(payload.get("url") or "").strip(),
+                "appid": "",
+                "appname": "链接",
+                "thumburl": str(payload.get("image") or "").strip(),
+                "type": "5",
+            },
+        }
+        bot = getattr(event, "bot", None)
+        if bot is None:
+            raise RuntimeError("当前平台不支持微信原生卡片")
+        group_id = str(event.get_group_id() or "").strip()
+        if group_id:
+            caller = getattr(bot, "call_action", None) or bot.send_group_msg
+            await caller("send_group_msg", group_id=group_id, message=[segment])
+        else:
+            user_id = str(event.get_sender_id() or event.get_session_id() or "").strip()
+            caller = getattr(bot, "call_action", None) or bot.send_private_msg
+            await caller("send_private_msg", user_id=user_id, message=[segment])
 
 
     @property
