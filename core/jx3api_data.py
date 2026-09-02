@@ -48,12 +48,6 @@ class JX3APIService:
         self._sql_db = sqlite
         self._cache_db = cache_sqlite or sqlite
 
-        global_token = self._config.get("jx3api_token", "") or ""
-        global_ticket = self._config.get("jx3api_ticket", "") or ""
-        if not global_token:
-            logger.warning("全局接口令牌池为空，未配置群属接口令牌的会话将无法使用付费查询")
-        if not global_ticket:
-            logger.warning("全局推栏标识池为空，需要推栏的功能将依赖全局凭据池或群属凭据池")
         self.command_catalog: dict | None = None
         self.push_names: dict[str, str] = {}
         
@@ -74,6 +68,15 @@ class JX3APIService:
         """释放底层 APIClient 资源"""
         if self._api:
             await self._api.close()
+
+    async def check_credential_pool_status(self, sessions) -> None:
+        """在数据库就绪后检查 SQLite 全局凭据池，替代启动时对旧配置键的误判。"""
+        has_token = bool(await sessions.list_active_global_credentials("token"))
+        has_ticket = bool(await sessions.list_active_global_credentials("ticket"))
+        if not has_token:
+            logger.warning("全局接口令牌池为空，未配置群属接口令牌的会话将无法使用付费查询")
+        if not has_ticket:
+            logger.warning("全局推栏标识池为空，需要推栏的功能将依赖全局凭据池或群属凭据池")
 
 
     def _init_return_data(self) -> Dict[str, Any]:

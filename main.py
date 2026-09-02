@@ -113,6 +113,7 @@ class Jx3ApiPlugin(Star):
                 if callable(save):
                     await save()
             await self.sessions.mark_astrbot_admin_claims(self._astrbot_admin_ids())
+            await self.jx3api.check_credential_pool_status(self.sessions)
             await self.settings.init()
             global_config = await self.settings.global_config(self.conf)
             self.conf["jx3api_base_url"] = str(global_config["jx3api_base_url"])

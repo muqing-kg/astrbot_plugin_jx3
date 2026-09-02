@@ -12,7 +12,7 @@ from astrbot.api import AstrBotConfig
 
 from .event_catalog import FREE_PUSH_ACTIONS, event_dedupe_key, format_event_text, parse_ws_message, resolve_push_action
 from .jx3api_data import JX3APIService
-from .jx3box_data import JX3BOXService
+from .jx3box_data import CHITU_NO_EVENT_MESSAGE, JX3BOXService
 from .push_errors import is_permanent_group_failure
 from .session_store import SessionStore
 from .ws_client import DEFAULT_WS_URL, JX3WSClient
@@ -269,6 +269,8 @@ class AsyncTask:
         if not isinstance(data, dict):
             return
         if data.get("code") != 200:
+            if data.get("msg") == CHITU_NO_EVENT_MESSAGE:
+                return
             logger.warning(f"赤兔轮询上游失败，保留上次状态: server={server}, error={data.get('msg')}")
             return
         status = event_dedupe_key(

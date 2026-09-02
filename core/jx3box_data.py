@@ -44,6 +44,7 @@ JX3BOX_API_BASE_URLS = {
 }
 
 CHITU_READY_MARK = "下一匹赤兔即将出世"
+CHITU_NO_EVENT_MESSAGE = "暂无最新赤兔消息"
 CHITU_TIMEZONE = timezone(timedelta(hours=8))
 CHITU_REPORT_MAX_AGE = timedelta(minutes=10)
 CHITU_EVENT_BUCKET_MINUTES = 30
@@ -208,7 +209,7 @@ class JX3BOXService:
         rows = data.get("list") or []
         report = _extract_chitu_report(rows, server, now=now)
         if not report:
-            return_data["msg"] = "暂无最新赤兔消息"
+            return_data["msg"] = CHITU_NO_EVENT_MESSAGE
             return return_data
 
         return_data["status"] = report["status"]
