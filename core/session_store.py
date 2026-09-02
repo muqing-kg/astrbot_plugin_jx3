@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from .event_catalog import (
@@ -11,7 +11,6 @@ from .event_catalog import (
     LEGACY_PUSH_FIELDS,
 )
 from .session_policy import (
-    CREDENTIAL_MISSING,
     NEED_TICKET,
     NEED_TOKEN,
     UNBOUND_SERVER,
@@ -23,7 +22,6 @@ from .sqlite import AsyncSQLiteDB
 
 
 __all__ = [
-    "CREDENTIAL_MISSING",
     "NEED_TICKET",
     "NEED_TOKEN",
     "UNBOUND_SERVER",
@@ -57,6 +55,7 @@ class SessionStore:
                 ticket TEXT DEFAULT '',
                 use_global_token INTEGER DEFAULT 0,
                 use_global_push_token INTEGER DEFAULT 0,
+                use_global_ticket INTEGER DEFAULT 1,
                 is_private INTEGER DEFAULT 0,
                 claim_identity TEXT DEFAULT '',
                 claim_type TEXT DEFAULT 'claimant',
@@ -74,6 +73,7 @@ class SessionStore:
             "group_credentials_enabled INTEGER DEFAULT 0",
             "push_token TEXT DEFAULT ''",
             "use_global_push_token INTEGER DEFAULT 0",
+            "use_global_ticket INTEGER DEFAULT 1",
             "bot_enabled INTEGER DEFAULT 1",
             "llm_enabled INTEGER DEFAULT 1",
             "push_fail_count INTEGER DEFAULT 0",
@@ -197,7 +197,8 @@ class SessionStore:
                 failure_reason TEXT DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                skipped_at TEXT DEFAULT ''
+                skipped_at TEXT DEFAULT '',
+                removed_at TEXT DEFAULT ''
             )
             """
         )
@@ -212,6 +213,27 @@ class SessionStore:
             CREATE INDEX IF NOT EXISTS idx_global_credentials_pool
             ON global_credentials (kind, status)
             """
+        )
+        global_columns = {
+            str(row.get("name") or "")
+            for row in await self.sql.fetch_all("PRAGMA table_info(global_credentials)")
+        }
+        if "removed_at" not in global_columns:
+            try:
+                await self.sql.execute(
+                    "ALTER TABLE global_credentials ADD COLUMN removed_at TEXT DEFAULT ''"
+                )
+            except Exception:
+                pass
+        await self.sql.execute(
+            """
+            UPDATE global_credentials
+            SET status='removed',
+                removed_at=COALESCE(NULLIF(skipped_at,''), updated_at),
+                updated_at=?
+            WHERE status='skipped'
+            """,
+            (_now(),),
         )
         credential_migration_row = await self.sql.select_one(
             "schema_migrations", "name=?", ("session_credential_pools_v1",)
@@ -250,12 +272,80 @@ class SessionStore:
                         """,
                         (umo,),
                     )
+        await self.sql.execute(
+            """
+            INSERT OR IGNORE INTO schema_migrations (name, completed_at)
+            VALUES (?, ?)
+            """,
+            ("session_credential_pools_v1", _now()),
+        )
+        push_pool_migration_row = await self.sql.select_one(
+            "schema_migrations", "name=?", ("credential_push_pools_v1",)
+        )
+        if not push_pool_migration_row:
+            rows = await self.list_all()
+            for row in rows:
+                umo = str(row.get("umo") or "")
+                if not umo or not is_group_umo(umo):
+                    continue
+                raw_values = str(row.get("push_token") or "").replace("，", ",")
+                values = [item.strip() for item in raw_values.split(",") if item.strip()]
+                if not values:
+                    continue
+                for value in values:
+                    try:
+                        await self.add_active_credential(umo, "push_token", value)
+                    except Exception:
+                        continue
+                await self.sql.execute(
+                    """
+                    UPDATE session_config
+                    SET push_token='', use_global_push_token=0
+                    WHERE umo=?
+                    """,
+                    (umo,),
+                )
+            await self.sql.execute(
+                """
+                INSERT OR IGNORE INTO schema_migrations (name, completed_at)
+                VALUES (?, ?)
+            """,
+            ("credential_push_pools_v1", _now()),
+        )
+        ticket_fallback_migration_row = await self.sql.select_one(
+            "schema_migrations", "name=?", ("global_ticket_fallback_v1",)
+        )
+        if not ticket_fallback_migration_row:
+            await self.sql.execute(
+                """
+                UPDATE session_config
+                SET use_global_ticket=1
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM session_credentials
+                    WHERE session_credentials.umo=session_config.umo
+                      AND session_credentials.kind='ticket'
+                      AND session_credentials.status='active'
+                )
+                """
+            )
+            await self.sql.execute(
+                """
+                UPDATE session_config
+                SET use_global_ticket=0
+                WHERE EXISTS (
+                    SELECT 1 FROM session_credentials
+                    WHERE session_credentials.umo=session_config.umo
+                      AND session_credentials.kind='ticket'
+                      AND session_credentials.status='active'
+                )
+                """
+            )
             await self.sql.execute(
                 """
                 INSERT OR IGNORE INTO schema_migrations (name, completed_at)
                 VALUES (?, ?)
                 """,
-                ("session_credential_pools_v1", _now()),
+                ("global_ticket_fallback_v1", _now()),
             )
         event_columns = {
             str(row.get("name") or "")
@@ -530,28 +620,6 @@ class SessionStore:
             )
         return True, ""
 
-    async def set_token(self, umo: str, token: str) -> None:
-        if not is_group_umo(umo):
-            raise ValueError("本插件只支持群聊会话配置 Token")
-        await self.ensure(umo)
-        await self.sql.update(
-            "session_config",
-            {"token": token.strip(), "updated_at": _now()},
-            "umo=?",
-            (umo,),
-        )
-
-    async def set_ticket(self, umo: str, ticket: str) -> None:
-        if not is_group_umo(umo):
-            raise ValueError("本插件只支持群聊会话配置推栏标识")
-        await self.ensure(umo)
-        await self.sql.update(
-            "session_config",
-            {"ticket": ticket.strip(), "updated_at": _now()},
-            "umo=?",
-            (umo,),
-        )
-
     async def set_bot_enabled(self, umo: str, enabled: bool) -> None:
         if not is_group_umo(umo):
             raise ValueError("本插件只支持群聊会话开关")
@@ -575,17 +643,6 @@ class SessionStore:
         await self.sql.update(
             "session_config",
             {"llm_enabled": 1 if enabled else 0, "updated_at": _now()},
-            "umo=?",
-            (umo,),
-        )
-
-    async def set_push_token(self, umo: str, token: str) -> None:
-        if not is_group_umo(umo):
-            raise ValueError("本插件只支持群聊会话配置推送令牌")
-        await self.ensure(umo)
-        await self.sql.update(
-            "session_config",
-            {"push_token": token.strip(), "updated_at": _now()},
             "umo=?",
             (umo,),
         )
@@ -665,71 +722,28 @@ class SessionStore:
             (umo,),
         )
 
-    async def set_use_global_token(self, umo: str, enabled: bool) -> None:
+    async def set_use_global_credential(self, umo: str, kind: str, enabled: bool) -> None:
         if not is_group_umo(umo):
             raise ValueError("本插件只支持群聊会话配置")
+        field = self._use_global_field(kind)
         await self.ensure(umo)
         await self.sql.update(
             "session_config",
-            {"use_global_token": 1 if enabled else 0, "updated_at": _now()},
+            {field: 1 if enabled else 0, "updated_at": _now()},
             "umo=?",
             (umo,),
         )
 
-    async def set_use_global_push_token(self, umo: str, enabled: bool) -> None:
-        if not is_group_umo(umo):
-            raise ValueError("本插件只支持群聊会话配置")
-        await self.ensure(umo)
-        await self.sql.update(
-            "session_config",
-            {"use_global_push_token": 1 if enabled else 0, "updated_at": _now()},
-            "umo=?",
-            (umo,),
-        )
-
-    async def clear_secret(self, umo: str, kind: str) -> None:
-        if kind not in ("token", "push_token", "ticket"):
-            raise ValueError(f"不支持的密钥类型: {kind}")
-        if not is_group_umo(umo):
-            raise ValueError("本插件只支持群聊会话配置")
-        field = {
-            "token": "token",
-            "push_token": "push_token",
-            "ticket": "ticket",
-        }[kind]
-        await self.ensure(umo)
-        await self.sql.update(
-            "session_config",
-            {field: "", "updated_at": _now()},
-            "umo=?",
-            (umo,),
-        )
-
-    def resolve_token(self, row: dict[str, Any] | None, global_token: str = "") -> str:
-        if row:
-            own = (row.get("token") or "").strip()
-            if own:
-                return own
-            if row.get("use_global_token") and (global_token or "").strip():
-                return global_token.strip()
-        return CREDENTIAL_MISSING
-
-    def resolve_ticket(self, row: dict[str, Any] | None, global_ticket: str = "") -> str:
-        if row:
-            own = (row.get("ticket") or "").strip()
-            if own:
-                return own
-        ticket = (global_ticket or "").strip()
-        return ticket or CREDENTIAL_MISSING
-
-    def resolve_push_token(self, row: dict[str, Any] | None, global_push_token: str = "") -> str:
-        own = str((row or {}).get("push_token") or "").strip()
-        if own:
-            return own
-        if not (row or {}).get("use_global_push_token"):
-            return CREDENTIAL_MISSING
-        global_token = (global_push_token or "").strip()
-        return global_token or CREDENTIAL_MISSING
+    @staticmethod
+    def _use_global_field(kind: str) -> str:
+        fields = {
+            "token": "use_global_token",
+            "push_token": "use_global_push_token",
+            "ticket": "use_global_ticket",
+        }
+        if kind not in fields:
+            raise ValueError(f"不支持的凭据类型: {kind}")
+        return fields[kind]
 
     async def list_credentials(
         self,
@@ -737,7 +751,7 @@ class SessionStore:
         kind: str,
         status: str = "active",
     ) -> list[dict[str, Any]]:
-        if not is_group_umo(umo) or kind not in {"token", "ticket"}:
+        if not is_group_umo(umo) or kind not in {"token", "push_token", "ticket"}:
             return []
         return await self.sql.fetch_all(
             """
@@ -752,8 +766,32 @@ class SessionStore:
         rows = await self.list_credentials(umo, kind, "active")
         return [str(row.get("value") or "").strip() for row in rows if str(row.get("value") or "").strip()]
 
+    async def list_all_credentials(self, umo: str, kind: str) -> list[dict[str, Any]]:
+        if not is_group_umo(umo) or kind not in {"token", "push_token", "ticket"}:
+            return []
+        return await self.sql.fetch_all(
+            """
+            SELECT * FROM session_credentials
+            WHERE umo=? AND kind=?
+            ORDER BY id
+            """,
+            (umo, kind),
+        )
+
+    async def list_credentials_for_umos(self, umos: list[str]) -> list[dict[str, Any]]:
+        values = [str(umo or "").strip() for umo in umos if str(umo or "").strip()]
+        rows: list[dict[str, Any]] = []
+        for start in range(0, len(values), 500):
+            chunk = values[start:start + 500]
+            placeholders = ",".join("?" for _ in chunk)
+            rows.extend(await self.sql.fetch_all(
+                f"SELECT * FROM session_credentials WHERE umo IN ({placeholders}) ORDER BY umo, kind, id",
+                tuple(chunk),
+            ))
+        return rows
+
     async def list_removed_credentials(self, kind: str) -> list[dict[str, Any]]:
-        if kind not in {"token", "ticket"}:
+        if kind not in {"token", "push_token", "ticket"}:
             return []
         return await self.sql.fetch_all(
             """
@@ -776,7 +814,7 @@ class SessionStore:
 
     async def add_active_credential(self, umo: str, kind: str, value: str) -> bool:
         value = (value or "").strip()
-        if not is_group_umo(umo) or kind not in {"token", "ticket"} or not value:
+        if not is_group_umo(umo) or kind not in {"token", "push_token", "ticket"} or not value:
             return False
         existing = await self.get_credential(umo, kind, value)
         if existing and existing.get("status") == "active":
@@ -808,7 +846,7 @@ class SessionStore:
             "session_config",
             {
                 "group_credentials_enabled": 1,
-                "use_global_token": 0,
+                self._use_global_field(kind): 0,
                 "updated_at": now,
             },
             "umo=?",
@@ -816,9 +854,9 @@ class SessionStore:
         )
         return True
 
-    async def remove_pool_token(self, umo: str, value: str, reason: str) -> bool:
+    async def remove_pool_credential(self, umo: str, kind: str, value: str, reason: str) -> bool:
         value = (value or "").strip()
-        row = await self.get_credential(umo, "token", value)
+        row = await self.get_credential(umo, kind, value)
         if not row or row.get("status") != "active":
             return False
         await self.sql.update(
@@ -834,15 +872,22 @@ class SessionStore:
         )
         return True
 
-    async def delete_pool_ticket(self, umo: str, value: str) -> bool:
+    async def delete_pool_credential(self, umo: str, kind: str, value: str) -> bool:
         value = (value or "").strip()
-        row = await self.get_credential(umo, "ticket", value)
+        row = await self.get_credential(umo, kind, value)
         if not row or row.get("status") != "active":
             return False
         await self.sql.execute(
             "DELETE FROM session_credentials WHERE id=?",
             (row.get("id"),),
         )
+        if kind == "ticket" and not await self.list_active_credentials(umo, kind):
+            await self.sql.update(
+                "session_config",
+                {"use_global_ticket": 1, "updated_at": _now()},
+                "umo=?",
+                (umo,),
+            )
         return True
 
     async def list_global_credentials(
@@ -850,7 +895,7 @@ class SessionStore:
         kind: str,
         status: str = "active",
     ) -> list[dict[str, Any]]:
-        if kind not in {"token", "ticket"}:
+        if kind not in {"token", "push_token", "ticket"}:
             return []
         return await self.sql.fetch_all(
             """
@@ -865,13 +910,16 @@ class SessionStore:
         rows = await self.list_global_credentials(kind, "active")
         return [str(row.get("value") or "").strip() for row in rows if str(row.get("value") or "").strip()]
 
-    async def list_skipped_global_credentials(self) -> list[dict[str, Any]]:
+    async def list_removed_global_credentials(self, kind: str) -> list[dict[str, Any]]:
+        if kind not in {"token", "push_token", "ticket"}:
+            return []
         return await self.sql.fetch_all(
             """
             SELECT * FROM global_credentials
-            WHERE kind='token' AND status='skipped'
-            ORDER BY skipped_at, id
-            """
+            WHERE kind=? AND status='removed'
+            ORDER BY removed_at, id
+            """,
+            (kind,),
         )
 
     async def get_global_credential(self, kind: str, value: str) -> dict[str, Any] | None:
@@ -886,7 +934,7 @@ class SessionStore:
 
     async def add_global_credential(self, kind: str, value: str) -> bool:
         value = (value or "").strip()
-        if kind not in {"token", "ticket"} or not value:
+        if kind not in {"token", "push_token", "ticket"} or not value:
             return False
         existing = await self.get_global_credential(kind, value)
         now = _now()
@@ -898,7 +946,7 @@ class SessionStore:
                 {
                     "status": "active",
                     "failure_reason": "",
-                    "skipped_at": "",
+                    "removed_at": "",
                     "updated_at": now,
                 },
                 "id=?",
@@ -918,10 +966,15 @@ class SessionStore:
     async def migrate_global_credentials(
         self,
         global_token: str = "",
+        global_push_token: str = "",
         global_ticket: str = "",
     ) -> bool:
         added = False
-        for kind, raw_value in (("token", global_token), ("ticket", global_ticket)):
+        for kind, raw_value in (
+            ("token", global_token),
+            ("push_token", global_push_token),
+            ("ticket", global_ticket),
+        ):
             for value in [
                 item.strip()
                 for item in str(raw_value or "").replace("，", ",").split(",")
@@ -931,17 +984,17 @@ class SessionStore:
                     added = True
         return added
 
-    async def skip_global_token(self, value: str, reason: str) -> bool:
+    async def remove_global_credential(self, kind: str, value: str, reason: str) -> bool:
         value = (value or "").strip()
-        row = await self.get_global_credential("token", value)
+        row = await self.get_global_credential(kind, value)
         if not row or row.get("status") != "active":
             return False
         await self.sql.update(
             "global_credentials",
             {
-                "status": "skipped",
+                "status": "removed",
                 "failure_reason": str(reason or "").strip()[:500],
-                "skipped_at": _now(),
+                "removed_at": _now(),
                 "updated_at": _now(),
             },
             "id=?",
@@ -949,17 +1002,17 @@ class SessionStore:
         )
         return True
 
-    async def restore_global_token(self, value: str) -> bool:
+    async def restore_global_credential(self, kind: str, value: str) -> bool:
         value = (value or "").strip()
-        row = await self.get_global_credential("token", value)
-        if not row or row.get("status") != "skipped":
+        row = await self.get_global_credential(kind, value)
+        if not row or row.get("status") != "removed":
             return False
         await self.sql.update(
             "global_credentials",
             {
                 "status": "active",
                 "failure_reason": "",
-                "skipped_at": "",
+                "removed_at": "",
                 "updated_at": _now(),
             },
             "id=?",
@@ -967,9 +1020,9 @@ class SessionStore:
         )
         return True
 
-    async def delete_global_ticket(self, value: str) -> bool:
+    async def delete_global_credential_by_value(self, kind: str, value: str) -> bool:
         value = (value or "").strip()
-        row = await self.get_global_credential("ticket", value)
+        row = await self.get_global_credential(kind, value)
         if not row:
             return False
         await self.sql.execute(
@@ -987,6 +1040,88 @@ class SessionStore:
             (credential_id,),
         )
         return True
+
+    async def resolve_credential_pool(
+        self,
+        umo: str,
+        kind: str,
+    ) -> tuple[str, list[str]]:
+        if kind not in {"token", "push_token", "ticket"}:
+            return "global_missing", []
+        group_records = await self.list_all_credentials(umo, kind)
+        if group_records:
+            config = await self.get(umo) or {}
+            active_values = [
+                str(row.get("value") or "").strip()
+                for row in group_records
+                if row.get("status") == "active" and str(row.get("value") or "").strip()
+            ]
+            if active_values:
+                return "group", active_values
+            use_global = bool(config.get(self._use_global_field(kind)))
+            if use_global:
+                global_values = await self.list_active_global_credentials(kind)
+                if global_values:
+                    return "global", global_values
+                return "global_missing", []
+            return "group_missing", []
+        global_values = await self.list_active_global_credentials(kind)
+        if global_values and bool((await self.get(umo) or {}).get(self._use_global_field(kind))):
+            return "global", global_values
+        return "global_missing", []
+
+    def resolve_credential_pool_for_records(
+        self,
+        row: dict[str, Any] | None,
+        records: list[dict[str, Any]],
+        global_values: list[str],
+        kind: str,
+    ) -> tuple[str, list[str]]:
+        if kind not in {"token", "push_token", "ticket"}:
+            return "global_missing", []
+        if records:
+            active_values = [
+                str(item.get("value") or "").strip()
+                for item in records
+                if item.get("status") == "active" and str(item.get("value") or "").strip()
+            ]
+            if active_values:
+                return "group", active_values
+            if bool((row or {}).get(self._use_global_field(kind))):
+                return ("global", global_values) if global_values else ("global_missing", [])
+            return "group_missing", []
+        if global_values and bool((row or {}).get(self._use_global_field(kind))):
+            return "global", global_values
+        return "global_missing", []
+
+    async def has_group_credential_records(self, umo: str, kind: str) -> bool:
+        return bool(await self.list_all_credentials(umo, kind))
+
+    async def purge_expired_removed_credentials(self, days: int = 30) -> int:
+        cutoff = (datetime.now() - timedelta(days=max(0, int(days)))).strftime(
+            "%Y-%m-%d %H:%M:%S"
+        )
+        before_group = await self.sql.fetch_all(
+            "SELECT id FROM session_credentials WHERE status='removed' "
+            "AND removed_at<>'' AND removed_at<=?",
+            (cutoff,),
+        )
+        before_global = await self.sql.fetch_all(
+            "SELECT id FROM global_credentials WHERE status='removed' "
+            "AND removed_at<>'' AND removed_at<=?",
+            (cutoff,),
+        )
+        await self.sql.execute(
+            "DELETE FROM session_credentials WHERE status='removed' "
+            "AND removed_at<>'' AND removed_at<=?",
+            (cutoff,),
+        )
+        await self.sql.execute(
+            "DELETE FROM global_credentials WHERE status='removed' "
+            "AND removed_at<>'' AND removed_at<=?",
+            (cutoff,),
+        )
+        return len(before_group) + len(before_global)
 
     async def push_targets(self, action: str, server: str = "") -> list[dict[str, Any]]:
         action = str(action or "").strip()
@@ -1352,6 +1487,21 @@ class SessionStore:
             "umo=? ORDER BY created_at ASC, user_id ASC",
             (umo,),
         )
+
+    async def list_managers_for_umos(self, umos: list[str]) -> dict[str, list[dict[str, Any]]]:
+        result = {str(umo or ""): [] for umo in umos}
+        values = [str(umo or "").strip() for umo in umos if str(umo or "").strip()]
+        for start in range(0, len(values), 500):
+            chunk = values[start:start + 500]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = await self.sql.fetch_all(
+                f"SELECT * FROM session_managers WHERE umo IN ({placeholders}) "
+                "ORDER BY created_at ASC, user_id ASC",
+                tuple(chunk),
+            )
+            for row in rows:
+                result.setdefault(str(row.get("umo") or ""), []).append(row)
+        return result
 
     async def add_manager(self, umo: str, user_id: str, name: str = "") -> tuple[bool, str]:
         umo = str(umo or "").strip()

@@ -2,49 +2,68 @@
   "prefix": {
     "description": "指令前缀",
     "type": "object",
+    "invisible": true,
     "items": {
       "enable": {
-        "description": "是否启用插件前缀",
+        "description": "迁移字段：是否启用插件前缀",
         "type": "bool",
         "default": false,
-        "hint": "关闭：命令不带前缀即可触发，带系统前缀（如 /）也能触发。开启：必须携带系统前缀才能触发。"
+        "invisible": true
       },
       "text": {
-        "description": "前缀内容",
+        "description": "迁移字段：插件前缀内容",
         "type": "string",
         "default": "剑三",
-        "hint": "仅在启用插件前缀时生效。设置后必须使用：系统前缀+该前缀+命令，例如 /剑三日常。"
+        "invisible": true
       }
     }
   },
   "jx3api_token": {
-    "description": "旧版全局 JX3API Token",
+    "description": "迁移字段：全局接口令牌",
     "type": "string",
     "default": "",
-    "hint": "兼容旧配置；启动时会迁移到 WebUI 的全局凭据池并清空。"
+    "invisible": true
   },
-  "jx3api_ticket": {
-    "description": "旧版全局推栏标识",
+  "jx3api_base_url": {
+    "description": "运行字段：JX3API 基础地址",
     "type": "string",
-    "default": "",
-    "hint": "兼容旧配置；启动时会迁移到 WebUI 的全局推栏标识池并清空。"
+    "default": "https://www.jx3api.com",
+    "invisible": true
   },
-  "jx3api_ws_url": {
-    "description": "JX3API 事件通道地址",
+  "jx3api_base_url": {
+    "description": "运行字段：JX3API 基础地址",
     "type": "string",
-    "default": "wss://socket.nicemoe.cn",
-    "hint": "事件版主动推送使用的 WebSocket 地址。"
+    "default": "https://www.jx3api.com",
+    "invisible": true
   },
   "jx3api_push_token": {
-    "description": "全局 JX3API 推送令牌",
+    "description": "迁移字段：全局推送令牌",
     "type": "string",
     "default": "",
-    "hint": "用于事件版付费推送，仅填一枚；留空时只能接收免费事件档，不会回退使用接口令牌。"
+    "invisible": true
+  },
+  "jx3api_ws_token": {
+    "description": "迁移字段：旧事件通道令牌",
+    "type": "string",
+    "default": "",
+    "invisible": true
+  },
+  "jx3api_ticket": {
+    "description": "迁移字段：全局推栏标识",
+    "type": "string",
+    "default": "",
+    "invisible": true
+  },
+  "jx3api_ws_url": {
+    "description": "迁移字段：JX3API 事件通道地址",
+    "type": "string",
+    "default": "wss://socket.nicemoe.cn",
+    "invisible": true
   },
   "jx3api_ssl_verify": {
-    "description": "校验 JX3API 等接口的 TLS 证书",
+    "description": "迁移字段：接口 TLS 校验开关",
     "type": "bool",
     "default": true,
-    "hint": "默认开启；如遇自签名或本地代理证书异常可关闭。"
+    "invisible": true
   }
 }

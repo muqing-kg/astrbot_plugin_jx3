@@ -51,9 +51,9 @@ class JX3APIService:
         global_token = self._config.get("jx3api_token", "") or ""
         global_ticket = self._config.get("jx3api_ticket", "") or ""
         if not global_token:
-            logger.warning("旧版全局接口令牌为空，未配置群属接口令牌的会话将无法使用付费查询")
+            logger.warning("全局接口令牌池为空，未配置群属接口令牌的会话将无法使用付费查询")
         if not global_ticket:
-            logger.warning("旧版全局推栏标识为空，需要推栏的功能将依赖全局凭据池或群属凭据池")
+            logger.warning("全局推栏标识池为空，需要推栏的功能将依赖全局凭据池或群属凭据池")
         self.command_catalog: dict | None = None
         self.push_names: dict[str, str] = {}
         
@@ -65,6 +65,10 @@ class JX3APIService:
     @property
     def ticket(self) -> str:
         return current_ticket(str(self._config.get("jx3api_ticket", "") or ""))
+
+    @property
+    def base_url(self) -> str:
+        return str(self._config.get("jx3api_base_url") or "https://www.jx3api.com").rstrip("/")
 
     async def close(self):
         """释放底层 APIClient 资源"""
@@ -97,8 +101,7 @@ class JX3APIService:
                 logger.error("API client is not initialized")
                 return None
 
-            base_url = "https://www.jx3api.com"
-            api_url = base_url + api_path
+            api_url = self.base_url + api_path
             data = await self._api.get(api_url, params=params, out_key=out)
             
             if not data:
@@ -125,7 +128,12 @@ class JX3APIService:
 
         data = await self._base_request(path, params)
         if isinstance(data, dict) and data.get("_error"):
-            credential_kind, credential_raw = credential_failure(data.get("_error"))
+            credential_kind, credential_raw = credential_failure(
+                data.get("_error"), data.get("_code")
+            )
+            if not credential_kind and data.get("_code") in (401, 403):
+                credential_kind = "token"
+                credential_raw = data.get("_error")
             if credential_kind:
                 raise CredentialRuntimeError(
                     credential_kind,
@@ -2430,19 +2438,22 @@ class JX3APIService:
             result["msg"] = "未提供 Token"
             result["valid"] = False
             return result
-        data = await self._api.post("https://www.jx3api.com/token/stats", data={"token": token}, out_key=None)
+        data = await self._api.post(self.base_url + "/token/stats", data={"token": token}, out_key=None)
         if not data:
             result["msg"] = "令牌无效或查询失败"
             result["valid"] = False
+            result["_transport_error"] = True
             return result
         if isinstance(data, dict) and data.get("_error"):
             result["msg"] = self._token_error_message(data["_error"])
             result["valid"] = False
+            result["_code"] = data.get("_code")
             return result
         payload = data.get("data") if isinstance(data, dict) and "data" in data else data
         if not isinstance(payload, dict):
             result["msg"] = "令牌无效或查询失败"
             result["valid"] = False
+            result["_invalid_payload"] = True
             return result
         level = payload.get("level")
         used = payload.get("used")
@@ -2558,12 +2569,8 @@ class JX3APIService:
             return False, "推栏标识校验请求失败，请稍后重试。", True
         if isinstance(data, dict) and data.get("_error"):
             error = str(data["_error"])
-            lowered = error.lower()
-            token_error = any(
-                key in lowered
-                for key in ("token", "expire", "expired", "quota", "limit", "remaining", "insufficient", "count")
-            ) or any(key in error for key in ("令牌", "过期", "次数", "余额", "额度", "用尽", "不足"))
+            token_error = credential_failure(error, data.get("_code"))
             if token_error:
-                return False, self._token_error_message(error), False
+                return False, "推栏标识校验未完成：校验用接口令牌不可用。", False
             return False, "推栏标识校验失败，可能是标识已过期或无效。", False
         return True, "推栏标识校验通过", False
