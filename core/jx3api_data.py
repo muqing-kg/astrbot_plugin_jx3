@@ -143,6 +143,8 @@ class JX3APIService:
                     credential_kind,
                     credential_message(credential_kind, credential_raw),
                 )
+            if data.get("_code") == 400 and "参数" in str(data.get("_error") or ""):
+                raise ValueError("缺少参数")
             return_data["msg"] = self._token_error_message(data.get("_error"))
             return return_data
         if data is None:
