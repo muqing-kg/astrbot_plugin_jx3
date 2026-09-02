@@ -1,4 +1,5 @@
 import json as _json
+import hashlib
 import time
 from xml.sax.saxutils import escape as _xml_escape
 
@@ -211,32 +212,22 @@ class MessageBuilder:
     async def link_card_msg(self, event: AstrMessageEvent, action):
         """标题/链接/封面打包成平台卡片发送。"""
         data = await action()
-        try:
-            if data["code"] == 200:
-                payload = data["data"]
-                if self._is_wechat_session(event):
-                    await self._send_wechat_appmsg(event, payload)
-                elif self._is_qq_session(event):
-                    await self._send_qq_json_card(event, payload)
-                else:
-                    segment = Share(
-                        url=payload["url"],
-                        title=payload["title"],
-                        content=payload.get("desc") or "",
-                        image=payload.get("image") or "",
-                    )
-                    await event.send(event.chain_result([segment]))
-            else:
-                await event.send(event.plain_result(data["msg"]))
-        except CredentialRuntimeError:
-            raise
-        except Exception as e:
-            logger.error(f"发送链接卡片失败: {e}")
-            fallback = data.get("data") or {}
-            if fallback.get("title") and fallback.get("url"):
-                await event.send(event.plain_result(f'{fallback["title"]}\n{fallback["url"]}'))
-            else:
-                await event.send(event.plain_result("发送卡片失败，请稍后再试"))
+        if data["code"] != 200:
+            await event.send(event.plain_result(data["msg"]))
+            return
+        payload = data["data"]
+        if self._is_wechat_session(event):
+            await self._send_wechat_appmsg(event, payload)
+        elif self._is_qq_session(event):
+            await self._send_qq_json_card(event, payload)
+        else:
+            segment = Share(
+                url=payload["url"],
+                title=payload["title"],
+                content=payload.get("desc") or "",
+                image=payload.get("image") or "",
+            )
+            await event.send(event.chain_result([segment]))
 
     @staticmethod
     def _is_wechat_session(event: AstrMessageEvent) -> bool:
@@ -288,17 +279,21 @@ class MessageBuilder:
         desc = _xml_escape(str(payload.get("desc") or ""))
         url = _xml_escape(str(payload.get("url") or ""))
         cover = _xml_escape(str(payload.get("image") or ""))
-        appmsg = (
-            '<appmsg appid="" sdkver="0">'
-            f"<title>{title}</title>"
-            f"<des>{desc}</des>"
-            "<action>view</action>"
-            "<type>5</type>"
-            f"<url>{url}</url>"
-            f"<thumburl>{cover}</thumburl>"
+        appmsg_parts = [
+            '<appmsg appid="" sdkver="0">',
+            f"<title>{title}</title>",
+            f"<des>{desc}</des>",
+            "<action>view</action>",
+            "<type>5</type>",
+            f"<url>{url}</url>",
+        ]
+        if cover:
+            appmsg_parts.append(f"<thumburl>{cover}</thumburl>")
+        appmsg_parts.append(
             "<appinfo><version>1</version><appname>链接</appname></appinfo>"
-            "</appmsg>"
         )
+        appmsg_parts.append("</appmsg>")
+        appmsg = "".join(appmsg_parts)
         segment = {
             "type": "wechat_appmsg",
             "data": {
@@ -314,6 +309,7 @@ class MessageBuilder:
         url = str(payload.get("url") or "").strip()
         cover = str(payload.get("image") or "").strip()
         now = int(time.time())
+        token = hashlib.md5(f"{url}:{title}".encode("utf-8")).hexdigest()
         card = {
             "app": "com.tencent.structmsg",
             "desc": "攻略",
@@ -321,11 +317,18 @@ class MessageBuilder:
             "ver": "0.0.0.1",
             "prompt": title,
             "config": {
+                "ctime": now,
                 "forward": True,
-                "type": "news",
+                "token": token,
+                "type": "normal",
                 "autosize": True,
             },
-            "extra": {"app_type": 1, "appid": 0, "msg_seq": 0, "uin": 0},
+            "extra": {
+                "app_type": 1,
+                "appid": 100951776,
+                "msg_seq": now * 1000000,
+                "uin": 0,
+            },
             "meta": {
                 "news": {
                     "action": "",
