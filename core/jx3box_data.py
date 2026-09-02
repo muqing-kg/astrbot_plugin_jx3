@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from astrbot.api import logger
@@ -42,6 +42,65 @@ JX3BOX_API_BASE_URLS = {
     "next2": "https://next2.jx3box.com",
     "cms": "https://cms.jx3box.com",
 }
+
+CHITU_READY_MARK = "下一匹赤兔即将出世"
+CHITU_TIMEZONE = timezone(timedelta(hours=8))
+CHITU_REPORT_MAX_AGE = timedelta(minutes=10)
+CHITU_EVENT_BUCKET_MINUTES = 30
+
+
+def _parse_chitu_report_time(value: Any) -> Optional[datetime]:
+    try:
+        report_time = datetime.fromisoformat(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+    if report_time.tzinfo is None:
+        report_time = report_time.replace(tzinfo=CHITU_TIMEZONE)
+    return report_time.astimezone(timezone.utc)
+
+
+def _extract_chitu_report(
+    rows: Any,
+    server: str,
+    now: Optional[datetime] = None,
+) -> Optional[Dict[str, Any]]:
+    """Extract the latest fresh arrival signal from generic horse reports."""
+    now = now or datetime.now(timezone.utc)
+    stale_before = now - CHITU_REPORT_MAX_AGE
+
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        report_time = _parse_chitu_report_time(row.get("created_at"))
+        if report_time is None or report_time < stale_before:
+            continue
+
+        content = str(row.get("content") or "")
+        if CHITU_READY_MARK not in content:
+            continue
+
+        local_time = report_time.astimezone(CHITU_TIMEZONE)
+        bucket_start = local_time.replace(
+            minute=(local_time.minute // CHITU_EVENT_BUCKET_MINUTES)
+            * CHITU_EVENT_BUCKET_MINUTES,
+            second=0,
+            microsecond=0,
+        )
+        map_name = str(row.get("map_name") or "").strip() or "未知"
+        status = (
+            f"chitu:{map_name}:"
+            f"{bucket_start.strftime('%Y%m%d%H%M')}"
+        )
+        return {
+            "status": status,
+            "data": (
+                "[赤兔速报] 赤兔即将出世\n"
+                f"区服：{server}\n"
+                f"地点：{map_name}"
+            ),
+        }
+
+    return None
 
 
 class JX3BOXService:
@@ -122,8 +181,13 @@ class JX3BOXService:
             return None
 
 
-    async def machangxiaoxi(self, server: str, type: str, subtype: str) -> Dict[str, Any]:
-        """马场消息 """
+    async def machangxiaoxi(
+        self,
+        server: str,
+        *,
+        now: Optional[datetime] = None,
+    ) -> Dict[str, Any]:
+        """最新赤兔到达情报"""
         return_data = self._init_return_data()
 
         data = await self._base_request(
@@ -131,32 +195,24 @@ class JX3BOXService:
             "/api/game/reporter/horse",
             "GET",
             params={
-                "pageIndex":1,
-                "pageSize":1,
-                "server":server,
-                "type":type,
-                "subtype":subtype,
+                "pageIndex": 1,
+                "pageSize": 15,
+                "server": server,
+                "type": "horse",
             },
         )
 
         if not isinstance(data, dict):
             return_data["msg"] = "获取马场消息失败"
             return return_data
-        rows = data.get("list")
-        if not isinstance(rows, list) or not rows:
-            return_data["msg"] = "暂无最新马场消息"
+        rows = data.get("list") or []
+        report = _extract_chitu_report(rows, server, now=now)
+        if not report:
+            return_data["msg"] = "暂无最新赤兔消息"
             return return_data
-        first = rows[0]
-        status = str(first.get("id") or "").strip()
-        if not status:
-            return_data["msg"] = "马场消息缺少记录编号"
-            return return_data
-        return_data["status"] = status
-        return_data["data"] = (
-            f"区服：{server}\n"
-            f"{first.get('content') or ''}\n"
-            f"时间：{first.get('created_at') or ''}\n"
-        )
+
+        return_data["status"] = report["status"]
+        return_data["data"] = report["data"]
         return_data["code"] = 200
 
         return return_data

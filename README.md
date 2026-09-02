@@ -436,7 +436,7 @@ AstrBot 的渲染接口接收完整 HTML 字符串，因此插件不会依赖渲
 
 调度任务取得业务数据后生成版本化去重指纹。状态发生变化时，向所有 `umos` 发送 `data` 文本，并将新状态写回 `push_state` 表；旧版粗粒度指纹不参与新判断，后续新状态会覆盖旧状态。插件卸载时会移除全部任务并以非等待方式关闭调度器。
 
-开服与新闻任务使用 `JX3APIService`；刷马与赤兔任务使用 `JX3BOXService.machangxiaoxi()` 请求 Next2 马场消息接口，分别传入 `horse/foreshow` 和 `chitu-horse/share_msg`，并把最新消息 ID 作为状态值避免重复推送。
+开服与新闻任务使用 `JX3APIService`；赤兔后台任务使用 `JX3BOXService.machangxiaoxi()` 请求 Next2 通用马场记录（`type=horse`），只推送 10 分钟内的到达信号，并用事件状态避免重复推送。
 
 ## 目录结构
 

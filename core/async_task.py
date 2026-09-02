@@ -265,7 +265,7 @@ class AsyncTask:
         return matched
 
     async def _push_server(self, action: str, server: str):
-        data = await self.jx3box.machangxiaoxi(server, "chitu-horse", "share_msg")
+        data = await self.jx3box.machangxiaoxi(server)
         if not isinstance(data, dict):
             return
         if data.get("code") != 200:
