@@ -262,17 +262,36 @@ class MessageBuilder:
             raise RuntimeError("当前平台不支持原生卡片")
         group_id = str(event.get_group_id() or "").strip()
         caller = getattr(bot, "call_action", None)
+        params = {"timeout": 30_000}
         if group_id:
             if caller:
-                await caller("send_group_msg", group_id=group_id, message=segments)
+                await caller(
+                    "send_group_msg",
+                    group_id=group_id,
+                    message=segments,
+                    **params,
+                )
             else:
-                await bot.send_group_msg(group_id=group_id, message=segments)
+                await bot.send_group_msg(
+                    group_id=group_id,
+                    message=segments,
+                    **params,
+                )
         else:
             user_id = str(event.get_sender_id() or event.get_session_id() or "").strip()
             if caller:
-                await caller("send_private_msg", user_id=user_id, message=segments)
+                await caller(
+                    "send_private_msg",
+                    user_id=user_id,
+                    message=segments,
+                    **params,
+                )
             else:
-                await bot.send_private_msg(user_id=user_id, message=segments)
+                await bot.send_private_msg(
+                    user_id=user_id,
+                    message=segments,
+                    **params,
+                )
 
     async def _send_wechat_appmsg(self, event: AstrMessageEvent, payload: dict):
         title = _xml_escape(str(payload.get("title") or "攻略"))
