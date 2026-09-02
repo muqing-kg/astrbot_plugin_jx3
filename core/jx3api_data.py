@@ -131,9 +131,10 @@ class JX3APIService:
 
         data = await self._base_request(path, params)
         if isinstance(data, dict) and data.get("_error"):
-            credential_kind, credential_raw = credential_failure(
+            credential_result = credential_failure(
                 data.get("_error"), data.get("_code")
             )
+            credential_kind, credential_raw = credential_result or ("", "")
             if not credential_kind and data.get("_code") in (401, 403):
                 credential_kind = "token"
                 credential_raw = data.get("_error")
