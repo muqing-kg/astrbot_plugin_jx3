@@ -15,6 +15,7 @@ from .core.jx3box_data import JX3BOXService
 from .core.unua_data import UnuaService
 from .core.async_task import AsyncTask
 from .core.message import MessageBuilder
+from .core.yymj_data import YymjGuideService
 from .core.fun_basic import load_as_base64
 from .core.session_store import SessionStore
 from .core.session_policy import (
@@ -151,6 +152,7 @@ class Jx3ApiPlugin(Star):
             self.aijx3.close if self.aijx3 else None,
             self.jx3box.close if self.jx3box else None,
             self.unua.close if self.unua else None,
+            self.yymj.close if self.yymj else None,
             self.local_sql_db.close if self.local_sql_db else None,
             self.plugin_sql_db.close if self.plugin_sql_db else None,
         ):
@@ -191,6 +193,7 @@ class Jx3ApiPlugin(Star):
         self.aijx3 = AIJX3Service(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.jx3box = JX3BOXService(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.unua = UnuaService()
+        self.yymj = YymjGuideService()
         self.jx3at = AsyncTask(
             cast(Context, self.context),
             self.conf,
@@ -198,7 +201,16 @@ class Jx3ApiPlugin(Star):
             self.jx3box,
             self.sessions,
         )
-        self.jx3cmd = MessageBuilder("", self.jx3api, self.aijx3, self.jx3box, self.unua, self.jx3at, self.icons)
+        self.jx3cmd = MessageBuilder(
+            "",
+            self.jx3api,
+            self.aijx3,
+            self.jx3box,
+            self.unua,
+            self.jx3at,
+            self.yymj,
+            self.icons,
+        )
         self.settings = PluginSettings(self.local_sql_db)
         self.command_catalog = apply_command_overrides({})
         self.server_catalog = apply_alias_overrides({})

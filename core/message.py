@@ -1,6 +1,7 @@
 from astrbot.core import html_renderer
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageChain
+from astrbot.api.message_components import Share
 from astrbot.core.utils.session_waiter import (
     SessionController,
     session_waiter,
@@ -11,6 +12,7 @@ from .aijx3_data import AIJX3Service
 from .jx3box_data import JX3BOXService
 from .unua_data import UnuaService
 from .async_task import AsyncTask
+from .yymj_data import YymjGuideService
 from .decorations import build_decorated_payload, estimate_body_length, fetch_poem_line
 from .credentials import CredentialRuntimeError
 from .render_meta import build_page_meta, limit_image_rows
@@ -61,6 +63,7 @@ class MessageBuilder:
                  jx3box: JX3BOXService,  
                  unua: UnuaService,
                  jx3at: AsyncTask, 
+                 yymj: YymjGuideService,
                  icons: dict[str, dict[str, str]]
             ):
         self.server = server
@@ -69,6 +72,7 @@ class MessageBuilder:
         self.jx3box = jx3box
         self.unua = unua
         self.jx3at = jx3at
+        self.yymj = yymj
         self.icons = icons
 
 
@@ -199,6 +203,31 @@ class MessageBuilder:
         except Exception as e:
             logger.error(f"功能函数执行错误: {e}")
             await event.send(event.plain_result("渲染图片失败，请稍后再试"))
+
+    async def link_card_msg(self, event: AstrMessageEvent, action):
+        """标题/链接/封面打包成平台卡片发送。"""
+        data = await action()
+        try:
+            if data["code"] == 200:
+                payload = data["data"]
+                segment = Share(
+                    url=payload["url"],
+                    title=payload["title"],
+                    content=payload.get("desc") or "",
+                    image=payload.get("image") or "",
+                )
+                await event.send(event.chain_result([segment]))
+            else:
+                await event.send(event.plain_result(data["msg"]))
+        except CredentialRuntimeError:
+            raise
+        except Exception as e:
+            logger.error(f"发送链接卡片失败: {e}")
+            fallback = data.get("data") or {}
+            if fallback.get("title") and fallback.get("url"):
+                await event.send(event.plain_result(f'{fallback["title"]}\n{fallback["url"]}'))
+            else:
+                await event.send(event.plain_result("发送卡片失败，请稍后再试"))
 
 
     @property
@@ -610,7 +639,7 @@ class MessageBuilder:
 
     async def  qiyugonglue(self, event: AstrMessageEvent,name: str):
         """ 攻略 奇遇"""
-        return await self.T2I_image_msg(event, lambda: self.jx3box.qiyugonglue(name))
+        return await self.link_card_msg(event, lambda: self.yymj.qiyugonglue(name))
 
     async def  jingnai(self, event: AstrMessageEvent, server: str, name: str):
         """ 精耐 服务器 角色 """
