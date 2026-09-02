@@ -1,3 +1,6 @@
+import json as _json
+import time
+
 from astrbot.core import html_renderer
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageChain
@@ -212,6 +215,8 @@ class MessageBuilder:
                 payload = data["data"]
                 if self._is_wechat_session(event):
                     await self._send_wechat_appmsg(event, payload)
+                elif self._is_qq_session(event):
+                    await self._send_qq_json_card(event, payload)
                 else:
                     segment = Share(
                         url=payload["url"],
@@ -234,15 +239,50 @@ class MessageBuilder:
 
     @staticmethod
     def _is_wechat_session(event: AstrMessageEvent) -> bool:
-        """WeChatBridge 的群 ID 带 @chatroom；私聊 wxid 通常不是纯数字。"""
+        """AstrBot 平台 ID 由用户配置；WeChatBridge 常见为“微信-*”。"""
         group_id = str(event.get_group_id() or "").strip()
-        if group_id:
-            return group_id.endswith("@chatroom")
-        session_id = str(event.get_session_id() or "").strip()
-        return bool(session_id) and not session_id.isdigit()
+        marker = " ".join(
+            (
+                str(event.get_platform_id() or ""),
+                str(event.get_platform_name() or ""),
+            )
+        ).lower()
+        return (
+            group_id.endswith("@chatroom")
+            or "微信" in marker
+            or "wechat" in marker
+            or "weixin" in marker
+        )
 
     @staticmethod
-    async def _send_wechat_appmsg(event: AstrMessageEvent, payload: dict):
+    def _is_qq_session(event: AstrMessageEvent) -> bool:
+        marker = " ".join(
+            (
+                str(event.get_platform_id() or ""),
+                str(event.get_platform_name() or ""),
+            )
+        ).lower()
+        return "qq" in marker or str(event.get_platform_name() or "") == "aiocqhttp"
+
+    async def _send_onebot_segments(self, event: AstrMessageEvent, segments: list[dict]):
+        bot = getattr(event, "bot", None)
+        if bot is None:
+            raise RuntimeError("当前平台不支持原生卡片")
+        group_id = str(event.get_group_id() or "").strip()
+        caller = getattr(bot, "call_action", None)
+        if group_id:
+            if caller:
+                await caller("send_group_msg", group_id=group_id, message=segments)
+            else:
+                await bot.send_group_msg(group_id=group_id, message=segments)
+        else:
+            user_id = str(event.get_sender_id() or event.get_session_id() or "").strip()
+            if caller:
+                await caller("send_private_msg", user_id=user_id, message=segments)
+            else:
+                await bot.send_private_msg(user_id=user_id, message=segments)
+
+    async def _send_wechat_appmsg(self, event: AstrMessageEvent, payload: dict):
         segment = {
             "type": "wechat_appmsg",
             "data": {
@@ -255,17 +295,49 @@ class MessageBuilder:
                 "type": "5",
             },
         }
-        bot = getattr(event, "bot", None)
-        if bot is None:
-            raise RuntimeError("当前平台不支持微信原生卡片")
-        group_id = str(event.get_group_id() or "").strip()
-        if group_id:
-            caller = getattr(bot, "call_action", None) or bot.send_group_msg
-            await caller("send_group_msg", group_id=group_id, message=[segment])
-        else:
-            user_id = str(event.get_sender_id() or event.get_session_id() or "").strip()
-            caller = getattr(bot, "call_action", None) or bot.send_private_msg
-            await caller("send_private_msg", user_id=user_id, message=[segment])
+        await self._send_onebot_segments(event, [segment])
+
+    async def _send_qq_json_card(self, event: AstrMessageEvent, payload: dict):
+        title = str(payload.get("title") or "攻略").strip()
+        desc = str(payload.get("desc") or "").strip()
+        url = str(payload.get("url") or "").strip()
+        cover = str(payload.get("image") or "").strip()
+        now = int(time.time())
+        card = {
+            "app": "com.tencent.structmsg",
+            "desc": "攻略",
+            "view": "news",
+            "ver": "0.0.0.1",
+            "prompt": title,
+            "config": {
+                "forward": True,
+                "type": "news",
+                "autosize": True,
+            },
+            "extra": {"app_type": 1, "appid": 0, "msg_seq": 0, "uin": 0},
+            "meta": {
+                "news": {
+                    "action": "",
+                    "android_pkg_name": "",
+                    "app_type": 1,
+                    "appid": 100951776,
+                    "ctime": now,
+                    "desc": desc,
+                    "jumpUrl": url,
+                    "preview": cover,
+                    "source_icon": "",
+                    "source_url": "",
+                    "tag": str(payload.get("author") or "隐元秘鉴"),
+                    "time": now,
+                    "title": title,
+                }
+            },
+        }
+        segment = {
+            "type": "json",
+            "data": _json.dumps(card, ensure_ascii=False, separators=(",", ":")),
+        }
+        await self._send_onebot_segments(event, [segment])
 
 
     @property
