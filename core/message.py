@@ -329,7 +329,6 @@ class MessageBuilder:
             "type": "music",
             "data": {
                 "type": "custom",
-                "id": None,
                 "url": url,
                 "audio": "",
                 "title": title,
