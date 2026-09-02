@@ -1,5 +1,6 @@
 import json as _json
 import time
+from xml.sax.saxutils import escape as _xml_escape
 
 from astrbot.core import html_renderer
 from astrbot.api import logger
@@ -283,15 +284,25 @@ class MessageBuilder:
                 await bot.send_private_msg(user_id=user_id, message=segments)
 
     async def _send_wechat_appmsg(self, event: AstrMessageEvent, payload: dict):
+        title = _xml_escape(str(payload.get("title") or "攻略"))
+        desc = _xml_escape(str(payload.get("desc") or ""))
+        url = _xml_escape(str(payload.get("url") or ""))
+        cover = _xml_escape(str(payload.get("image") or ""))
+        appmsg = (
+            '<appmsg appid="" sdkver="0">'
+            f"<title>{title}</title>"
+            f"<des>{desc}</des>"
+            "<action>view</action>"
+            "<type>5</type>"
+            f"<url>{url}</url>"
+            f"<thumburl>{cover}</thumburl>"
+            "<appinfo><version>1</version><appname>链接</appname></appinfo>"
+            "</appmsg>"
+        )
         segment = {
             "type": "wechat_appmsg",
             "data": {
-                "title": str(payload.get("title") or "").strip(),
-                "desc": str(payload.get("desc") or "").strip(),
-                "url": str(payload.get("url") or "").strip(),
-                "appid": "",
-                "appname": "链接",
-                "thumburl": str(payload.get("image") or "").strip(),
+                "content": appmsg,
                 "type": "5",
             },
         }
@@ -335,7 +346,13 @@ class MessageBuilder:
         }
         segment = {
             "type": "json",
-            "data": _json.dumps(card, ensure_ascii=False, separators=(",", ":")),
+            "data": {
+                "data": _json.dumps(
+                    card,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+            },
         }
         await self._send_onebot_segments(event, [segment])
 
