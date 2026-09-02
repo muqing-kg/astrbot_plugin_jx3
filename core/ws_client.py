@@ -49,12 +49,15 @@ class JX3WSClient:
         self._stop = asyncio.Event()
         self._wanted = False
 
-    async def configure(self, token: str, wanted: bool) -> None:
+    async def configure(self, token: str, wanted: bool, url: str | None = None) -> None:
         token = token or ""
         wanted = bool(wanted)
         token_changed = token != self.token
+        url_changed = bool(url and url.rstrip("/") != self.url.rstrip("/"))
+        if url:
+            self.url = url.rstrip("/")
         self.token = token
-        if wanted and (not self._wanted or token_changed):
+        if wanted and (not self._wanted or token_changed or url_changed):
             if self._wanted:
                 await self.stop()
             await self.start()

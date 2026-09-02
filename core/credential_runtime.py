@@ -5,10 +5,9 @@ from typing import Any
 
 from .credentials import (
     CredentialRuntimeError,
-    confirm_token_failure,
     confirm_ticket_failure,
+    inspect_token_status,
     masked_credential,
-    validate_pool_token,
 )
 
 
@@ -26,13 +25,8 @@ async def _credential_source(
     umo: str,
     kind: str,
 ) -> tuple[str, list[str], str]:
-    group_values = list(await sessions.list_active_credentials(umo, kind))
-    if group_values:
-        return "group", group_values, f"group_{kind}"
-    global_values = list(await sessions.list_active_global_credentials(kind))
-    if global_values:
-        return "global", global_values, f"global_{kind}"
-    return "none", [], f"none_{kind}"
+    source, values = await sessions.resolve_credential_pool(umo, kind)
+    return source, list(values), f"{source}_{kind}"
 
 
 async def execute_query_with_credentials(
@@ -85,30 +79,26 @@ async def execute_query_with_credentials(
                 value = token_value if kind == "token" else ticket_value
                 reason = exc.reason
                 if kind == "token":
-                    confirmed, reason = await confirm_token_failure(jx3api, value)
-                    if confirmed:
-                        if token_source == "group":
-                            await sessions.remove_pool_token(umo, value, reason)
-                            action = "已停用接口令牌"
-                        elif token_source == "global":
-                            await sessions.skip_global_token(value, reason)
-                            action = "已跳过全局接口令牌"
-                        else:
-                            action = "接口令牌不可用"
-                        if notify:
-                            await notify(f"{action} {masked_credential(value)}：{reason}")
+                    if token_source == "group":
+                        await sessions.remove_pool_credential(umo, "token", value, reason)
+                        action = "已停用群属接口令牌"
+                    elif token_source == "global":
+                        await sessions.remove_global_credential("token", value, reason)
+                        action = "已停用全局接口令牌"
                     else:
-                        reason = f"未能确认失效：{reason}"
+                        action = "接口令牌不可用"
+                    if notify:
+                        await notify(f"{action} {masked_credential(value)}：{reason}")
                     token_failures.append(f"{masked_credential(value)}：{reason}")
                     break
                 if kind == "ticket":
                     confirmed, reason = await confirm_ticket_failure(jx3api, value, token_value)
                     if confirmed:
                         if ticket_source == "group":
-                            await sessions.delete_pool_ticket(umo, value)
-                            action = "已移除推栏标识"
+                            await sessions.delete_pool_credential(umo, "ticket", value)
+                            action = "已移除群属推栏标识"
                         elif ticket_source == "global":
-                            await sessions.delete_global_ticket(value)
+                            await sessions.delete_global_credential_by_value("ticket", value)
                             action = "已移除全局推栏标识"
                         else:
                             action = "推栏标识不可用"
@@ -128,25 +118,23 @@ async def execute_query_with_credentials(
 
 
 async def restore_recoverable_tokens(jx3api: Any, sessions: Any) -> list[str]:
-    """Move removed group tokens and skipped global tokens back when restored."""
-    if hasattr(sessions, "list_removed_credentials"):
-        rows = await sessions.list_removed_credentials("token")
-    else:
-        rows = await sessions.list_credentials("", "token", "removed")
+    """Move recovered tokens from failure pools back to active pools."""
+    await sessions.purge_expired_removed_credentials(30)
     restored: list[str] = []
-    for row in rows:
-        umo = str(row.get("umo") or "")
-        value = str(row.get("value") or "").strip()
-        if not umo or not value:
-            continue
-        ok, _message, _remaining = await validate_pool_token(jx3api, value)
-        if ok and await sessions.add_active_credential(umo, "token", value):
-            restored.append(value)
-    for row in await sessions.list_skipped_global_credentials():
-        value = str(row.get("value") or "").strip()
-        if not value:
-            continue
-        ok, _message, _remaining = await validate_pool_token(jx3api, value)
-        if ok and await sessions.restore_global_token(value):
-            restored.append(value)
+    for kind in ("token", "push_token"):
+        for row in await sessions.list_removed_credentials(kind):
+            umo = str(row.get("umo") or "")
+            value = str(row.get("value") or "").strip()
+            if not umo or not value:
+                continue
+            state, _reason, _remaining = await inspect_token_status(jx3api, value)
+            if state == "ok" and await sessions.add_active_credential(umo, kind, value):
+                restored.append(value)
+        for row in await sessions.list_removed_global_credentials(kind):
+            value = str(row.get("value") or "").strip()
+            if not value:
+                continue
+            state, _reason, _remaining = await inspect_token_status(jx3api, value)
+            if state == "ok" and await sessions.restore_global_credential(kind, value):
+                restored.append(value)
     return restored

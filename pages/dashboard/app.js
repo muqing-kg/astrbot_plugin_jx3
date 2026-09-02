@@ -1,12 +1,12 @@
 const statusEl = document.getElementById("status");
-const globalCredentialsEl = document.getElementById("globalCredentials");
+const globalConfigEl = document.getElementById("globalConfig");
 const cardsEl = document.getElementById("cards");
 const commandListEl = document.getElementById("commandList");
 const pushListEl = document.getElementById("pushList");
 const serverListEl = document.getElementById("serverList");
 const resetBtn = document.getElementById("resetBtn");
 let bridge = null;
-let currentView = "sessions";
+let currentView = "global";
 const TOKEN_SOURCE_TEXT = {
   none: "未配置",
   global: "已配置全局",
@@ -96,7 +96,7 @@ function credentialPool(title, items, emptyText, removed = false) {
     <div class="credential-item${removed ? " removed" : ""}">
       <code>${escapeHtml(item.value || "")}</code>
       <div class="credential-meta">
-        ${escapeHtml(item.failure_reason || (removed ? "已移除" : "可用"))}
+        ${escapeHtml(item.failure_reason || (removed ? "失效" : "可用"))}
         ${escapeHtml(item.removed_at || item.updated_at || "")}
       </div>
     </div>
@@ -110,12 +110,12 @@ function credentialPool(title, items, emptyText, removed = false) {
 }
 
 function globalCredentialItem(item, kind) {
-  const skipped = item.status === "skipped";
-  const state = skipped ? "已跳过" : "可用";
+  const failed = item.status === "removed";
+  const state = failed ? "失效" : "可用";
   const reason = item.failure_reason || "";
-  const time = skipped ? item.skipped_at : item.updated_at;
+  const time = failed ? item.removed_at : item.updated_at;
   return `
-    <div class="credential-item${skipped ? " removed" : ""}">
+    <div class="credential-item${failed ? " removed" : ""}">
       <code>${escapeHtml(item.value || "")}</code>
       <div class="credential-meta">
         ${escapeHtml(state)}${reason ? ` · ${escapeHtml(reason)}` : ""}${time ? ` · ${escapeHtml(time)}` : ""}
@@ -129,16 +129,26 @@ function globalCredentialItem(item, kind) {
 
 function renderGlobalCredentials(payload) {
   const tokens = payload.tokens || [];
+  const removedTokens = payload.removed_tokens || [];
+  const pushTokens = payload.push_tokens || [];
+  const removedPushTokens = payload.removed_push_tokens || [];
   const tickets = payload.tickets || [];
-  globalCredentialsEl.innerHTML = `
+  const config = payload.config || {};
+  globalConfigEl.innerHTML = `
     <article class="card global-card">
       <div class="card-head">
         <div>
-          <h2 class="card-title">全局凭据</h2>
-          <p class="umo">多条全局凭据自动轮询；未配置群属凭据的类型会使用这里。</p>
+          <h2 class="card-title">全局配置</h2>
+          <p class="umo">统一维护 JX3API 连接、凭据池与指令前缀。</p>
         </div>
       </div>
       <div class="rows">
+        <div class="row">
+          <label class="field">
+            <span>JX3API 基础地址</span>
+            <input data-k="jx3api_base_url" value="${escapeHtml(config.jx3api_base_url || "")}" />
+          </label>
+        </div>
         <div class="row">
           <label class="field">
             <span>添加全局接口令牌</span>
@@ -149,9 +159,42 @@ function renderGlobalCredentials(payload) {
           </div>
         </div>
         <div class="credential-pool">
-          <div class="pool-title">全局接口令牌</div>
+          <div class="pool-title">全局接口令牌 · 可用池</div>
           <div class="pool-items">
             ${tokens.map((item) => globalCredentialItem(item, "token")).join("") || `<div class="credential-empty">未配置</div>`}
+          </div>
+        </div>
+        <div class="credential-pool removed-pool">
+          <div class="pool-title">全局接口令牌 · 失效池</div>
+          <div class="pool-items">
+            ${removedTokens.map((item) => globalCredentialItem(item, "token")).join("") || `<div class="credential-empty">暂无</div>`}
+          </div>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>JX3API 事件通道地址</span>
+            <input data-k="jx3api_ws_url" value="${escapeHtml(config.jx3api_ws_url || "")}" />
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>添加全局推送令牌</span>
+            <input data-k="global-push-token" placeholder="一次添加一条" />
+          </label>
+          <div class="row-actions">
+            <button data-act="global-push-token" type="button">添加令牌</button>
+          </div>
+        </div>
+        <div class="credential-pool">
+          <div class="pool-title">全局推送令牌 · 可用池</div>
+          <div class="pool-items">
+            ${pushTokens.map((item) => globalCredentialItem(item, "push_token")).join("") || `<div class="credential-empty">未配置</div>`}
+          </div>
+        </div>
+        <div class="credential-pool removed-pool">
+          <div class="pool-title">全局推送令牌 · 失效池</div>
+          <div class="pool-items">
+            ${removedPushTokens.map((item) => globalCredentialItem(item, "push_token")).join("") || `<div class="credential-empty">暂无</div>`}
           </div>
         </div>
         <div class="row">
@@ -164,9 +207,28 @@ function renderGlobalCredentials(payload) {
           </div>
         </div>
         <div class="credential-pool">
-          <div class="pool-title">全局推栏标识</div>
+          <div class="pool-title">全局推栏标识 · 可用池</div>
           <div class="pool-items">
             ${tickets.map((item) => globalCredentialItem(item, "ticket")).join("") || `<div class="credential-empty">未配置</div>`}
+          </div>
+        </div>
+        <div class="switches">
+          <label class="toggle">
+            <input data-k="jx3api_ssl_verify" type="checkbox" ${config.jx3api_ssl_verify ? "checked" : ""} />
+            校验 JX3API 接口 TLS 证书
+          </label>
+          <label class="toggle">
+            <input data-k="prefix_enable" type="checkbox" ${config.prefix_enable ? "checked" : ""} />
+            启用插件指令前缀
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>插件指令前缀</span>
+            <input data-k="prefix_text" value="${escapeHtml(config.prefix_text || "")}" />
+          </label>
+          <div class="row-actions">
+            <button data-act="global-save" type="button">保存全局配置</button>
           </div>
         </div>
       </div>
@@ -182,7 +244,7 @@ function setView(view) {
   document.querySelectorAll(".view-panel").forEach((panel) => {
     panel.classList.toggle("active", panel.dataset.viewPanel === view);
   });
-  resetBtn.hidden = view === "sessions";
+  resetBtn.hidden = !["commands", "push", "servers"].includes(view);
 }
 
 function renderSessions(payload) {
@@ -252,8 +314,16 @@ function sessionCard(row) {
         启用该会话机器人
       </label>
       <label class="toggle">
-        <input data-k="use_global_push_token" type="checkbox" ${row.use_global_push_token ? "checked" : ""} />
-        使用全局推送令牌
+        <input data-k="use_global_token" type="checkbox" ${(row.tokens || []).length ? "disabled" : ""} ${row.use_global_token ? "checked" : ""} />
+        失效时使用全局接口令牌
+      </label>
+      <label class="toggle">
+        <input data-k="use_global_push_token" type="checkbox" ${(row.push_tokens || []).length ? "disabled" : ""} ${row.use_global_push_token ? "checked" : ""} />
+        失效时使用全局推送令牌
+      </label>
+      <label class="toggle">
+        <input data-k="use_global_ticket" type="checkbox" ${(row.tickets || []).length ? "disabled" : ""} ${row.use_global_ticket ? "checked" : ""} />
+        失效时使用全局推栏标识
       </label>
     </div>
     <div class="rows">
@@ -279,11 +349,11 @@ function sessionCard(row) {
       </div>
       <div class="row">
         <label class="field">
-          <span>JX3API 推送令牌</span>
-          <input data-k="push-token" data-initial="${escapeHtml(row.push_token_display_value || "")}" value="${escapeHtml(row.push_token_display_value || "")}" placeholder="推送令牌" />
+          <span>添加推送令牌</span>
+          <input data-k="push-token" data-initial="" value="" placeholder="一次添加一条" />
         </label>
         <div class="row-actions">
-          <button data-act="push-token" type="button">保存令牌</button>
+          <button data-act="push-token" type="button">添加令牌</button>
           <button data-act="clear-push-token" class="ghost" type="button">清除令牌</button>
         </div>
       </div>
@@ -306,7 +376,8 @@ function sessionCard(row) {
           <button data-act="save-managers" type="button">保存管理</button>
         </div>
       </div>
-      ${credentialPool("移除池令牌", row.removed_tokens, "暂无", true)}
+      ${credentialPool("失效池接口令牌", row.removed_tokens, "暂无", true)}
+      ${credentialPool("失效池推送令牌", row.removed_push_tokens, "暂无", true)}
     </div>
   `;
 
@@ -341,9 +412,6 @@ function sessionCard(row) {
       await run(() => bridge.apiPost("page/sessions/token", { umo: row.umo, token }));
     } else if (act === "push-token") {
       if (!row.umo || !pushToken) return setStatus("请填写推送令牌", true);
-      if (pushToken === (card.querySelector('[data-k="push-token"]').dataset.initial || "")) {
-        return setStatus("推送令牌未修改，保持当前配置");
-      }
       await run(() => bridge.apiPost("page/sessions/push-token", { umo: row.umo, token: pushToken }));
     } else if (act === "ticket") {
       if (!row.umo || !ticket) return setStatus("请填写推栏标识", true);
@@ -387,18 +455,20 @@ function sessionCard(row) {
     }
   });
 
-  card.querySelector('[data-k="use_global_push_token"]').addEventListener("change", async (ev) => {
+  for (const kind of ["token", "push_token", "ticket"]) {
+    card.querySelector(`[data-k="use_global_${kind === "token" ? "token" : kind}"]`).addEventListener("change", async (ev) => {
     const enabled = ev.target.checked;
     try {
       if (!row.umo) throw new Error("当前会话缺少标识");
-      await bridge.apiPost("page/sessions/use-global", { umo: row.umo, enabled, kind: "push_token" });
-      setStatus(enabled ? "已启用全局推送令牌" : "已关闭全局推送令牌");
+      await bridge.apiPost("page/sessions/use-global", { umo: row.umo, enabled, kind });
+      setStatus(enabled ? "已启用全局凭据回退" : "已关闭全局凭据回退");
       await loadSessions();
     } catch (err) {
       ev.target.checked = !enabled;
       setStatus(err.message || "保存失败", true);
     }
-  });
+    });
+  }
   card.querySelector('[data-k="bot_enabled"]').addEventListener("change", async (ev) => {
     const enabled = ev.target.checked;
     try {
@@ -539,29 +609,50 @@ async function loadSessions() {
 }
 
 async function loadGlobalCredentials() {
-  renderGlobalCredentials(await bridge.apiGet("page/credentials"));
+  const [credentialPayload, configPayload] = await Promise.all([
+    bridge.apiGet("page/credentials"),
+    bridge.apiGet("page/global-config"),
+  ]);
+  renderGlobalCredentials({ ...credentialPayload, config: configPayload.config });
 }
 
-globalCredentialsEl.addEventListener("click", async (ev) => {
+globalConfigEl.addEventListener("click", async (ev) => {
   const btn = ev.target.closest("button");
   if (!btn) return;
   const act = btn.dataset.act;
   try {
-    if (act === "global-token" || act === "global-ticket") {
-      const input = globalCredentialsEl.querySelector(`[data-k="${act}"]`);
+    if (act === "global-token" || act === "global-push-token" || act === "global-ticket") {
+      const input = globalConfigEl.querySelector(`[data-k="${act}"]`);
       const value = (input?.value || "").trim();
-      if (!value) throw new Error(act === "global-token" ? "请填写全局接口令牌" : "请填写全局推栏标识");
+      const labels = {
+        "global-token": "全局接口令牌",
+        "global-push-token": "全局推送令牌",
+        "global-ticket": "全局推栏标识",
+      };
+      if (!value) throw new Error(`请填写${labels[act]}`);
       await bridge.apiPost("page/credentials/add", {
-        kind: act === "global-token" ? "token" : "ticket",
+        kind: act === "global-token" ? "token" : act === "global-push-token" ? "push_token" : "ticket",
         value,
       });
       if (input) input.value = "";
       setStatus("已保存");
-      await Promise.all([loadSessions(), loadGlobalCredentials()]);
+      await loadGlobalCredentials();
+    } else if (act === "global-save") {
+      const value = (key) => globalConfigEl.querySelector(`[data-k="${key}"]`)?.value ?? "";
+      const checked = (key) => Boolean(globalConfigEl.querySelector(`[data-k="${key}"]`)?.checked);
+      await bridge.apiPost("page/global-config/save", {
+        jx3api_base_url: value("jx3api_base_url"),
+        jx3api_ws_url: value("jx3api_ws_url"),
+        jx3api_ssl_verify: checked("jx3api_ssl_verify"),
+        prefix_enable: checked("prefix_enable"),
+        prefix_text: value("prefix_text"),
+      });
+      setStatus("全局配置已保存");
+      await loadGlobalCredentials();
     } else if (act === "global-delete") {
       await bridge.apiPost("page/credentials/delete", { id: Number(btn.dataset.id) });
       setStatus("已移除全局凭据");
-      await Promise.all([loadSessions(), loadGlobalCredentials()]);
+      await loadGlobalCredentials();
     }
   } catch (err) {
     setStatus(err.message || "保存失败", true);
@@ -581,10 +672,11 @@ async function loadServers() {
 }
 
 async function loadCurrent() {
+  if (currentView === "global") return loadGlobalCredentials();
   if (currentView === "commands") return loadCommands();
   if (currentView === "push") return loadPush();
   if (currentView === "servers") return loadServers();
-  return Promise.all([loadSessions(), loadGlobalCredentials()]);
+  return loadSessions();
 }
 
 document.querySelectorAll(".tab-btn").forEach((btn) => {
@@ -626,11 +718,10 @@ resetBtn.addEventListener("click", async () => {
     setStatus(err.message || "恢复失败", true);
   }
 });
-
 waitForPluginBridge()
   .then((readyBridge) => {
     bridge = readyBridge;
-    setView("sessions");
+    setView("global");
     return loadCurrent();
   })
   .catch((e) => setStatus(e.message, true));

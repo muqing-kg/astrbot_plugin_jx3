@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from urllib.parse import urlsplit, urlunsplit
 
 from .sqlite import AsyncSQLiteDB
 
@@ -105,3 +106,54 @@ class PluginSettings:
 
     async def set_command_overrides(self, overrides: dict[str, str]) -> None:
         await self._set("command_overrides", json.dumps(overrides, ensure_ascii=False))
+
+    async def global_config(self, fallback: dict) -> dict[str, object]:
+        stored_base = await self._get("jx3api_base_url")
+        stored_ws = await self._get("jx3api_ws_url")
+        stored_ssl = await self._get("jx3api_ssl_verify")
+        stored_prefix_enable = await self._get("prefix_enable")
+        stored_prefix_text = await self._get("prefix_text")
+        return {
+            "jx3api_base_url": stored_base or str(
+                fallback.get("jx3api_base_url") or "https://www.jx3api.com"
+            ),
+            "jx3api_ws_url": stored_ws or str(
+                fallback.get("jx3api_ws_url") or "wss://socket.nicemoe.cn"
+            ),
+            "jx3api_ssl_verify": (
+                stored_ssl == "1" if stored_ssl else bool(fallback.get("jx3api_ssl_verify", True))
+            ),
+            "prefix_enable": (
+                stored_prefix_enable == "1" if stored_prefix_enable else bool(
+                    (fallback.get("prefix") or {}).get("enable", False)
+                )
+            ),
+            "prefix_text": stored_prefix_text or str(
+                (fallback.get("prefix") or {}).get("text") or "剑三"
+            ),
+        }
+
+    async def set_global_config(self, values: dict[str, object]) -> None:
+        await self._set("jx3api_base_url", str(values.get("jx3api_base_url") or ""))
+        await self._set("jx3api_ws_url", str(values.get("jx3api_ws_url") or ""))
+        await self._set(
+            "jx3api_ssl_verify",
+            "1" if values.get("jx3api_ssl_verify") else "0",
+        )
+        await self._set(
+            "prefix_enable",
+            "1" if values.get("prefix_enable") else "0",
+        )
+        await self._set("prefix_text", str(values.get("prefix_text") or ""))
+
+
+def normalize_base_url(value: object) -> str:
+    text = str(value or "").strip().rstrip("/")
+    if not text:
+        return "https://www.jx3api.com"
+    parts = urlsplit(text)
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        raise ValueError("基础地址必须以 http:// 或 https:// 开头。")
+    if parts.query or parts.fragment:
+        raise ValueError("基础地址不能携带查询参数或锚点。")
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))

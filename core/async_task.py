@@ -14,7 +14,6 @@ from .event_catalog import FREE_PUSH_ACTIONS, event_dedupe_key, format_event_tex
 from .jx3api_data import JX3APIService
 from .jx3box_data import JX3BOXService
 from .push_errors import is_permanent_group_failure
-from .session_policy import CREDENTIAL_MISSING
 from .session_store import SessionStore
 from .ws_client import DEFAULT_WS_URL, JX3WSClient
 
@@ -40,14 +39,8 @@ class AsyncTask:
             "0": {"interval": 60, "name": "赤兔消息"},
         }
         self.ws_clients: dict[str, JX3WSClient] = {}
+        self._push_token_options: dict[str, list[str]] = {}
         logger.info("初始化推送功能成功")
-
-    def _ws_token(self) -> str:
-        return str(
-            self.conf.get("jx3api_push_token", "")
-            or self.conf.get("jx3api_ws_token", "")
-            or ""
-        ).strip()
 
     @staticmethod
     def _token_key(token: str) -> str:
@@ -57,23 +50,59 @@ class AsyncTask:
         return "token:" + hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
 
     async def _push_token_groups(self, event_actions: set[str]) -> dict[str, dict[str, set[str] | str]]:
+        rows_by_action = await self._prepare_push_assignments(event_actions)
         groups: dict[str, dict[str, set[str] | str]] = {}
-        global_push_token = str(
-            self.conf.get("jx3api_push_token", "")
-            or self.conf.get("jx3api_ws_token", "")
-            or ""
-        ).strip()
+        for action in event_actions:
+            for row in rows_by_action[action]:
+                umo = str(row.get("umo") or "")
+                options = self._push_token_options.get(umo, [])
+                if options:
+                    for token in options:
+                        key = self._token_key(token)
+                        group = groups.setdefault(key, {"actions": set(), "token": token})
+                        cast_set = group["actions"]
+                        cast_set.add(action)
+                elif action in FREE_PUSH_ACTIONS:
+                    key = self._token_key("")
+                    group = groups.setdefault(key, {"actions": set(), "token": ""})
+                    cast_set = group["actions"]
+                    cast_set.add(action)
+        return groups
+
+    async def _prepare_push_assignments(self, event_actions: set[str]) -> dict[str, list[dict]]:
+        rows_by_action: dict[str, list[dict]] = {}
+        unique_rows: dict[str, dict] = {}
         for action in event_actions:
             targets = await self.sessions.rows_with_push_action(action)
+            rows_by_action[action] = targets
             for row in targets:
-                token = self.sessions.resolve_push_token(row, global_push_token)
-                if token == CREDENTIAL_MISSING and action not in FREE_PUSH_ACTIONS:
-                    continue
-                key = self._token_key("" if token == CREDENTIAL_MISSING else token)
-                group = groups.setdefault(key, {"actions": set(), "token": "" if token == CREDENTIAL_MISSING else token})
-                cast_set = group["actions"]
-                cast_set.add(action)
-        return groups
+                umo = str(row.get("umo") or "")
+                if umo:
+                    unique_rows[umo] = row
+
+        self._push_token_options.clear()
+        status_cache: dict[str, tuple[str, str]] = {}
+        for umo, row in unique_rows.items():
+            source, values = await self.sessions.resolve_credential_pool(umo, "push_token")
+            valid_values: list[str] = []
+            for value in values:
+                from .credentials import inspect_token_status
+
+                cache_key = value
+                if cache_key not in status_cache:
+                    state, reason, _remaining = await inspect_token_status(self.jx3api, value)
+                    if state == "failed":
+                        if source == "group":
+                            await self.sessions.remove_pool_credential(umo, "push_token", value, reason)
+                        elif source == "global":
+                            await self.sessions.remove_global_credential("push_token", value, reason)
+                    status_cache[cache_key] = (state, reason)
+                state, _reason = status_cache[cache_key]
+                if state != "failed":
+                    valid_values.append(value)
+
+            self._push_token_options[umo] = valid_values
+        return rows_by_action
 
     async def _configure_ws_clients(self, groups: dict[str, dict[str, set[str] | str]]) -> None:
         url = str(self.conf.get("jx3api_ws_url", "") or DEFAULT_WS_URL)
@@ -94,7 +123,7 @@ class AsyncTask:
                 self.ws_clients[key] = client
             else:
                 token_for_client = token
-            await client.configure(token_for_client, bool(actions))
+            await client.configure(token_for_client, bool(actions), url)
 
     async def init_tasks(self):
         if not self.scheduler.running:
@@ -141,11 +170,12 @@ class AsyncTask:
 
             restored = await restore_recoverable_tokens(self.jx3api, self.sessions)
             if restored:
-                logger.info(f"已恢复 {len(restored)} 枚移除池接口令牌")
+                logger.info(f"已恢复 {len(restored)} 枚失效池令牌")
+                await self.refresh_jobs()
         except asyncio.CancelledError:
             raise
         except Exception:
-            logger.exception("移除池接口令牌每日检查失败")
+            logger.exception("失效池令牌每日检查失败")
 
     async def _job(self, action: str, name: str):
         try:
@@ -185,30 +215,52 @@ class AsyncTask:
             if legacy == status:
                 targets = await self.sessions.push_targets(action_id, server)
                 targets = await self._targets_for_token(targets, token_key, action_id)
-                if targets:
-                    await self.sessions.set_push_state(action_id, server or "*", status, token_key)
                 return
-        old = await self.sessions.get_push_state(action_id, server or "*", token_key)
-        if old == status:
-            return
         targets = await self.sessions.push_targets(action_id, server)
         targets = await self._targets_for_token(targets, token_key, action_id)
         if not targets:
             return
-        await self._send(targets, text, action_id)
-        await self.sessions.set_push_state(action_id, server or "*", status, token_key)
+        pending = []
+        state_keys: dict[str, str] = {}
+        for row in targets:
+            umo = str(row.get("umo") or "")
+            state_key = f"umo:{umo}"
+            state_keys[umo] = state_key
+            old = await self.sessions.get_push_state(action_id, server or "*", state_key)
+            if old != status:
+                pending.append(row)
+        if not pending:
+            return
+        async with self.sessions._push_state_lock:
+            still_pending = []
+            for row in pending:
+                umo = str(row.get("umo") or "")
+                old = await self.sessions.get_push_state(action_id, server or "*", state_keys[umo])
+                if old != status:
+                    still_pending.append(row)
+            if not still_pending:
+                return
+            await self._send(still_pending, text, action_id)
+            for row in still_pending:
+                umo = str(row.get("umo") or "")
+                await self.sessions.set_push_state(
+                    action_id,
+                    server or "*",
+                    status,
+                    state_keys[umo],
+                )
 
     async def _targets_for_token(self, targets: list[dict], token_key: str, action: str = ""):
         if token_key == "__scheduled__":
             return targets
         if token_key == "__free__" and action not in FREE_PUSH_ACTIONS:
             return []
-        global_push_token = self._ws_token()
         matched = []
         for row in targets:
-            token = self.sessions.resolve_push_token(row, global_push_token)
-            row_key = self._token_key("" if token == CREDENTIAL_MISSING else token)
-            if row_key == token_key:
+            if token_key in [
+                self._token_key(token)
+                for token in self._push_token_options.get(str(row.get("umo") or ""), [])
+            ]:
                 matched.append(row)
         return matched
 

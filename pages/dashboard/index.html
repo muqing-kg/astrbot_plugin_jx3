@@ -19,14 +19,17 @@
         </div>
       </header>
       <nav class="tabs" aria-label="配置分类">
-        <button class="tab-btn active" type="button" data-view="sessions">会话配置</button>
+        <button class="tab-btn active" type="button" data-view="global">全局配置</button>
+        <button class="tab-btn" type="button" data-view="sessions">会话配置</button>
         <button class="tab-btn" type="button" data-view="commands">自主查询命令配置</button>
         <button class="tab-btn" type="button" data-view="push">主动推送命令配置</button>
         <button class="tab-btn" type="button" data-view="servers">区服配置</button>
       </nav>
       <p id="status" class="status" hidden></p>
-      <section class="view-panel active" data-view-panel="sessions">
-        <section id="globalCredentials" class="global-credentials"></section>
+      <section class="view-panel active" data-view-panel="global">
+        <section id="globalConfig" class="global-credentials"></section>
+      </section>
+      <section class="view-panel" data-view-panel="sessions">
         <section id="cards" class="cards"></section>
       </section>
       <section class="view-panel" data-view-panel="commands">

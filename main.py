@@ -16,7 +16,7 @@ from .core.unua_data import UnuaService
 from .core.async_task import AsyncTask
 from .core.message import MessageBuilder
 from .core.fun_basic import load_as_base64
-from .core.session_store import CREDENTIAL_MISSING, SessionStore
+from .core.session_store import SessionStore
 from .core.session_policy import (
     GROUP_SECRET_FORBIDDEN,
     NEED_TICKET,
@@ -101,16 +101,30 @@ class Jx3ApiPlugin(Star):
             await self.sessions.init()
             await self.sessions.migrate_global_credentials(
                 self._global_token(),
+                self._global_push_token(),
                 self._global_ticket(),
             )
-            if self._global_token() or self._global_ticket():
+            if self._global_token() or self._global_push_token() or self._global_ticket():
                 self.conf["jx3api_token"] = ""
+                self.conf["jx3api_push_token"] = ""
+                self.conf["jx3api_ws_token"] = ""
                 self.conf["jx3api_ticket"] = ""
                 save = getattr(self.conf, "save_config_async", None)
                 if callable(save):
                     await save()
             await self.sessions.mark_astrbot_admin_claims(self._astrbot_admin_ids())
             await self.settings.init()
+            global_config = await self.settings.global_config(self.conf)
+            self.conf["jx3api_base_url"] = str(global_config["jx3api_base_url"])
+            self.conf["jx3api_ws_url"] = str(global_config["jx3api_ws_url"])
+            self.conf["jx3api_ssl_verify"] = bool(global_config["jx3api_ssl_verify"])
+            self.prefix = {
+                "enable": bool(global_config["prefix_enable"]),
+                "text": str(global_config["prefix_text"]),
+            }
+            self.jx3api._api.ssl_verify = bool(global_config["jx3api_ssl_verify"])
+            self.jx3box._api.ssl_verify = bool(global_config["jx3api_ssl_verify"])
+            self.aijx3._api.ssl_verify = bool(global_config["jx3api_ssl_verify"])
             self.command_catalog = apply_command_overrides(await self.settings.command_overrides())
             self.server_catalog = apply_alias_overrides(await self.settings.server_aliases())
             self.push_name_overrides = await self.settings.push_name_overrides()
@@ -476,12 +490,83 @@ class Jx3ApiPlugin(Star):
 
     async def _validation_token_for_group(self, row: dict | None) -> str:
         umo = str((row or {}).get("umo") or "").strip()
-        if umo:
-            values = await self.sessions.list_active_credentials(umo, "token")
-            if values:
-                return values[0]
-        global_values = await self.sessions.list_active_global_credentials("token")
-        return global_values[0] if global_values else ""
+        if not umo:
+            return ""
+        _source, values = await self.sessions.resolve_credential_pool(umo, "token")
+        return values[0] if values else ""
+
+    async def _usable_push_token_for_group(self, row: dict | None) -> tuple[str, str]:
+        umo = str((row or {}).get("umo") or "").strip()
+        if not umo:
+            return "", "当前会话未配置推送令牌。"
+        source, values = await self.sessions.resolve_credential_pool(umo, "push_token")
+        if not values:
+            if source == "global_missing":
+                return "", "未配置可用的全局推送令牌，请在全局配置页添加。"
+            return "", "群属推送令牌可用池为空，请在失效原因处理后重试或先关闭推送。"
+        from .credentials import inspect_token_status
+
+        for value in values:
+            state, reason, _remaining = await inspect_token_status(self.jx3api, value)
+            if state == "failed":
+                if source == "group":
+                    await self.sessions.remove_pool_credential(umo, "push_token", value, reason)
+                elif source == "global":
+                    await self.sessions.remove_global_credential("push_token", value, reason)
+                continue
+            if state == "unknown":
+                return "", reason
+            return value, ""
+        return "", "推送令牌均已失效，已进入失效池。"
+
+    async def _credential_stats_reply(
+        self,
+        event: AstrMessageEvent,
+        kind: str,
+    ):
+        umo = self._event_umo(event)
+        source, _values = await self.sessions.resolve_credential_pool(umo, kind)
+        if source.startswith("group"):
+            active = await self.sessions.list_credentials(umo, kind, "active")
+            removed = await self.sessions.list_credentials(umo, kind, "removed")
+            if not active and not removed:
+                return hint_need_token(self.command_catalog)
+            if not active:
+                if kind == "push_token":
+                    return hint_need_push_token(self.command_catalog)
+                return hint_need_token(self.command_catalog)
+        else:
+            active = await self.sessions.list_global_credentials(kind, "active")
+            removed = await self.sessions.list_global_credentials(kind, "removed")
+            if not active and not removed:
+                if kind == "push_token":
+                    return hint_need_push_token(self.command_catalog)
+                return hint_need_token(self.command_catalog)
+
+        labels = {
+            "token": ("群属接口令牌", "全局接口令牌"),
+            "push_token": ("群属推送令牌", "全局推送令牌"),
+        }
+        group_label, global_label = labels[kind]
+        blocks = []
+        for index, row_data in enumerate(active, 1):
+            data = await self.jx3api.token_stats(str(row_data.get("value") or ""))
+            body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
+            label = group_label if source.startswith("group") else global_label
+            blocks.append(f"【{label} {index}】\n{body}")
+        for index, row_data in enumerate(removed, 1):
+            value = str(row_data.get("value") or "")
+            data = await self.jx3api.token_stats(value)
+            body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
+            label = "群属失效池" if source.startswith("group") else "全局失效池"
+            blocks.append(
+                f"【{label} {index}】\n"
+                f"凭据：{mask_for_user(value)}\n"
+                f"当前查询：{body}\n"
+                f"原因：{row_data.get('failure_reason') or '已失效'}\n"
+                f"时间：{row_data.get('removed_at') or '未知'}"
+            )
+        return event.plain_result("\n\n".join(blocks))
 
     async def _call_handler_with_credentials(
         self,
@@ -596,65 +681,13 @@ class Jx3ApiPlugin(Star):
             umo = self._event_umo(event)
             if not await self._is_plugin_admin(event, umo=umo):
                 return event.plain_result(hint_need_claim(self.command_catalog))
-            row = await self.sessions.get(umo)
-            pool_tokens = await self.sessions.list_active_credentials(umo, "token")
-            removed_tokens = await self.sessions.list_credentials(umo, "token", "removed")
-            if pool_tokens or removed_tokens:
-                blocks = []
-                for index, token in enumerate(pool_tokens, 1):
-                    data = await self.jx3api.token_stats(token)
-                    body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
-                    blocks.append(f"【群属接口令牌 {index}】\n{body}")
-                for row_data in removed_tokens:
-                    blocks.append(
-                        "【移除池接口令牌】\n"
-                        f"凭据：{mask_for_user(str(row_data.get('value') or ''))}\n"
-                        f"原因：{row_data.get('failure_reason') or '已移除'}\n"
-                        f"时间：{row_data.get('removed_at') or '未知'}"
-                    )
-                if not blocks:
-                    return event.plain_result(hint_need_token(self.command_catalog))
-                return event.plain_result("\n\n".join(blocks))
-            blocks = []
-            global_tokens = await self.sessions.list_global_credentials("token", "active")
-            for index, global_token in enumerate(global_tokens, 1):
-                data = await self.jx3api.token_stats(global_token)
-                body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
-                blocks.append(f"【全局接口令牌 {index}】\n{body}")
-            for skipped in await self.sessions.list_skipped_global_credentials():
-                blocks.append(
-                    "【全局接口令牌已跳过】\n"
-                    f"凭据：{mask_for_user(str(skipped.get('value') or ''))}\n"
-                    f"原因：{skipped.get('failure_reason') or '已跳过'}\n"
-                    f"时间：{skipped.get('skipped_at') or '未知'}"
-                )
-            if not blocks:
-                return event.plain_result(hint_need_token(self.command_catalog))
-            return event.plain_result("\n\n".join(blocks))
+            return await self._credential_stats_reply(event, "token")
 
         if parsed.action == "push_token_stats":
             umo = self._event_umo(event)
             if not await self._is_plugin_admin(event, umo=umo):
                 return event.plain_result(hint_need_claim(self.command_catalog))
-            row = await self.sessions.get(umo)
-            group_push_token = ((row or {}).get("push_token") or "").strip()
-            global_push_token = self._global_push_token()
-            use_global_push_token = bool((row or {}).get("use_global_push_token"))
-            blocks = []
-            for label, value in (
-                ("【该群推送令牌】", group_push_token),
-                ("【全局推送令牌】", global_push_token if use_global_push_token else ""),
-            ):
-                if not value:
-                    continue
-                for index, token in enumerate([item.strip() for item in value.replace("，", ",").split(",") if item.strip()], 1):
-                    suffix = f"（第 {index} 个）" if "," in value else ""
-                    data = await self.jx3api.token_stats(token)
-                    body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
-                    blocks.append(f"{label}{suffix}\n{body}")
-            if not blocks:
-                return event.plain_result(hint_need_push_token(self.command_catalog))
-            return event.plain_result("\n\n".join(blocks))
+            return await self._credential_stats_reply(event, "push_token")
 
         if parsed.action == "bind":
             umo = self._event_umo(event)
@@ -702,16 +735,8 @@ class Jx3ApiPlugin(Star):
             )
             row = await self.sessions.get(umo)
             if parsed.action == "open_push" and parsed.value not in FREE_PUSH_ACTIONS:
-                push_token = self.sessions.resolve_push_token(row, self._global_push_token())
-                if push_token == CREDENTIAL_MISSING:
-                    return event.plain_result(hint_need_push_token(self.command_catalog))
-                stats = await self.jx3api.token_stats(push_token)
-                if stats.get("code") != 200 or stats.get("valid") is False:
-                    detail = str(stats.get("msg") or "推送令牌不可用")
-                    if "过期" in detail:
-                        detail = "JX3API 推送令牌已过期，请更换或续费后再试。"
-                    elif any(key in detail for key in ("次数", "余额", "额度", "不足", "用尽")):
-                        detail = "JX3API 推送令牌次数已用尽，请更换或续费后再试。"
+                push_token, detail = await self._usable_push_token_for_group(row)
+                if not push_token:
                     return event.plain_result(f"推送令牌校验失败：{detail}")
             ok, msg = await self.sessions.set_push(umo, parsed.value, parsed.action == "open_push")
             if not ok:
@@ -772,23 +797,25 @@ class Jx3ApiPlugin(Star):
             row = await self.sessions.get(target)
             if not row:
                 return event.plain_result(hint_umo_invalid())
-            values = [part.strip() for part in parsed.value.replace("，", ",").split(",") if part.strip()]
-            if not values:
-                return event.plain_result("请填写需要保存的推送令牌。")
-            if len(values) > 1:
-                return event.plain_result("推送令牌一次只能配置一枚；如需更换，请保存新的推送令牌。")
-            for index, value in enumerate(values, 1):
-                data = await self.jx3api.token_stats(value)
-                if data.get("code") != 200 or data.get("valid") is False:
-                    detail = str(data.get("msg") or "推送令牌不可用")
-                    if "过期" in detail:
-                        detail = "JX3API 推送令牌已过期，请更换后再试。"
-                    elif any(key in detail for key in ("次数", "余额", "额度", "不足", "用尽")):
-                        detail = "JX3API 推送令牌次数已用尽，请更换或续费后再试。"
-                    return event.plain_result(f"第 {index} 个推送令牌校验失败：{detail}")
-            await self.sessions.set_push_token(target, parsed.value)
+            value = parsed.value.strip()
+            if not value:
+                return event.plain_result("请填写需要添加的推送令牌。")
+            if "," in value or "，" in value:
+                return event.plain_result("一次只能添加一条推送令牌。")
+            existing = await self.sessions.get_credential(target, "push_token", value)
+            if existing and existing.get("status") == "active":
+                return event.plain_result("该推送令牌已在可用池中。")
+            from .credentials import validate_pool_token
+
+            ok, message, _remaining = await validate_pool_token(self.jx3api, value)
+            if not ok:
+                return event.plain_result(f"推送令牌 {mask_for_user(value)} 校验失败：{message}")
+            await self.sessions.add_active_credential(target, "push_token", value)
             await self.jx3at.refresh_jobs()
-            return event.plain_result(hint_secret_saved("push_token", target) + "\n已通过 JX3API 校验。")
+            return event.plain_result(
+                hint_secret_saved("push_token", target)
+                + "\n已通过 JX3API 校验，并加入群属推送令牌池。"
+            )
         return None
 
     async def _call_with_auto_args(self, handler, event: AstrMessageEvent, args: list[str]):

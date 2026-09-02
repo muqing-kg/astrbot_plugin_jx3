@@ -60,6 +60,10 @@ class JX3BOXService:
     def token(self) -> str:
         return current_token(str(self._config.get("jx3api_token", "") or ""))
 
+    @property
+    def base_url(self) -> str:
+        return str(self._config.get("jx3api_base_url") or "https://www.jx3api.com").rstrip("/")
+
     async def close(self):
         """释放底层 APIClient 资源"""
         if self._api:
@@ -596,7 +600,7 @@ class JX3BOXService:
             return return_data
 
         role_params = {"server": server, "name": name, "token": self.token}
-        api_url = "https://www.jx3api.com/role/detail"
+        api_url = self.base_url + "/role/detail"
         role_data: Optional[Dict[str, Any]] = await self._api.get(api_url, params=role_params, out_key="data")
 
         if not role_data or not isinstance(role_data, dict):
