@@ -303,7 +303,7 @@ function renderSessions(payload) {
 }
 
 function sessionCard(row) {
-  const ticketSource = (row.tickets || []).length ? "group" : row.has_ticket ? "global" : "none";
+  const ticketSource = row.ticket_source || "none";
   const card = document.createElement("article");
   card.className = "card";
   card.innerHTML = `
