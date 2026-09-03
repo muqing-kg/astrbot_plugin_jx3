@@ -25,6 +25,7 @@ class JX3WSClient:
         self,
         url: str = DEFAULT_WS_URL,
         token: str = "",
+        channel: str = "__free__",
         on_message: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
         on_open: SyncOrAsyncCallback | None = None,
         on_close: SyncOrAsyncCallback | None = None,
@@ -34,6 +35,7 @@ class JX3WSClient:
     ):
         self.url = (url or DEFAULT_WS_URL).rstrip("/")
         self.token = token or ""
+        self.channel = channel or "__free__"
         self.on_message = on_message
         self.on_open = on_open
         self.on_close = on_close
@@ -102,6 +104,16 @@ class JX3WSClient:
             ))
         return self.url
 
+    def _safe_url(self) -> str:
+        parts = urlsplit(self.url)
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, "", ""))
+
+    def _connection_info(self) -> str:
+        return (
+            f"channel={self.channel}, url={self._safe_url()}, "
+            f"auth={'yes' if self.token else 'no'}"
+        )
+
     async def _notify(self, callback: SyncOrAsyncCallback | None, *args: Any) -> None:
         if callback is None:
             return
@@ -138,7 +150,7 @@ class JX3WSClient:
                     headers = {"token": self.token} if self.token else None
                     async with session.ws_connect(self._ws_url(), headers=headers, heartbeat=20) as ws:
                         logger.info(
-                            "JX3API 事件通道已连接",
+                            f"JX3API 事件通道已连接: {self._connection_info()}",
                             extra={"log_source": "websocket"},
                         )
                         self.reconnect_attempts = 0
@@ -175,11 +187,20 @@ class JX3WSClient:
                             ws.close_code or aiohttp.WSCloseCode.ABNORMAL_CLOSURE,
                             str(getattr(ws, "close_reason", "") or ""),
                         )
+                        if not self._stop.is_set() and self._wanted:
+                            close_reason = str(getattr(ws, "close_reason", "") or "")
+                            if self.token:
+                                close_reason = close_reason.replace(self.token, "***")
+                            logger.info(
+                                "JX3API 事件通道连接关闭: "
+                                f"{self._connection_info()}, code={ws.close_code}, reason={close_reason}",
+                                extra={"log_source": "websocket"},
+                            )
             except asyncio.CancelledError:
                 raise
             except Exception as e:
                 logger.warning(
-                    f"JX3API 事件通道断开: {type(e).__name__}",
+                    f"JX3API 事件通道断开: {self._connection_info()}, error={type(e).__name__}",
                     extra={"log_source": "websocket"},
                 )
                 await self._notify(self.on_error, e)
@@ -198,11 +219,15 @@ class JX3WSClient:
                 )
                 self.reconnect_attempts += 1
                 logger.info(
-                    f"JX3API 事件通道将在 {delay:g} 秒后重连",
+                    f"JX3API 事件通道将在 {delay:g} 秒后重连: "
+                    f"{self._connection_info()}, attempt={self.reconnect_attempts + 1}",
                     extra={"log_source": "websocket"},
                 )
                 try:
                     await asyncio.wait_for(self._stop.wait(), timeout=delay)
                 except asyncio.TimeoutError:
                     pass
-        logger.info("JX3API 事件通道已停止", extra={"log_source": "websocket"})
+        logger.info(
+            f"JX3API 事件通道已停止: {self._connection_info()}",
+            extra={"log_source": "websocket"},
+        )

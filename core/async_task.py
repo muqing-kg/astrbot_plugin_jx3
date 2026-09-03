@@ -226,6 +226,7 @@ class AsyncTask:
                 client = JX3WSClient(
                     url=url,
                     token=token_for_client,
+                    channel=key,
                     on_message=lambda raw, token_key=key: self._enqueue_ws_message(raw, token_key),
                 )
                 self.ws_clients[key] = client
