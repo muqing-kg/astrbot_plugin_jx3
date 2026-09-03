@@ -280,46 +280,58 @@ button.danger[data-armed="true"] {
   align-items: end;
   margin-bottom: 12px;
 }
-.log-list { display: grid; gap: 8px; }
-.log-row {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 10px 12px;
-  min-width: 0;
-}
-.log-head {
+.log-list {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-}
-.log-time { color: var(--muted); font-size: 12px; }
-.log-badge {
-  border-radius: 999px;
-  padding: 1px 7px;
-  font-size: 11px;
-  background: #e8eef3;
-  color: var(--muted);
-}
-.log-level-info { color: #1971c2; background: #e7f5ff; }
-.log-level-debug { color: #495057; background: #e9ecef; }
-.log-level-warning { color: #e8590c; background: #fff4e6; }
-.log-level-error { color: #c92a2a; background: #ffe3e3; }
-.log-level-critical { color: #fff; background: #c92a2a; }
-.log-message {
-  margin: 0;
-  color: var(--ink);
+  flex-direction: column;
+  gap: 2px;
+  height: min(65vh, 720px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: #101418;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 12px;
+  color: #e6edf3;
   font-family: Consolas, "Courier New", monospace;
   font-size: 12px;
+  scrollbar-color: #30363d transparent;
+}
+.log-empty {
+  border-color: #30363d;
+  background: transparent;
+  color: #8b949e;
+}
+.log-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+  line-height: 1.5;
+}
+.log-time { color: #8b949e; font-size: 11px; }
+.log-badge {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #79c0ff;
+  font-size: 11px;
+}
+.log-level-info { color: #58a6ff; }
+.log-level-debug { color: #8b949e; }
+.log-level-warning { color: #f0883e; }
+.log-level-error { color: #f85149; }
+.log-level-critical { color: #ff6b6b; font-weight: 700; }
+.log-message {
+  flex: 1 1 240px;
+  min-width: 0;
+  color: #e6edf3;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 .log-subject {
-  margin-top: 4px;
-  color: var(--muted);
-  font-size: 12px;
+  color: #7ee787;
+  font-size: 11px;
   overflow-wrap: anywhere;
 }
 @media (max-width: 820px) {
