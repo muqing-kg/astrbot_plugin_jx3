@@ -129,10 +129,18 @@ button.danger[data-armed="true"] {
   color: var(--muted);
 }
 .pill.on { background: #d9efe3; color: var(--ok); }
-.pill.source-none { color: #9a93a0; }
-.pill.source-global { color: #4b7bec; }
-.pill.source-group { color: #c45c7a; }
-.pill.source-all { color: #2f9e6e; }
+.source-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.source-label { font-weight: 600; }
+.source-label.label-token { color: #e8590c; }
+.source-label.label-push-token { color: #1971c2; }
+.source-label.label-ticket { color: #ae3ec9; }
+.source-status.status-none { color: #868e96; }
+.source-status.status-group { color: #c2255c; }
+.source-status.status-global { color: #0ca678; }
 .switches {
   display: flex;
   flex-wrap: wrap;

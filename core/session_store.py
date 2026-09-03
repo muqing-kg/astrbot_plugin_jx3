@@ -360,25 +360,49 @@ class SessionStore:
                 )
                 """
             )
-            await self.sql.execute(
-                """
-                UPDATE session_config
-                SET use_global_ticket=0
-                WHERE EXISTS (
+        await self.sql.execute(
+            """
+            UPDATE session_config
+            SET use_global_ticket=0
+            WHERE EXISTS (
                     SELECT 1 FROM session_credentials
                     WHERE session_credentials.umo=session_config.umo
                       AND session_credentials.kind='ticket'
                       AND session_credentials.status='active'
                 )
-                """
+            """
+        )
+        await self.sql.execute(
+            """
+            INSERT OR IGNORE INTO schema_migrations (name, completed_at)
+            VALUES (?, ?)
+            """,
+            ("global_ticket_fallback_v1", _now()),
+        )
+        await self.sql.execute(
+            """
+            UPDATE session_config
+            SET use_global_token=0
+            WHERE EXISTS (
+                SELECT 1 FROM session_credentials
+                WHERE session_credentials.umo=session_config.umo
+                  AND session_credentials.kind='token'
+                  AND session_credentials.status='active'
             )
-            await self.sql.execute(
-                """
-                INSERT OR IGNORE INTO schema_migrations (name, completed_at)
-                VALUES (?, ?)
-                """,
-                ("global_ticket_fallback_v1", _now()),
+            """
+        )
+        await self.sql.execute(
+            """
+            UPDATE session_config
+            SET use_global_push_token=0
+            WHERE EXISTS (
+                SELECT 1 FROM session_credentials
+                WHERE session_credentials.umo=session_config.umo
+                  AND session_credentials.kind='push_token'
+                  AND session_credentials.status='active'
             )
+            """
+        )
         event_columns = {
             str(row.get("name") or "")
             for row in await self.sql.fetch_all("PRAGMA table_info(session_push_events)")
@@ -469,6 +493,30 @@ class SessionStore:
                 user_id TEXT PRIMARY KEY,
                 name TEXT DEFAULT '',
                 claimed_at TEXT DEFAULT ''
+            )
+            """
+        )
+        await self.sql.execute(
+            """
+            UPDATE session_config
+            SET use_global_token=0
+            WHERE EXISTS (
+                SELECT 1 FROM session_credentials
+                WHERE session_credentials.umo=session_config.umo
+                  AND session_credentials.kind='token'
+                  AND session_credentials.status='active'
+            )
+            """
+        )
+        await self.sql.execute(
+            """
+            UPDATE session_config
+            SET use_global_push_token=0
+            WHERE EXISTS (
+                SELECT 1 FROM session_credentials
+                WHERE session_credentials.umo=session_config.umo
+                  AND session_credentials.kind='push_token'
+                  AND session_credentials.status='active'
             )
             """
         )
@@ -1372,9 +1420,7 @@ class SessionStore:
             token_status = "全局未配置"
         else:
             token_status = "未配置"
-        if has_own_token and use_global_token and token_global_available:
-            token_source = "all"
-        elif has_own_token:
+        if has_own_token:
             token_source = "group"
         elif use_global_token and token_global_available:
             token_source = "global"
@@ -1402,7 +1448,7 @@ class SessionStore:
             "global_ticket_value": global_ticket,
             "has_token": has_own_token or (use_global_token and token_global_available),
             "has_ticket": has_own_ticket or ticket_global_available,
-            "use_global_token": use_global_token,
+            "use_global_token": use_global_token and not has_own_token,
             "token_source": token_source,
             "push_token_status": (
                 own_push_token
@@ -1412,10 +1458,9 @@ class SessionStore:
             "push_token_display_value": own_push_token or (global_push_token if use_global_push_token else ""),
             "global_push_token_value": global_push_token,
             "has_push_token": bool(own_push_token or (use_global_push_token and global_push_token)),
-            "use_global_push_token": use_global_push_token,
+            "use_global_push_token": use_global_push_token and not own_push_token,
             "push_token_source": (
-                "all" if own_push_token and use_global_push_token and global_push_token
-                else "group" if own_push_token
+                "group" if own_push_token
                 else "global" if use_global_push_token and global_push_token
                 else "none"
             ),

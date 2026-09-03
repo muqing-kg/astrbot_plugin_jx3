@@ -11,7 +11,6 @@ const TOKEN_SOURCE_TEXT = {
   none: "未配置",
   global: "已配置全局",
   group: "已配置群属",
-  all: "已配置全部",
 };
 
 function setStatus(text, isError = false) {
@@ -87,8 +86,15 @@ function pill(label, on, title = "") {
   return `<span class="pill ${on ? "on" : ""}"${titleAttribute}>${escapeHtml(label)}</span>`;
 }
 
-function sourcePill(label, state) {
-  return `<span class="pill source-${escapeHtml(state || "none")}">${escapeHtml(label)}</span>`;
+function sourcePill(label, labelClass, state) {
+  const sourceState = state || "none";
+  const statusText = TOKEN_SOURCE_TEXT[sourceState] || TOKEN_SOURCE_TEXT.none;
+  return `
+    <span class="pill source-pill source-${escapeHtml(sourceState)}">
+      <span class="source-label ${escapeHtml(labelClass)}">${escapeHtml(label)}：</span>
+      <span class="source-status status-${escapeHtml(sourceState)}">${escapeHtml(statusText)}</span>
+    </span>
+  `;
 }
 
 function groupCredentialAction(item) {
@@ -297,6 +303,7 @@ function renderSessions(payload) {
 }
 
 function sessionCard(row) {
+  const ticketSource = (row.tickets || []).length ? "group" : row.has_ticket ? "global" : "none";
   const card = document.createElement("article");
   card.className = "card";
   card.innerHTML = `
@@ -308,9 +315,9 @@ function sessionCard(row) {
       <div class="pills">
         ${pill(row.claim_type === "astrbot_admin" || !row.claim_identity ? "AstrBot 管理员" : `认领人 ${row.claim_name || row.claim_identity}`, true)}
         ${pill(row.server || "未绑定区服", Boolean(row.server))}
-        ${sourcePill("接口令牌：" + TOKEN_SOURCE_TEXT[row.token_source || "none"], row.token_source || "none")}
-        ${sourcePill("推送令牌：" + TOKEN_SOURCE_TEXT[row.push_token_source || "none"], row.push_token_source || "none")}
-        ${pill("推栏 " + (row.ticket_status || "未配置"), Boolean(row.has_ticket))}
+        ${sourcePill("接口令牌", "label-token", row.token_source || "none")}
+        ${sourcePill("推送令牌", "label-push-token", row.push_token_source || "none")}
+        ${sourcePill("推栏", "label-ticket", ticketSource)}
         ${pill(row.bot_enabled === false ? "机器人已关闭" : "机器人开启", row.bot_enabled !== false)}
         ${pill(
           row.push_fail_count ? `推送异常 ${row.push_fail_count} 次` : "推送正常",
@@ -330,15 +337,15 @@ function sessionCard(row) {
       </label>
       <label class="toggle">
         <input data-k="use_global_token" type="checkbox" ${(row.tokens || []).length ? "disabled" : ""} ${row.use_global_token ? "checked" : ""} />
-        失效时使用全局接口令牌
+        使用全局接口令牌
       </label>
       <label class="toggle">
         <input data-k="use_global_push_token" type="checkbox" ${(row.push_tokens || []).length ? "disabled" : ""} ${row.use_global_push_token ? "checked" : ""} />
-        失效时使用全局推送令牌
+        使用全局推送令牌
       </label>
       <label class="toggle">
         <input data-k="use_global_ticket" type="checkbox" ${(row.tickets || []).length ? "disabled" : ""} ${row.use_global_ticket ? "checked" : ""} />
-        失效时使用全局推栏标识
+        使用全局推栏标识
       </label>
     </div>
     <div class="rows">
