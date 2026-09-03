@@ -15,6 +15,7 @@ let bridge = null;
 let currentView = "global";
 let logAutoTimer = null;
 let lastLogId = 0;
+let seenLogIds = new Set();
 const TOKEN_SOURCE_TEXT = {
   none: "未配置",
   global: "已配置全局",
@@ -285,6 +286,9 @@ function setView(view) {
   });
   resetBtn.hidden = !["commands", "push", "servers"].includes(view);
   if (view === "logs") {
+    logListEl.innerHTML = "";
+    seenLogIds.clear();
+    lastLogId = 0;
     startLogAutoRefresh();
   } else {
     clearLogAutoRefresh();
@@ -706,6 +710,7 @@ async function loadServers() {
 function renderLogs(payload) {
   const logs = (payload.logs || []).slice().reverse();
   lastLogId = logs.reduce((maxId, row) => Math.max(maxId, Number(row.id) || 0), lastLogId);
+  seenLogIds = new Set(logs.map((row) => Number(row.id) || 0));
   logListEl.innerHTML = "";
   if (!logs.length) {
     const empty = document.createElement("div");
@@ -725,6 +730,7 @@ function buildLogRow(row) {
   const subject = [row.umo, row.action, row.server].filter(Boolean).join(" · ");
   const el = document.createElement("div");
   el.className = `log-row log-${escapeHtml(row.level.toLowerCase())}`;
+  el.dataset.id = String(row.id || "");
   el.innerHTML = `
     <span class="log-time">${escapeHtml(row.time)}</span>
     <span class="log-badge log-level-${escapeHtml(row.level.toLowerCase())}">${escapeHtml(row.level)}</span>
@@ -740,7 +746,10 @@ function appendLogs(payload) {
   if (!logs.length) return;
   const shouldStick = logListEl.scrollHeight - logListEl.scrollTop - logListEl.clientHeight < 40;
   for (const row of logs) {
-    lastLogId = Math.max(lastLogId, Number(row.id) || 0);
+    const rowId = Number(row.id) || 0;
+    if (rowId && seenLogIds.has(rowId)) continue;
+    if (rowId) seenLogIds.add(rowId);
+    lastLogId = Math.max(lastLogId, rowId);
     logListEl.appendChild(buildLogRow(row));
   }
   while (logListEl.children.length > 1000) {
@@ -847,8 +856,5 @@ waitForPluginBridge()
     bridge = readyBridge;
     setView("global");
     return loadCurrent();
-  })
-  .then(() => {
-    startLogAutoRefresh();
   })
   .catch((e) => setStatus(e.message, true));
