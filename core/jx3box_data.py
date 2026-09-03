@@ -3,9 +3,9 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from astrbot.api import logger
 from astrbot.api import AstrBotConfig
 
+from .plugin_log import logger
 from .request import APIClient
 from .sqlite import AsyncSQLiteDB
 from .fun_basic import gold_to_parts

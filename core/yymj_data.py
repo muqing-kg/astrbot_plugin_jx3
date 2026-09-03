@@ -7,7 +7,8 @@ from urllib.parse import urlparse
 from typing import Any
 
 import aiohttp
-from astrbot.api import logger
+
+from .plugin_log import logger
 
 
 class YymjGuideService:

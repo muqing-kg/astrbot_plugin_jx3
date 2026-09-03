@@ -4,8 +4,9 @@ from typing import cast
 
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register, StarTools
-from astrbot.api import logger
 from astrbot.api import AstrBotConfig
+
+from .core.plugin_log import logger
 
 from .core.sqlite import AsyncSQLiteDB
 from .core.group_info import ensure_group_display_name
@@ -73,7 +74,7 @@ from .core.plugin_settings import PluginSettings
 @register("astrbot_plugin_jx3",
           "muqing-kg",
           "聚合剑网三游戏数据，提供查询、图片渲染和后台推送。",
-          "3.3.9",
+          "3.4.0",
           "https://github.com/muqing-kg/astrbot_plugin_jx3"
 )
 class Jx3ApiPlugin(Star):
@@ -593,6 +594,11 @@ class Jx3ApiPlugin(Star):
     ):
         token_required = cmd_id in NEED_TOKEN
         ticket_required = cmd_id in NEED_TICKET
+        umo = self._event_umo(event)
+        logger.info(
+            "收到主动查询命令",
+            extra={"log_source": "query", "log_umo": umo, "log_action": cmd_id},
+        )
 
         async def runner(token: str, ticket: str):
             creds = set_request_credentials(token or None, ticket or None)
@@ -615,6 +621,32 @@ class Jx3ApiPlugin(Star):
             token_missing=hint_need_token(self.command_catalog),
             ticket_missing=hint_need_ticket(self.command_catalog),
             notify=notify,
+        )
+
+    def _log_query_result(self, umo: str, cmd_id: str, result):
+        text = result.strip() if isinstance(result, str) else ""
+        if text.startswith((
+            "该功能需要",
+            "未配置可用的",
+            "接口令牌",
+            "推栏标识",
+            "推送令牌",
+            "全局未配置",
+        )) or ("尚未配置" in text and ("令牌" in text or "推栏标识" in text)):
+            logger.warning(
+                f"主动查询凭据不足: {text}",
+                extra={"log_source": "query", "log_umo": umo, "log_action": cmd_id},
+            )
+            return
+        if isinstance(result, str) and result.startswith(("接口令牌", "推栏标识")):
+            logger.warning(
+                f"主动查询凭据执行失败: {result}",
+                extra={"log_source": "query", "log_umo": umo, "log_action": cmd_id},
+            )
+            return
+        logger.info(
+            "主动查询执行完成",
+            extra={"log_source": "query", "log_umo": umo, "log_action": cmd_id},
         )
 
     async def _handle_admin_command(self, event: AstrMessageEvent, parts: list[str]):
@@ -907,11 +939,16 @@ class Jx3ApiPlugin(Star):
         args = injected
 
         try:
-            return await self._call_handler_with_credentials(
+            result = await self._call_handler_with_credentials(
                 event, cmd_id, handler, args
             )
+            self._log_query_result(self._event_umo(event), cmd_id, result)
+            return result
         except Exception as e:
-            logger.exception(f"菜单子命令执行失败: {cmd_id}, error={e}")
+            logger.exception(
+                f"菜单子命令执行失败: {cmd_id}, error={e}",
+                extra={"log_source": "query", "log_action": cmd_id},
+            )
             return event.plain_result(format_command_error(cmd_id, e, self.command_catalog))
 
     async def _cmd_ranking(self, event: AstrMessageEvent, args: list[str]):
@@ -1074,10 +1111,14 @@ class Jx3ApiPlugin(Star):
             ret = await self._call_handler_with_credentials(
                 event, cmd, handler, args
             )
+            self._log_query_result(umo, cmd, ret)
             if ret is not None:
                 yield ret
         except Exception as e:
-            logger.exception(f"指令执行失败: {cmd}, error={e}")
+            logger.exception(
+                f"指令执行失败: {cmd}, error={e}",
+                extra={"log_source": "query", "log_umo": umo, "log_action": cmd},
+            )
             yield event.plain_result(format_command_error(cmd, e, self.command_catalog))
 
     def _forced_llm(self, event: AstrMessageEvent, text: str):

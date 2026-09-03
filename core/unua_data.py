@@ -1,7 +1,6 @@
 """unua.top 推栏数据源：角色在线状态查询。"""
 
 import asyncio
-import logging
 import hashlib
 import json
 import secrets
@@ -10,7 +9,7 @@ from typing import Any, Dict, Optional
 
 import requests
 
-logger = logging.getLogger(__name__)
+from .plugin_log import logger
 
 UNUA_BASE = "https://jx3.unua.top"
 

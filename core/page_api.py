@@ -4,7 +4,8 @@ import re
 
 from typing import Any
 
-from astrbot.api import logger
+from .plugin_log import logger as runtime_logger
+from .plugin_log import LOG_BUFFER_SIZE, memory_handler
 
 from .group_info import refresh_missing_group_display_names
 from .page_payload import read_json_payload
@@ -21,7 +22,7 @@ class SessionPageAPI:
         try:
             from astrbot.api.web import error_response, json_response, request
         except Exception as e:
-            logger.warning(f"当前 AstrBot 不支持插件页面 API: {e}")
+            runtime_logger.warning(f"当前 AstrBot 不支持插件页面 API: {e}")
             return
         self.json_response = json_response
         self.error_response = error_response
@@ -54,6 +55,8 @@ class SessionPageAPI:
             ("/page/servers", self.list_servers, ["GET"], "列出区服别名"),
             ("/page/servers/save", self.save_server, ["POST"], "保存区服别名"),
             ("/page/servers/reset", self.reset_servers, ["POST"], "恢复默认区服别名"),
+            ("/page/logs", self.list_logs, ["GET"], "插件运行日志"),
+            ("/page/logs/clear", self.clear_logs, ["POST"], "清空插件运行日志"),
         ]
         for route, handler, methods, description in routes:
             self.plugin.context.register_web_api(
@@ -106,6 +109,46 @@ class SessionPageAPI:
             "sessions": sessions,
             "notice": "本页面只展示群聊会话，仅供 AstrBot 后台主人使用。",
         })
+
+    def _request_query(self, name: str) -> str:
+        for attribute in ("query_params", "args", "GET"):
+            mapping = getattr(self.request, attribute, None)
+            if not mapping:
+                continue
+            try:
+                value = mapping.get(name)
+            except Exception:
+                continue
+            if value is not None:
+                return str(value)
+        return ""
+
+    async def list_logs(self):
+        try:
+            limit = int(self._request_query("limit") or 300)
+        except (TypeError, ValueError):
+            limit = 300
+        limit = max(1, min(limit, LOG_BUFFER_SIZE))
+        try:
+            after_id = int(self._request_query("after_id") or 0)
+        except (TypeError, ValueError):
+            after_id = 0
+        logs = memory_handler.snapshot(
+            limit=limit,
+            level=self._request_query("level"),
+            source=self._request_query("source"),
+            keyword=self._request_query("keyword"),
+            after_id=after_id,
+        )
+        return self.json_response({
+            "logs": logs,
+            "max_entries": LOG_BUFFER_SIZE,
+        })
+
+    async def clear_logs(self):
+        memory_handler.clear()
+        runtime_logger.info("运行日志已清空", extra={"log_source": "plugin"})
+        return self.json_response({"ok": True})
 
     @staticmethod
     def _pool_status(

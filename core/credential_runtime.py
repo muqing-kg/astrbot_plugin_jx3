@@ -9,6 +9,7 @@ from .credentials import (
     inspect_token_status,
     masked_credential,
 )
+from .plugin_log import logger
 
 
 LABELS = {"token": "接口令牌", "ticket": "推栏标识"}
@@ -89,6 +90,10 @@ async def execute_query_with_credentials(
                         action = "接口令牌不可用"
                     if notify:
                         await notify(f"{action} {masked_credential(value)}：{reason}")
+                    logger.warning(
+                        f"{action}，原因：{reason}",
+                        extra={"log_source": "query", "log_umo": umo, "log_action": "credential_rotation"},
+                    )
                     token_failures.append(f"{masked_credential(value)}：{reason}")
                     break
                 if kind == "ticket":
@@ -104,6 +109,10 @@ async def execute_query_with_credentials(
                             action = "推栏标识不可用"
                         if notify:
                             await notify(f"{action} {masked_credential(value)}：{reason}")
+                        logger.warning(
+                            f"{action}，原因：{reason}",
+                            extra={"log_source": "query", "log_umo": umo, "log_action": "credential_rotation"},
+                        )
                     else:
                         reason = f"未能确认失效：{reason}"
                     ticket_failures.append(f"{masked_credential(value)}：{reason}")

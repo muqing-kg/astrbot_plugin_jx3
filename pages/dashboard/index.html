@@ -24,6 +24,7 @@
         <button class="tab-btn" type="button" data-view="commands">自主查询命令配置</button>
         <button class="tab-btn" type="button" data-view="push">主动推送命令配置</button>
         <button class="tab-btn" type="button" data-view="servers">区服配置</button>
+        <button class="tab-btn" type="button" data-view="logs">运行日志</button>
       </nav>
       <p id="status" class="status" hidden></p>
       <section class="view-panel active" data-view-panel="global">
@@ -40,6 +41,45 @@
       </section>
       <section class="view-panel" data-view-panel="servers">
         <section id="serverList" class="list"></section>
+      </section>
+      <section class="view-panel" data-view-panel="logs">
+        <section class="log-controls card">
+          <label class="field">
+            <span>等级</span>
+            <select id="logLevel">
+              <option value="">全部</option>
+              <option value="DEBUG">DEBUG</option>
+              <option value="INFO">INFO</option>
+              <option value="WARNING">WARNING</option>
+              <option value="ERROR">ERROR</option>
+              <option value="CRITICAL">CRITICAL</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>来源</span>
+            <select id="logSource">
+              <option value="">全部</option>
+              <option value="websocket">WebSocket</option>
+              <option value="event">事件</option>
+              <option value="push">推送</option>
+              <option value="retry">补推</option>
+              <option value="chitu">赤兔</option>
+              <option value="query">接口请求</option>
+              <option value="webui">WebUI</option>
+              <option value="plugin">插件</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>关键字</span>
+            <input id="logKeyword" placeholder="搜索日志内容" />
+          </label>
+          <label class="toggle log-auto">
+            <input id="logAutoRefresh" type="checkbox" checked />
+            自动刷新
+          </label>
+          <button id="clearLogBtn" class="ghost" type="button">清空日志</button>
+        </section>
+        <section id="logList" class="log-list"></section>
       </section>
     </div>
     <script src="./app.js"></script>

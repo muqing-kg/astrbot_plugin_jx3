@@ -10,8 +10,9 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from astrbot.api.event import MessageChain
 from astrbot.api.star import Context
-from astrbot.api import logger
 from astrbot.api import AstrBotConfig
+
+from .plugin_log import logger
 
 from .event_catalog import (
     ACTION_IDS,
@@ -391,6 +392,15 @@ class AsyncTask:
         self._retry_tasks_by_umo.setdefault(str(row.get("umo") or ""), set()).add(task)
         task.add_done_callback(self._retry_tasks.discard)
         task.add_done_callback(partial(self._discard_retry_task_by_umo, str(row.get("umo") or "")))
+        logger.info(
+            "推送失败，已安排补推",
+            extra={
+                "log_source": "retry",
+                "log_umo": str(row.get("umo") or ""),
+                "log_action": action,
+                "log_server": server,
+            },
+        )
         return True
 
     def _discard_retry_task_by_umo(self, umo: str, task: asyncio.Task):
@@ -449,6 +459,16 @@ class AsyncTask:
             )
             if not scheduled:
                 await self._release_event_claim(claim_key)
+            else:
+                logger.info(
+                    "插件重启后恢复补推任务",
+                    extra={
+                        "log_source": "retry",
+                        "log_umo": str(record.get("umo") or ""),
+                        "log_action": action,
+                        "log_server": server,
+                    },
+                )
 
     async def _finish_retry(
         self,
@@ -562,6 +582,10 @@ class AsyncTask:
                 acquired.append((row, claim_key))
         if not acquired:
             return
+        logger.info(
+            f"开始投递事件，目标数 {len(acquired)}",
+            extra={"log_source": "push", "log_action": action, "log_server": server},
+        )
 
         retry_claim_keys: set[str] = set()
         try:
@@ -665,12 +689,24 @@ class AsyncTask:
                 server = official
         status = event_dedupe_key(action, payload)
         event_time = self._event_time(payload)
+        logger.info(
+            "收到推送事件",
+            extra={"log_source": "event", "log_action": action_id, "log_server": server},
+        )
         event_age = (datetime.now(timezone.utc) - event_time).total_seconds()
         if event_age > PUSH_RETRY_WINDOW_SECONDS:
+            logger.warning(
+                "推送事件超过补推窗口，已丢弃",
+                extra={"log_source": "event", "log_action": action_id, "log_server": server},
+            )
             return
         targets = await self.sessions.push_targets(action_id, server)
         targets = await self._targets_for_token(targets, token_key, action_id)
         if not targets:
+            logger.debug(
+                "推送事件无匹配目标",
+                extra={"log_source": "event", "log_action": action_id, "log_server": server},
+            )
             return
         pending = []
         state_keys: dict[str, str] = {}
@@ -713,7 +749,10 @@ class AsyncTask:
         if data.get("code") != 200:
             if data.get("msg") == CHITU_NO_EVENT_MESSAGE:
                 return
-            logger.warning(f"赤兔轮询上游失败，保留上次状态: server={server}, error={data.get('msg')}")
+            logger.warning(
+                f"赤兔轮询上游失败，保留上次状态: server={server}, error={data.get('msg')}",
+                extra={"log_source": "chitu", "log_server": server},
+            )
             return
         status = event_dedupe_key(
             action,
@@ -731,6 +770,11 @@ class AsyncTask:
             old = await self.sessions.get_push_state(action, server, state_keys[umo])
             if old != status:
                 pending.append(row)
+        if pending:
+            logger.info(
+                "收到新的赤兔信号",
+                extra={"log_source": "chitu", "log_server": server},
+            )
         await self._deliver_pending(
             pending,
             data.get("data") or "",
@@ -779,7 +823,15 @@ class AsyncTask:
                         timeout=SEND_TIMEOUT_SECONDS,
                     )
                 except Exception as exc:
-                    logger.warning(f"主动推送发送失败: {umo}, error={exc}")
+                    logger.warning(
+                        f"主动推送发送失败: {umo}, error={exc}",
+                        extra={
+                            "log_source": "push",
+                            "log_umo": umo,
+                            "log_action": action,
+                            "log_server": str(row.get("server") or ""),
+                        },
+                    )
                     if is_permanent_group_failure(exc):
                         await self.sessions.record_permanent_push_failure(umo, str(exc))
                         return None, None
@@ -787,13 +839,28 @@ class AsyncTask:
                 else:
                     if sent:
                         await self.sessions.mark_push_success(umo)
+                        logger.info(
+                            "推送成功",
+                            extra={"log_source": "push", "log_umo": umo, "log_action": action},
+                        )
                         return umo, None
-                    logger.warning(f"主动推送平台不可达，已跳过计数: {umo}")
+                    logger.warning(
+                        f"主动推送平台不可达，已跳过计数: {umo}",
+                        extra={"log_source": "push", "log_umo": umo, "log_action": action},
+                    )
                     return None, umo
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.warning(f"主动推送目标处理失败: {umo}, error={exc}")
+            logger.warning(
+                f"主动推送目标处理失败: {umo}, error={exc}",
+                extra={
+                    "log_source": "push",
+                    "log_umo": umo,
+                    "log_action": action,
+                    "log_server": str(row.get("server") or ""),
+                },
+            )
             return None, umo
 
     async def _cancel_runtime_tasks(self):

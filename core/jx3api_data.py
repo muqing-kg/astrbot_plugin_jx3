@@ -7,10 +7,10 @@ from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, Optional
 from zoneinfo import ZoneInfo
 
-from astrbot.api import logger
 from astrbot.api import AstrBotConfig
 import astrbot.api.message_components as Comp
 
+from .plugin_log import logger
 from .request import APIClient
 from .sqlite import AsyncSQLiteDB
 from .fun_basic import week_to_num,compare_date_str,format_time,format_duration,format_short_time
