@@ -24,6 +24,17 @@ class YymjGuideService:
     _CACHE_TTL = 6 * 60 * 60
     _ALLOWED_LINK_HOSTS = {"mp.weixin.qq.com"}
     _ALLOWED_IMAGE_HOSTS = {"mmbiz.qpic.cn", "mmbiz.qlogo.cn"}
+    _CARD_SIGN_URL = "https://oiapi.net/api/QQMusicJSONArk/"
+    _CARD_STYLES = {
+        "qq",
+        "163",
+        "kugou",
+        "kuwo",
+        "migu",
+        "mihoyo",
+        "bilibili",
+        "wechat",
+    }
 
     def __init__(self, timeout: int = 10):
         self._timeout = aiohttp.ClientTimeout(total=timeout)
@@ -205,3 +216,34 @@ class YymjGuideService:
                 "author": str(row.get("author") or "隐元秘鉴").strip(),
             },
         }
+
+    async def sign_card(self, payload: dict[str, Any], style: str = "wechat") -> dict[str, Any]:
+        """请求签名服务，把公众号文章转成 QQ 支持的卡片 JSON。"""
+        card_style = str(style or "wechat").strip().lower()
+        if card_style not in self._CARD_STYLES:
+            raise ValueError(f"不支持的卡片样式: {card_style}")
+        url = self._safe_url(payload.get("url"), self._ALLOWED_LINK_HOSTS)
+        if not url:
+            raise ValueError("攻略链接不合法")
+        params = {
+            "url": url,
+            "song": str(payload.get("title") or "奇遇攻略").strip(),
+            "singer": str(payload.get("desc") or "").strip(),
+            "cover": self._safe_url(payload.get("image"), self._ALLOWED_IMAGE_HOSTS),
+            "jump": url,
+            "format": card_style,
+        }
+        session = await self._get_session()
+        async with session.get(
+            self._CARD_SIGN_URL,
+            params=params,
+            timeout=aiohttp.ClientTimeout(total=20),
+        ) as response:
+            response.raise_for_status()
+            result = await response.json(content_type=None)
+        if not isinstance(result, dict) or result.get("code") != 1:
+            raise RuntimeError(f"卡片签名服务返回失败: {result.get('message') or result}")
+        signed_card = result.get("data")
+        if not isinstance(signed_card, dict):
+            raise ValueError("卡片签名服务返回格式异常")
+        return signed_card

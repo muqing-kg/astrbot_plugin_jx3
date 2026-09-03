@@ -194,6 +194,8 @@ class Jx3ApiPlugin(Star):
         self.jx3box = JX3BOXService(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.unua = UnuaService()
         self.yymj = YymjGuideService()
+        card_config = self.conf.get("guide_card_config", {}) or {}
+        self.qq_card_style = str(card_config.get("qq_style") or "wechat").strip().lower()
         self.jx3at = AsyncTask(
             cast(Context, self.context),
             self.conf,
@@ -210,6 +212,7 @@ class Jx3ApiPlugin(Star):
             self.jx3at,
             self.yymj,
             self.icons,
+            self.qq_card_style,
         )
         self.settings = PluginSettings(self.local_sql_db)
         self.command_catalog = apply_command_overrides({})

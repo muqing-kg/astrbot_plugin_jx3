@@ -65,5 +65,28 @@
     "type": "bool",
     "default": true,
     "invisible": true
+  },
+  "guide_card_config": {
+    "description": "攻略卡片配置",
+    "type": "object",
+    "hint": "QQ 端公众号攻略卡片样式",
+    "items": {
+      "qq_style": {
+        "description": "卡片伪装来源",
+        "type": "string",
+        "hint": "微信、哔哩哔哩、米游社等来源由签名服务决定；默认使用微信",
+        "options": [
+          "wechat",
+          "bilibili",
+          "mihoyo",
+          "qq",
+          "163",
+          "kugou",
+          "kuwo",
+          "migu"
+        ],
+        "default": "wechat"
+      }
+    }
   }
 }
