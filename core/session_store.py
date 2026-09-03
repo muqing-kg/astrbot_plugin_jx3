@@ -151,6 +151,38 @@ class SessionStore:
         )
         await self.sql.execute(
             """
+            DELETE FROM push_state
+            WHERE token_key NOT LIKE 'umo:%'
+            """
+        )
+        await self.sql.execute(
+            """
+            CREATE TABLE IF NOT EXISTS push_retry_queue (
+                claim_key TEXT PRIMARY KEY,
+                action TEXT NOT NULL,
+                server TEXT NOT NULL,
+                umo TEXT NOT NULL,
+                status TEXT NOT NULL,
+                text TEXT NOT NULL,
+                state_key TEXT NOT NULL,
+                event_time TEXT NOT NULL
+            )
+            """
+        )
+        await self.sql.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_push_retry_queue_umo
+            ON push_retry_queue (umo)
+            """
+        )
+        await self.sql.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_push_retry_queue_event_time
+            ON push_retry_queue (event_time)
+            """
+        )
+        await self.sql.execute(
+            """
             CREATE TABLE IF NOT EXISTS session_push_events (
                 umo TEXT NOT NULL,
                 action TEXT NOT NULL,
@@ -658,24 +690,32 @@ class SessionStore:
         if not is_group_umo(umo):
             raise ValueError("只能删除群聊会话")
         async with self.session_lock(umo):
-            async with self._push_state_lock:
-                row = await self.get(umo)
-                if not row:
-                    return False
-                await self.sql.execute("DELETE FROM session_config WHERE umo=?", (umo,))
-                await self.sql.execute("DELETE FROM session_managers WHERE umo=?", (umo,))
-                await self.sql.execute("DELETE FROM session_push_events WHERE umo=?", (umo,))
-                await self.sql.execute("DELETE FROM session_credentials WHERE umo=?", (umo,))
-                for state in await self.sql.select_all("push_state"):
-                    action = str(state.get("kind") or "")
-                    server = str(state.get("server") or "")
-                    if action in ACTION_IDS and not await self.push_targets(action, server):
-                        await self.sql.execute(
-                            "DELETE FROM push_state WHERE kind=? AND server=?",
-                            (action, server),
-                        )
-            self._session_locks.pop(umo, None)
-            return True
+            row = await self.get(umo)
+            if not row:
+                return False
+            await self.sql.execute("DELETE FROM session_config WHERE umo=?", (umo,))
+            await self.sql.execute("DELETE FROM session_managers WHERE umo=?", (umo,))
+            await self.sql.execute("DELETE FROM session_push_events WHERE umo=?", (umo,))
+            await self.sql.execute("DELETE FROM session_credentials WHERE umo=?", (umo,))
+            await self.sql.execute(
+                "DELETE FROM push_state WHERE token_key=?",
+                (f"umo:{umo}",),
+            )
+            await self.sql.execute(
+                "DELETE FROM push_retry_queue WHERE umo=?",
+                (umo,),
+            )
+        async with self._push_state_lock:
+            for state in await self.sql.select_all("push_state"):
+                action = str(state.get("kind") or "")
+                server = str(state.get("server") or "")
+                if action in ACTION_IDS and not await self.push_targets(action, server):
+                    await self.sql.execute(
+                        "DELETE FROM push_state WHERE kind=? AND server=?",
+                        (action, server),
+                    )
+        self._session_locks.pop(umo, None)
+        return True
 
     async def is_active_push_target(self, umo: str, action: str) -> bool:
         action = str(action or "").strip()
@@ -1230,26 +1270,77 @@ class SessionStore:
         token_key: str = "__scheduled__",
     ) -> None:
         async with self._push_state_lock:
-            action = str(action or "").strip()
-            if action not in ACTION_IDS or not await self.push_targets(action, server):
-                return
-            row = await self.sql.select_one(
+            await self.set_push_state_locked(action, server, status, token_key)
+
+    async def set_push_state_locked(
+        self,
+        action: str,
+        server: str,
+        status: str,
+        token_key: str = "__scheduled__",
+    ) -> None:
+        """Persist push state when _push_state_lock is already held."""
+        action = str(action or "").strip()
+        if action not in ACTION_IDS or not await self.push_targets(action, server):
+            return
+        row = await self.sql.select_one(
+            "push_state",
+            "kind=? AND server=? AND token_key=?",
+            (action, server, token_key),
+        )
+        if row:
+            await self.sql.update(
                 "push_state",
+                {"status": str(status)},
                 "kind=? AND server=? AND token_key=?",
                 (action, server, token_key),
             )
-            if row:
-                await self.sql.update(
-                    "push_state",
-                    {"status": str(status)},
-                    "kind=? AND server=? AND token_key=?",
-                    (action, server, token_key),
-                )
-                return
-            await self.sql.insert(
-                "push_state",
-                {"kind": action, "server": server, "token_key": token_key, "status": str(status)},
-            )
+            return
+        await self.sql.insert(
+            "push_state",
+            {"kind": action, "server": server, "token_key": token_key, "status": str(status)},
+        )
+
+    async def add_push_retry(
+        self,
+        *,
+        claim_key: str,
+        action: str,
+        server: str,
+        umo: str,
+        status: str,
+        text: str,
+        state_key: str,
+        event_time: str,
+    ) -> None:
+        await self.sql.execute(
+            """
+            INSERT OR REPLACE INTO push_retry_queue
+            (claim_key, action, server, umo, status, text, state_key, event_time)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                claim_key,
+                str(action),
+                str(server or "*"),
+                str(umo),
+                str(status),
+                str(text or "")[:500],
+                str(state_key),
+                str(event_time),
+            ),
+        )
+
+    async def list_push_retry(self) -> list[dict[str, Any]]:
+        return await self.sql.fetch_all(
+            "SELECT * FROM push_retry_queue ORDER BY event_time, claim_key"
+        )
+
+    async def delete_push_retry(self, claim_key: str) -> None:
+        await self.sql.execute(
+            "DELETE FROM push_retry_queue WHERE claim_key=?",
+            (claim_key,),
+        )
 
     def public_row(
         self,

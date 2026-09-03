@@ -46,7 +46,7 @@ JX3BOX_API_BASE_URLS = {
 CHITU_READY_MARK = "下一匹赤兔即将出世"
 CHITU_NO_EVENT_MESSAGE = "暂无最新赤兔消息"
 CHITU_TIMEZONE = timezone(timedelta(hours=8))
-CHITU_REPORT_MAX_AGE = timedelta(minutes=10)
+CHITU_REPORT_MAX_AGE = timedelta(minutes=1)
 CHITU_EVENT_BUCKET_MINUTES = 30
 
 
@@ -94,6 +94,7 @@ def _extract_chitu_report(
         )
         return {
             "status": status,
+            "event_time": local_time.isoformat(),
             "data": (
                 "[赤兔速报] 赤兔即将出世\n"
                 f"区服：{server}\n"
@@ -213,6 +214,7 @@ class JX3BOXService:
             return return_data
 
         return_data["status"] = report["status"]
+        return_data["event_time"] = report["event_time"]
         return_data["data"] = report["data"]
         return_data["code"] = 200
 
