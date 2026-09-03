@@ -52,7 +52,7 @@ h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: 0; }
 }
 .view-panel { display: none; }
 .view-panel.active { display: block; }
-button, input { font: inherit; }
+button, input, select { font: inherit; }
 button {
   background: var(--accent);
   color: var(--accent-ink);
@@ -156,13 +156,20 @@ button.danger[data-armed="true"] {
 }
 .field { display: grid; gap: 6px; min-width: 0; }
 .field span { font-size: 12px; color: var(--muted); }
-.field input, .list .row input {
+.field input, .field select, .list .row input {
   width: 100%;
   min-height: 40px;
   padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
+}
+.field select {
+  padding-right: 34px;
+  color: var(--ink);
+  appearance: none;
+  background: #fff url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%235d6b7a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 12px center / 10px 6px;
+  cursor: pointer;
 }
 .row-actions {
   display: grid;
