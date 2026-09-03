@@ -8,7 +8,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import aiohttp
 
-from astrbot.api import logger
+from .plugin_log import logger
 
 DEFAULT_WS_URL = "wss://socket.nicemoe.cn"
 HEARTBEAT_INTERVAL = 30
@@ -137,7 +137,10 @@ class JX3WSClient:
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     headers = {"token": self.token} if self.token else None
                     async with session.ws_connect(self._ws_url(), headers=headers, heartbeat=20) as ws:
-                        logger.info("JX3API 事件通道已连接")
+                        logger.info(
+                            "JX3API 事件通道已连接",
+                            extra={"log_source": "websocket"},
+                        )
                         self.reconnect_attempts = 0
                         self._heartbeat_task = asyncio.create_task(
                             self._heartbeat(ws),
@@ -151,7 +154,10 @@ class JX3WSClient:
                                 try:
                                     payload = json.loads(msg.data)
                                 except Exception:
-                                    logger.warning("事件通道收到无法解析的消息")
+                                    logger.warning(
+                                        "事件通道收到无法解析的消息",
+                                        extra={"log_source": "websocket"},
+                                    )
                                     continue
                                 if self.on_message:
                                     try:
@@ -172,7 +178,10 @@ class JX3WSClient:
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                logger.warning(f"JX3API 事件通道断开: {type(e).__name__}")
+                logger.warning(
+                    f"JX3API 事件通道断开: {type(e).__name__}",
+                    extra={"log_source": "websocket"},
+                )
                 await self._notify(self.on_error, e)
             finally:
                 if self._heartbeat_task:
@@ -188,9 +197,12 @@ class JX3WSClient:
                     self.reconnect_max_seconds,
                 )
                 self.reconnect_attempts += 1
-                logger.info(f"JX3API 事件通道将在 {delay:g} 秒后重连")
+                logger.info(
+                    f"JX3API 事件通道将在 {delay:g} 秒后重连",
+                    extra={"log_source": "websocket"},
+                )
                 try:
                     await asyncio.wait_for(self._stop.wait(), timeout=delay)
                 except asyncio.TimeoutError:
                     pass
-        logger.info("JX3API 事件通道已停止")
+        logger.info("JX3API 事件通道已停止", extra={"log_source": "websocket"})

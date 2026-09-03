@@ -4,13 +4,31 @@ const cardsEl = document.getElementById("cards");
 const commandListEl = document.getElementById("commandList");
 const pushListEl = document.getElementById("pushList");
 const serverListEl = document.getElementById("serverList");
+const logListEl = document.getElementById("logList");
+const logLevelEl = document.getElementById("logLevel");
+const logSourceEl = document.getElementById("logSource");
+const logKeywordEl = document.getElementById("logKeyword");
+const logAutoRefreshEl = document.getElementById("logAutoRefresh");
+const clearLogBtn = document.getElementById("clearLogBtn");
 const resetBtn = document.getElementById("resetBtn");
 let bridge = null;
 let currentView = "global";
+let logAutoTimer = null;
+let lastLogId = 0;
 const TOKEN_SOURCE_TEXT = {
   none: "未配置",
   global: "已配置全局",
   group: "已配置群属",
+};
+const LOG_SOURCE_TEXT = {
+  websocket: "WebSocket",
+  event: "事件",
+  push: "推送",
+  retry: "补推",
+  chitu: "赤兔",
+  query: "接口请求",
+  webui: "WebUI",
+  plugin: "插件",
 };
 
 function setStatus(text, isError = false) {
@@ -266,6 +284,11 @@ function setView(view) {
     panel.classList.toggle("active", panel.dataset.viewPanel === view);
   });
   resetBtn.hidden = !["commands", "push", "servers"].includes(view);
+  if (view === "logs") {
+    startLogAutoRefresh();
+  } else {
+    clearLogAutoRefresh();
+  }
 }
 
 function renderSessions(payload) {
@@ -680,11 +703,111 @@ async function loadServers() {
   renderServers(await bridge.apiGet("page/servers"));
 }
 
+function renderLogs(payload) {
+  const logs = (payload.logs || []).slice().reverse();
+  lastLogId = logs.reduce((maxId, row) => Math.max(maxId, Number(row.id) || 0), lastLogId);
+  logListEl.innerHTML = "";
+  if (!logs.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = "暂无符合条件的插件日志。";
+    logListEl.appendChild(empty);
+    return;
+  }
+  for (const row of logs) {
+    const el = document.createElement("div");
+    el.className = `log-row log-${escapeHtml(row.level.toLowerCase())}`;
+    const source = LOG_SOURCE_TEXT[row.source] || row.source || "插件";
+    const subject = [row.umo, row.action, row.server].filter(Boolean).join(" · ");
+    el.innerHTML = `
+      <div class="log-head">
+        <span class="log-time">${escapeHtml(row.time)}</span>
+        <span class="log-badge log-level-${escapeHtml(row.level.toLowerCase())}">${escapeHtml(row.level)}</span>
+        <span class="log-badge">${escapeHtml(source)}</span>
+      </div>
+      <pre class="log-message">${escapeHtml(row.message)}</pre>
+      ${subject ? `<div class="log-subject">${escapeHtml(subject)}</div>` : ""}
+    `;
+    logListEl.appendChild(el);
+  }
+}
+
+function appendLogs(payload) {
+  const logs = payload.logs || [];
+  if (!logs.length) return;
+  for (const row of logs) {
+    lastLogId = Math.max(lastLogId, Number(row.id) || 0);
+    const source = LOG_SOURCE_TEXT[row.source] || row.source || "插件";
+    const subject = [row.umo, row.action, row.server].filter(Boolean).join(" · ");
+    const el = document.createElement("div");
+    el.className = `log-row log-${escapeHtml(row.level.toLowerCase())}`;
+    el.innerHTML = `
+      <div class="log-head">
+        <span class="log-time">${escapeHtml(row.time)}</span>
+        <span class="log-badge log-level-${escapeHtml(row.level.toLowerCase())}">${escapeHtml(row.level)}</span>
+        <span class="log-badge">${escapeHtml(source)}</span>
+      </div>
+      <pre class="log-message">${escapeHtml(row.message)}</pre>
+      ${subject ? `<div class="log-subject">${escapeHtml(subject)}</div>` : ""}
+    `;
+    logListEl.appendChild(el);
+  }
+  while (logListEl.children.length > 1000) {
+    logListEl.firstChild.remove();
+  }
+}
+
+async function loadLogs(reset = false) {
+  const params = {
+    limit: 1000,
+    level: logLevelEl.value,
+    source: logSourceEl.value,
+    keyword: logKeywordEl.value.trim(),
+  };
+  if (!reset && lastLogId) params.after_id = lastLogId;
+  const payload = await bridge.apiGet("page/logs", params);
+  if (reset) renderLogs(payload);
+  else appendLogs(payload);
+}
+
+function clearLogAutoRefresh() {
+  if (logAutoTimer) {
+    window.clearInterval(logAutoTimer);
+    logAutoTimer = null;
+  }
+}
+
+function startLogAutoRefresh() {
+  clearLogAutoRefresh();
+  if (logAutoRefreshEl.checked) {
+    logAutoTimer = window.setInterval(() => {
+      if (currentView !== "logs") return;
+      loadLogs().catch((err) => setStatus(err.message, true));
+    }, 3000);
+  }
+}
+
+logLevelEl.addEventListener("change", () => loadLogs(true).catch((err) => setStatus(err.message, true)));
+logSourceEl.addEventListener("change", () => loadLogs(true).catch((err) => setStatus(err.message, true)));
+logKeywordEl.addEventListener("change", () => loadLogs(true).catch((err) => setStatus(err.message, true)));
+logAutoRefreshEl.addEventListener("change", startLogAutoRefresh);
+clearLogBtn.addEventListener("click", async () => {
+  try {
+    await bridge.apiPost("page/logs/clear", {});
+    lastLogId = 0;
+    await loadLogs();
+    setStatus("运行日志已清空");
+  } catch (err) {
+    setStatus(err.message || "清空失败", true);
+  }
+});
+
 async function loadCurrent() {
   if (currentView === "global") return loadGlobalCredentials();
   if (currentView === "commands") return loadCommands();
   if (currentView === "push") return loadPush();
   if (currentView === "servers") return loadServers();
+  if (currentView === "logs") return loadLogs();
   return loadSessions();
 }
 
@@ -732,5 +855,8 @@ waitForPluginBridge()
     bridge = readyBridge;
     setView("global");
     return loadCurrent();
+  })
+  .then(() => {
+    startLogAutoRefresh();
   })
   .catch((e) => setStatus(e.message, true));

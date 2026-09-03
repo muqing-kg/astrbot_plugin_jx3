@@ -2,7 +2,6 @@ import json as _json
 from xml.sax.saxutils import escape as _xml_escape
 
 from astrbot.core import html_renderer
-from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, MessageChain
 from astrbot.api.message_components import Share
 from astrbot.core.utils.session_waiter import (
@@ -15,6 +14,7 @@ from .aijx3_data import AIJX3Service
 from .jx3box_data import JX3BOXService
 from .unua_data import UnuaService
 from .async_task import AsyncTask
+from .plugin_log import logger
 from .yymj_data import YymjGuideService
 from .decorations import build_decorated_payload, estimate_body_length, fetch_poem_line
 from .credentials import CredentialRuntimeError
@@ -80,6 +80,15 @@ class MessageBuilder:
         self.qq_card_style = str(qq_card_style or "wechat").strip().lower()
         self.icons = icons
 
+    def _log_query_delivery(self, event, kind):
+        logger.info(
+            f"主动查询结果已发送：{kind}",
+            extra={
+                "log_source": "query",
+                "log_umo": str(getattr(event, "unified_msg_origin", "") or ""),
+            },
+        )
+
 
     async def html_render(
         self,
@@ -110,6 +119,7 @@ class MessageBuilder:
         try:
             if data["code"] == 200:
                 await event.send( event.plain_result(data["data"]))
+                self._log_query_delivery(event, "文本")
             else:
                 await event.send(event.plain_result(data["msg"])) 
         except CredentialRuntimeError:
@@ -149,6 +159,7 @@ class MessageBuilder:
                     data["data"]["page_note"] = page_note
                 url = await self.html_render(data["temp"], data["data"], options=options)
                 await event.send(event.image_result(url)) 
+                self._log_query_delivery(event, "渲染图片")
             else:
                 await event.send(event.plain_result(data["msg"])) 
 
@@ -163,6 +174,7 @@ class MessageBuilder:
         try:
             if data["code"] == 200:
                 await event.send(event.image_result(data["data"])) 
+                self._log_query_delivery(event, "图片")
             else:
                 await event.send(event.plain_result(data["msg"])) 
 
@@ -186,6 +198,7 @@ class MessageBuilder:
                 }
                 url = await self.html_render(data["temp"], data["data"], options=options)
                 await event.send(event.image_result(url))
+                self._log_query_delivery(event, "独立图片")
             else:
                 await event.send(event.plain_result(data["msg"]))
         except CredentialRuntimeError:
@@ -201,6 +214,7 @@ class MessageBuilder:
         try:
             if data["code"] == 200:
                 await event.send(event.chain_result(data["data"]))
+                self._log_query_delivery(event, "富媒体链")
             else:
                 await event.send(event.plain_result(data["msg"])) 
         except CredentialRuntimeError:
@@ -218,8 +232,10 @@ class MessageBuilder:
         payload = data["data"]
         if self._is_wechat_session(event):
             await self._send_wechat_appmsg(event, payload)
+            self._log_query_delivery(event, "微信卡片")
         elif self._is_qq_session(event):
             await self._send_qq_card(event, payload)
+            self._log_query_delivery(event, "QQ卡片")
         else:
             segment = Share(
                 url=payload["url"],
@@ -228,6 +244,7 @@ class MessageBuilder:
                 image=payload.get("image") or "",
             )
             await event.send(event.chain_result([segment]))
+            self._log_query_delivery(event, "分享卡片")
 
     @staticmethod
     def _is_wechat_session(event: AstrMessageEvent) -> bool:

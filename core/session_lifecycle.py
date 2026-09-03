@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from astrbot.api import logger
-
 from .session_policy import is_group_umo, parse_umo
+from .plugin_log import logger
 
 
 async def leave_group(context: Any, umo: str) -> tuple[bool, str]:

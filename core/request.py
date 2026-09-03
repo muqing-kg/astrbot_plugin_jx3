@@ -5,7 +5,7 @@ import asyncio
 from typing import Any, Dict, Optional
 from aiohttp import ClientTimeout, ClientSession
 
-from astrbot.api import logger
+from .plugin_log import logger
 
 class APIClient:
     """

@@ -1,8 +1,8 @@
 from typing import Any, Awaitable, Callable, Dict, Optional
 
-from astrbot.api import logger
 from astrbot.api import AstrBotConfig
 
+from .plugin_log import logger
 from .request import APIClient
 from .sqlite import AsyncSQLiteDB
 from .template import load_template
