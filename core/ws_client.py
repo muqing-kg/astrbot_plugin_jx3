@@ -19,7 +19,7 @@ SyncOrAsyncCallback = Callable[..., Any]
 
 
 class JX3WSClient:
-    """JX3API 事件通道。有订阅才连接，断线自动重连。"""
+    """JX3API 事件通道。连接常驻，断线自动重连。"""
 
     def __init__(
         self,
@@ -124,6 +124,11 @@ class JX3WSClient:
         except Exception as exc:
             logger.warning(f"JX3API 事件通道心跳发送失败: {type(exc).__name__}")
             await self._notify(self.on_error, exc)
+            if not ws.closed:
+                try:
+                    await ws.close()
+                except Exception as close_exc:
+                    logger.warning(f"JX3API 事件通道关闭失败: {type(close_exc).__name__}")
 
     async def _run(self) -> None:
         timeout = aiohttp.ClientTimeout(total=None, sock_connect=10, sock_read=None)

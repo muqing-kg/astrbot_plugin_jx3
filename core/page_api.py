@@ -295,6 +295,9 @@ class SessionPageAPI:
             return self.error_response("本插件只支持群聊会话", status_code=400)
         if "," in token or "，" in token:
             return self.error_response("一次只能添加一条推送令牌。", status_code=400)
+        existing = await self.plugin.sessions.get_credential(umo, "push_token", token)
+        if existing and existing.get("status") == "active":
+            return self.error_response("该推送令牌已在可用池中。", status_code=400)
         from .credentials import validate_pool_token
 
         ok, message, _remaining = await validate_pool_token(self.plugin.jx3api, token)
@@ -405,6 +408,7 @@ class SessionPageAPI:
             return self.error_response("缺少 umo", status_code=400)
         if not is_group_umo(umo):
             return self.error_response("只能删除群聊会话", status_code=400)
+        await self.plugin.jx3at.cancel_push_retries_for_umo(umo)
         deleted = await self.plugin.sessions.delete_session(umo)
         if not deleted:
             return self.error_response("未找到该会话", status_code=404)

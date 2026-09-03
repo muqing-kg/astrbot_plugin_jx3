@@ -319,7 +319,8 @@ flowchart LR
 
 - `session_config`：每个群聊的区服绑定和密钥。历史私聊会话会在初始化时清理。
 - `session_push_events`：每个群聊的独立推送事件开关，按官方 action 保存。
-- `push_state`：记录主动通知与赤兔轮询的去重状态；当前使用完整 payload 的 canonical SHA-256 指纹，避免字段缺失时把不同事件误判为重复。
+- `push_state`：按 `action`、`server` 和目标 `token_key` 记录去重状态；普通目标使用 `umo:<UMO>`，实现不同群聊互不影响。指纹基于 payload 的 canonical SHA-256，避免字段缺失时把不同事件误判为重复。
+- `push_retry_queue`：保存发送失败且仍在 60 秒补推窗口内的目标事件，插件重载后继续尝试。
 - `achievement_cache`：JSON 基础数据缓存及更新时间。
 
 随后连接随包的 `plugin_data.db`、启动已配置的后台任务，最后建立指令映射。插件停用时会关闭调度器、三个 HTTP Session 和两个 SQLite 连接。
@@ -426,17 +427,11 @@ AstrBot 的渲染接口接收完整 HTML 字符串，因此插件不会依赖渲
 
 ### 7. 后台推送
 
-`core/async_task.py` 使用 `AsyncIOScheduler` 和 `IntervalTrigger`。每类任务保存：
+`core/async_task.py` 使用常驻事件通道、`AsyncIOScheduler` 和 `IntervalTrigger`。免费事件固定使用无令牌 WebSocket，插件启动后立即连接并保持在线；有效推送令牌按唯一令牌建立付费 WebSocket。没有配置任何群属或全局推送令牌时，付费通道不建立，但订阅记录保留。
 
-- 是否启用；
-- 轮询周期；
-- 目标会话列表；
-- 本地旧状态；
-- 最近请求得到的新状态。
+免费事件不读取、不校验、不依赖推送令牌。付费事件必须有可用推送令牌；令牌失效或无可用回退时，只暂停付费推送。推送状态按 `action/server/umo` 记录，不同群之间互不影响。发送失败的目标会写入本地补推队列，并在事件时间起 60 秒内重试；超过 60 秒后标记为已消费。上游没有发来的历史事件不补发。
 
-调度任务取得业务数据后生成版本化去重指纹。状态发生变化时，向所有 `umos` 发送 `data` 文本，并将新状态写回 `push_state` 表；旧版粗粒度指纹不参与新判断，后续新状态会覆盖旧状态。插件卸载时会移除全部任务并以非等待方式关闭调度器。
-
-开服与新闻任务使用 `JX3APIService`；赤兔后台任务使用 `JX3BOXService.machangxiaoxi()` 请求 Next2 通用马场记录（`type=horse`），只推送 10 分钟内的到达信号，并用事件状态避免重复推送。
+赤兔后台任务每 20 秒使用 `JX3BOXService.machangxiaoxi()` 请求 Next2 通用马场记录（`type=horse`），只推送 1 分钟内的到达信号，并用按群事件状态避免重复推送；事件通道收到 action `0` 时直接忽略。插件卸载时会等待内部任务退出、关闭 WebSocket 并停止调度器。
 
 ## 目录结构
 
