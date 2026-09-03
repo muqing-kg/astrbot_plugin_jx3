@@ -1,4 +1,4 @@
-import time
+import json as _json
 from xml.sax.saxutils import escape as _xml_escape
 
 from astrbot.core import html_renderer
@@ -67,7 +67,8 @@ class MessageBuilder:
                  unua: UnuaService,
                  jx3at: AsyncTask, 
                  yymj: YymjGuideService,
-                 icons: dict[str, dict[str, str]]
+                 icons: dict[str, dict[str, str]],
+                 qq_card_style: str = "wechat"
             ):
         self.server = server
         self.jx3api = jx3api
@@ -76,6 +77,7 @@ class MessageBuilder:
         self.unua = unua
         self.jx3at = jx3at
         self.yymj = yymj
+        self.qq_card_style = str(qq_card_style or "wechat").strip().lower()
         self.icons = icons
 
 
@@ -217,7 +219,7 @@ class MessageBuilder:
         if self._is_wechat_session(event):
             await self._send_wechat_appmsg(event, payload)
         elif self._is_qq_session(event):
-                    await self._send_qq_card(event, payload)
+            await self._send_qq_card(event, payload)
         else:
             segment = Share(
                 url=payload["url"],
@@ -321,19 +323,18 @@ class MessageBuilder:
         await self._send_onebot_segments(event, [segment])
 
     async def _send_qq_card(self, event: AstrMessageEvent, payload: dict):
-        title = str(payload.get("title") or "攻略").strip()
-        desc = str(payload.get("desc") or "").strip()
-        url = str(payload.get("url") or "").strip()
-        cover = str(payload.get("image") or "").strip()
+        signed_card = await self.yymj.sign_card(
+            payload,
+            self.qq_card_style,
+        )
         segment = {
-            "type": "music",
+            "type": "json",
             "data": {
-                "type": "custom",
-                "url": url,
-                "audio": "",
-                "title": title,
-                "image": cover,
-                "content": desc,
+                "data": _json.dumps(
+                    signed_card,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
             },
         }
         await self._send_onebot_segments(event, [segment])
