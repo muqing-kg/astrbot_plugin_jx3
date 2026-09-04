@@ -25,6 +25,7 @@ from .event_catalog import (
 from .jx3api_data import JX3APIService
 from .jx3box_data import CHITU_NO_EVENT_MESSAGE, JX3BOXService
 from .push_errors import is_permanent_group_failure
+from .request import quiet_request_debug
 from .session_store import SessionStore
 from .ws_client import DEFAULT_WS_URL, JX3WSClient
 
@@ -35,6 +36,7 @@ PUSH_RETRY_WINDOW_SECONDS = 60
 CLOCK_SKEW_SECONDS = 5
 PUSH_EVENT_QUEUE_MAXSIZE = 1000
 PUSH_RETRY_TEXT_MAX_CHARS = 500
+CHITU_POLL_SUMMARY_MINUTES = 30
 
 
 class AsyncTask:
@@ -84,6 +86,8 @@ class AsyncTask:
             self._retry_tasks = set()
         if not hasattr(self, "_retry_tasks_by_umo"):
             self._retry_tasks_by_umo = {}
+        if not hasattr(self, "_chitu_poll_stats"):
+            self._chitu_poll_stats = {}
 
     @staticmethod
     def _event_time(payload: dict) -> datetime:
@@ -251,6 +255,13 @@ class AsyncTask:
                 self._credential_pool_recheck,
                 IntervalTrigger(hours=24),
                 id="credential_pool_recheck",
+                max_instances=1,
+            )
+        if self.scheduler.get_job("chitu_poll_summary") is None:
+            self.scheduler.add_job(
+                self._summarize_chitu_polling,
+                IntervalTrigger(minutes=CHITU_POLL_SUMMARY_MINUTES),
+                id="chitu_poll_summary",
                 max_instances=1,
             )
 
@@ -744,10 +755,18 @@ class AsyncTask:
 
     async def _push_server(self, action: str, server: str):
         self._ensure_runtime_state()
-        data = await self.jx3box.machangxiaoxi(server)
+        try:
+            with quiet_request_debug():
+                data = await self.jx3box.machangxiaoxi(server)
+        except Exception:
+            self._record_chitu_poll(server, False)
+            raise
         if not isinstance(data, dict):
+            self._record_chitu_poll(server, False)
             return
         if data.get("code") != 200:
+            succeeded = data.get("msg") == CHITU_NO_EVENT_MESSAGE
+            self._record_chitu_poll(server, succeeded)
             if data.get("msg") == CHITU_NO_EVENT_MESSAGE:
                 return
             logger.warning(
@@ -755,6 +774,7 @@ class AsyncTask:
                 extra={"log_source": "chitu", "log_server": server},
             )
             return
+        self._record_chitu_poll(server, True)
         status = event_dedupe_key(
             action,
             {"status": data.get("status"), "data": data.get("data")},
@@ -784,6 +804,44 @@ class AsyncTask:
             status,
             self._event_time(data),
         )
+
+    def _record_chitu_poll(self, server: str, succeeded: bool):
+        stats = self._chitu_poll_stats.setdefault(
+            str(server or "未知"), {"success": 0, "failed": 0}
+        )
+        stats["success" if succeeded else "failed"] += 1
+
+    def _summarize_chitu_polling(self):
+        if not self._chitu_poll_stats:
+            return
+        server_parts = []
+        failed = False
+        succeeded = False
+        for server, counts in self._chitu_poll_stats.items():
+            success_count = counts["success"]
+            failed_count = counts["failed"]
+            failed = failed or failed_count > 0
+            succeeded = succeeded or success_count > 0
+            if success_count and failed_count:
+                server_parts.append(f"{server}成功 {success_count} 次、失败 {failed_count} 次")
+            elif failed_count:
+                server_parts.append(f"{server}失败 {failed_count} 次")
+            else:
+                server_parts.append(f"{server}成功 {success_count} 次")
+
+        state = "异常" if not succeeded else "部分异常"
+        if failed:
+            message = (
+                f"过去 {CHITU_POLL_SUMMARY_MINUTES} 分钟，赤兔轮询{state}："
+                f"{'；'.join(server_parts)}。失败详情已在前方单独输出。"
+            )
+        else:
+            message = (
+                f"过去 {CHITU_POLL_SUMMARY_MINUTES} 分钟，赤兔轮询正常："
+                f"{('，'.join(server_parts))}。"
+            )
+        logger.info(message, extra={"log_source": "chitu"})
+        self._chitu_poll_stats = {}
 
     async def _send(self, targets, text: str, action: str):
         if not text or not targets:

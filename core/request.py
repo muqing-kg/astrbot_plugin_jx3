@@ -1,4 +1,6 @@
 # core/request.py
+from contextlib import contextmanager
+from contextvars import ContextVar
 import json
 import aiohttp
 import asyncio
@@ -6,6 +8,18 @@ from typing import Any, Dict, Optional
 from aiohttp import ClientTimeout, ClientSession
 
 from .plugin_log import logger
+
+_quiet_debug = ContextVar("jx3_quiet_request_debug", default=False)
+
+
+@contextmanager
+def quiet_request_debug():
+    """Hide routine request DEBUG lines for a caller; errors stay visible."""
+    token = _quiet_debug.set(True)
+    try:
+        yield
+    finally:
+        _quiet_debug.reset(token)
 
 class APIClient:
     """
@@ -61,9 +75,10 @@ class APIClient:
         method = method.upper()
         
         # 记录日志
-        logger.debug(f"发起 {method} 请求: {url}")
-        if params: logger.debug(f"Query参数: {self._redact(params)}")
-        if json_data: logger.debug(f"Body数据: {self._redact(json_data)}")
+        if not _quiet_debug.get():
+            logger.debug(f"发起 {method} 请求: {url}")
+            if params: logger.debug(f"Query参数: {self._redact(params)}")
+            if json_data: logger.debug(f"Body数据: {self._redact(json_data)}")
 
         try:
             # aiohttp 会自动处理 json=json_data 时的 Content-Type
@@ -86,7 +101,8 @@ class APIClient:
     async def _handle_response(self, response: aiohttp.ClientResponse) -> Any:
         """处理响应：自动识别二进制或JSON"""
         try:
-            logger.debug(f"响应状态: {response.status}")
+            if not _quiet_debug.get():
+                logger.debug(f"响应状态: {response.status}")
             if response.status in (401, 403):
                 try:
                     detail = (await response.text()).strip()
@@ -114,7 +130,8 @@ class APIClient:
                     logger.error(f"无法解析响应为 JSON。原始内容: {text[:100]}...")
                     return None
 
-            logger.debug(f"响应数据: {type(data).__name__}, 长度 {len(data) if hasattr(data, '__len__') else '未知'}")
+            if not _quiet_debug.get():
+                logger.debug(f"响应数据: {type(data).__name__}, 长度 {len(data) if hasattr(data, '__len__') else '未知'}")
             return self._validate_api_payload(data)
 
         except aiohttp.ClientError as e:
