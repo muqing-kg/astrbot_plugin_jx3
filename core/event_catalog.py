@@ -299,7 +299,7 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
         url = str(value("url") or "").strip()
         date = str(value("date") or "").strip()
         return line(
-            "官方新闻" if not news_type else f"官方新闻 · {news_type}",
+            news_type,
             field("标题", title),
             field("链接", url),
             field("日期", date),
