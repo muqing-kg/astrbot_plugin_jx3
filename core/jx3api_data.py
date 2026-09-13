@@ -1240,7 +1240,7 @@ class JX3APIService:
         return dt.strftime("%m/%d %H:%M")
 
     async def jueshemingpian(self, server: str, name: str) -> Dict[str, Any]:
-        """名片缓存"""
+        """名片记录"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
             url = data.get("showAvatar")
             if not url:
@@ -1264,7 +1264,7 @@ class JX3APIService:
             ]
             
         return await self._request_api(
-            path="/card/cached",
+            path="/card/record",
             params={"server": server, "name": name, "token": self.token},
             processor=processor,
             template=""
