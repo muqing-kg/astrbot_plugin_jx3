@@ -1255,7 +1255,7 @@ class JX3APIService:
             updated = self._card_update_text(data.get("cacheTime"))
             like_line = f"获赞 {show_like} 次"
             if updated:
-                like_line = f"{like_line} · 名片更新于 {updated}"
+                like_line = f"{like_line} · 数据更新于 {updated}"
             msg = f"{title}\n{like_line}"
 
             return_data["data"] = [
