@@ -67,7 +67,7 @@
     "invisible": true
   },
   "proxy": {
-    "description": "HTTP 代理地址（如 [已清除]），留空则直连",
+    "description": "HTTP 代理地址，留空则直连",
     "type": "string",
     "default": ""
   },
