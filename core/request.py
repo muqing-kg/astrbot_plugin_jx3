@@ -33,9 +33,10 @@ class APIClient:
 
     _SUCCESS_CODES = frozenset((200, "200", "0", 0, 1))
 
-    def __init__(self, base_timeout: int = 10, ssl_verify: bool = True):
+    def __init__(self, base_timeout: int = 10, ssl_verify: bool = True, proxy: str = ""):
         self.base_timeout = base_timeout
         self.ssl_verify = ssl_verify
+        self.proxy = str(proxy or "").strip()
         self._session: Optional[ClientSession] = None
 
     async def get_session(self) -> ClientSession:
@@ -87,7 +88,8 @@ class APIClient:
                 url=url,
                 params=params,
                 json=json_data,
-                ssl=self.ssl_verify
+                ssl=self.ssl_verify,
+                proxy=self.proxy or None
             ) as response:
                 return await self._handle_response(response)
                 

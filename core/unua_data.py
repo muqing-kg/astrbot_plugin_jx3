@@ -16,9 +16,12 @@ UNUA_BASE = "https://jx3.unua.top"
 class UnuaService:
     """jx3.unua.top 推栏数据接口封装（含 proof 认证）。"""
 
-    def __init__(self):
+    def __init__(self, proxy: str = ""):
         self._session = requests.Session()
         self._session.headers.update({"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
+        proxy = str(proxy or "").strip()
+        if proxy:
+            self._session.proxies = {"http": proxy, "https": proxy}
         self._proof_ctx: Optional[dict] = None
         self._proof_ts = 0.0
         self._request_lock = asyncio.Lock()

@@ -26,6 +26,7 @@ class JX3WSClient:
         url: str = DEFAULT_WS_URL,
         token: str = "",
         channel: str = "__free__",
+        proxy: str = "",
         on_message: Callable[[dict[str, Any]], Awaitable[None]] | None = None,
         on_open: SyncOrAsyncCallback | None = None,
         on_close: SyncOrAsyncCallback | None = None,
@@ -36,6 +37,7 @@ class JX3WSClient:
         self.url = (url or DEFAULT_WS_URL).rstrip("/")
         self.token = token or ""
         self.channel = channel or "__free__"
+        self.proxy = str(proxy or "").strip()
         self.on_message = on_message
         self.on_open = on_open
         self.on_close = on_close
@@ -148,7 +150,7 @@ class JX3WSClient:
             try:
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     headers = {"token": self.token} if self.token else None
-                    async with session.ws_connect(self._ws_url(), headers=headers, heartbeat=20) as ws:
+                    async with session.ws_connect(self._ws_url(), headers=headers, heartbeat=20, proxy=self.proxy or None) as ws:
                         logger.info(
                             f"JX3API 事件通道已连接: {self._connection_info()}",
                             extra={"log_source": "websocket"},

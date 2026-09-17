@@ -17,6 +17,7 @@ from .core.unua_data import UnuaService
 from .core.async_task import AsyncTask
 from .core.message import MessageBuilder
 from .core.yymj_data import YymjGuideService
+from .core.decorations import set_proxy
 from .core.fun_basic import load_as_base64
 from .core.session_store import SessionStore
 from .core.session_policy import (
@@ -193,8 +194,10 @@ class Jx3ApiPlugin(Star):
         self.jx3api = JX3APIService(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.aijx3 = AIJX3Service(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.jx3box = JX3BOXService(self.conf, self.plugin_sql_db, self.local_sql_db)
-        self.unua = UnuaService()
-        self.yymj = YymjGuideService()
+        proxy_url = str(self.conf.get("proxy", "") or "").strip()
+        set_proxy(proxy_url)
+        self.unua = UnuaService(proxy=proxy_url)
+        self.yymj = YymjGuideService(proxy=proxy_url)
         card_config = self.conf.get("guide_card_config", {}) or {}
         self.qq_card_style = str(card_config.get("qq_style") or "wechat").strip().lower()
         self.jx3at = AsyncTask(

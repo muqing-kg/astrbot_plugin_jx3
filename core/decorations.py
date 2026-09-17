@@ -7,6 +7,14 @@ from jinja2 import Environment
 
 _JINJA = Environment(autoescape=False)
 
+_proxy: str = ""
+
+
+def set_proxy(value: str) -> None:
+    """配置出站代理；空串表示直连。"""
+    global _proxy
+    _proxy = str(value or "").strip()
+
 _DECOR_COLORS = ("#f3b6c4", "#efb3c3", "#f5cdd7", "#f9dbe3")
 _DECOR_KINDS = ("heart", "star", "sparkle", "diamond", "paw", "flower", "moon", "cloud")
 _DECOR_SVG = {
@@ -125,7 +133,7 @@ async def fetch_poem_line() -> str:
     for url, keys in _POEM_SOURCES:
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=4)) as resp:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=4), proxy=_proxy or None) as resp:
                     if resp.status != 200:
                         continue
                     payload = await resp.json(content_type=None)

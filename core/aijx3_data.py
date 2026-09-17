@@ -12,7 +12,8 @@ class AIJX3Service:
     def __init__(self, config: AstrBotConfig, sqlite: AsyncSQLiteDB, cache_sqlite: Optional[AsyncSQLiteDB] = None):
         # 实例化 API Client
         self._api: APIClient = APIClient(
-            ssl_verify=bool(config.get("jx3api_ssl_verify", True))
+            ssl_verify=bool(config.get("jx3api_ssl_verify", True)),
+            proxy=str(config.get("proxy", "") or ""),
         )
         # 引用插件配置文件
         self._config = config

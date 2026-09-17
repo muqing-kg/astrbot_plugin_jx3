@@ -37,7 +37,8 @@ class YymjGuideService:
         "wechat",
     }
 
-    def __init__(self, timeout: int = 10):
+    def __init__(self, timeout: int = 10, proxy: str = ""):
+        self._proxy = str(proxy or "").strip()
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._session: aiohttp.ClientSession | None = None
         self._articles: list[dict[str, Any]] | None = None
@@ -86,7 +87,7 @@ class YymjGuideService:
             "X-Requested-With": "XMLHttpRequest",
             "Referer": self._safe_url(self._HOMEPAGE_URL, self._ALLOWED_LINK_HOSTS),
         }
-        async with session.post(self._HOMEPAGE_URL, params=params, headers=headers) as response:
+        async with session.post(self._HOMEPAGE_URL, params=params, headers=headers, proxy=self._proxy or None) as response:
             response.raise_for_status()
             payload = await response.json(content_type=None)
         if not isinstance(payload, dict) or not isinstance(payload.get("base_resp"), dict):
@@ -239,6 +240,7 @@ class YymjGuideService:
             self._CARD_SIGN_URL,
             params=params,
             timeout=aiohttp.ClientTimeout(total=20),
+            proxy=self._proxy or None,
         ) as response:
             response.raise_for_status()
             result = await response.json(content_type=None)

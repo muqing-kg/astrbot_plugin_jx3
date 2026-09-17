@@ -219,6 +219,7 @@ class AsyncTask:
 
     async def _configure_ws_clients(self, groups: dict[str, dict[str, set[str] | str]]) -> None:
         url = str(self.conf.get("jx3api_ws_url", "") or DEFAULT_WS_URL)
+        proxy = str(self.conf.get("proxy", "") or "").strip()
         for key in list(self.ws_clients):
             if key not in groups:
                 await self.ws_clients.pop(key).stop()
@@ -231,6 +232,7 @@ class AsyncTask:
                     url=url,
                     token=token_for_client,
                     channel=key,
+                    proxy=proxy,
                     on_message=lambda raw, token_key=key: self._enqueue_ws_message(raw, token_key),
                 )
                 self.ws_clients[key] = client
