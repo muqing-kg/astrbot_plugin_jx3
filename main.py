@@ -911,7 +911,7 @@ class Jx3ApiPlugin(Star):
             return
         result = await self._exec_menu_command(event, ids[choice - 1], list(args))
         if result is not None:
-            await event.send(result)
+            await event.send(event.plain_result(result) if isinstance(result, str) else result)
 
     async def _exec_menu_command(
         self,
@@ -1116,7 +1116,7 @@ class Jx3ApiPlugin(Star):
             )
             self._log_query_result(umo, cmd, ret)
             if ret is not None:
-                yield ret
+                yield event.plain_result(ret) if isinstance(ret, str) else ret
         except Exception as e:
             logger.exception(
                 f"指令执行失败: {cmd}, error={e}",
