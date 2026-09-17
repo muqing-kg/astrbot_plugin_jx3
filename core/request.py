@@ -173,6 +173,19 @@ class APIClient:
         data = await self._request('POST', url, json_data=data)
         return self._extract_data(data, out_key)
 
+    async def get_bytes(self, url: str) -> Optional[bytes]:
+        """经统一会话下载二进制资源（沿用代理配置）。"""
+        session = await self.get_session()
+        try:
+            async with session.get(url, ssl=self.ssl_verify, proxy=self.proxy or None) as response:
+                if response.status != 200:
+                    logger.error(f"资源下载失败 {response.status}: {url}")
+                    return None
+                return await response.read()
+        except aiohttp.ClientError as e:
+            logger.error(f"资源下载出错 ({url}): {e}")
+            return None
+
     def _extract_data(self, data: Any, key: Optional[str]) -> Any:
         """辅助方法：从结果中提取指定字段"""
         if data is None:

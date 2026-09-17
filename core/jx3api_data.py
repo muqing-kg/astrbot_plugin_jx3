@@ -1240,6 +1240,13 @@ class JX3APIService:
             return ""
         return dt.strftime("%m/%d %H:%M")
 
+    async def _proxied_image(self, url: str):
+        """下载远程图片转 base64 发送，避免框架直连拉取被拦；失败时退回 URL。"""
+        raw = await self._api.get_bytes(url)
+        if raw:
+            return Comp.Image.fromBase64(base64.b64encode(raw).decode())
+        return Comp.Image.fromURL(url)
+
     async def jueshemingpian(self, server: str, name: str) -> Dict[str, Any]:
         """名片记录"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
@@ -1261,9 +1268,9 @@ class JX3APIService:
 
             return_data["data"] = [
                 Comp.Plain(msg),
-                Comp.Image.fromURL(url),
+                await self._proxied_image(url),
             ]
-            
+
         return await self._request_api(
             path="/card/record",
             params={"server": server, "name": name, "token": self.token},
@@ -1287,9 +1294,9 @@ class JX3APIService:
 
             return_data["data"] = [
                 Comp.Plain(msg),
-                Comp.Image.fromURL(url),
+                await self._proxied_image(url),
             ]
-            
+
         return await self._request_api(
             path="/card/random",
             params={"server": server, "body": body, "force":force, "token": self.token},
@@ -1309,7 +1316,10 @@ class JX3APIService:
                     logger.warning(f"第{m.get('showIndex')}张名片缺少图片URL，已跳过")
                     continue
 
-                images.append(url)
+                raw = await self._api.get_bytes(url)
+                images.append(
+                    f"data:image/png;base64,{base64.b64encode(raw).decode()}" if raw else url
+                )
 
             if not images:
                 return_data["msg"] = "未获取到有效的名片数据"
