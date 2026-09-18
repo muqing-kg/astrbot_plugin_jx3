@@ -738,7 +738,7 @@ class MessageBuilder:
 
     async def  shuoyoumingpian(self, event: AstrMessageEvent, server: str, name: str, ):
         """ 全名片 服务器 角色 """
-        return await self.T2I_image_msg(event, lambda: self.jx3api.shuoyoumingpian(server,name))
+        return await self.plain_chain(event, lambda: self.jx3api.shuoyoumingpian(server, name))
 
     async def  shuijimingpian(self, event: AstrMessageEvent,server: str, force: str = "", body: str = "", ):
         """ 随机秀 服务器 门派 体型 """

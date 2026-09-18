@@ -1306,8 +1306,8 @@ class JX3APIService:
 
 
     async def shuoyoumingpian(self, server: str, name: str) -> Dict[str, Any]:
-        """名片历史"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
+        """名片历史：全量名片逐张直发，不渲染、不带文字。"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
             images = []
             for m in data:
                 url = m.get("showAvatar")
@@ -1316,28 +1316,20 @@ class JX3APIService:
                     logger.warning(f"第{m.get('showIndex')}张名片缺少图片URL，已跳过")
                     continue
 
-                raw = await self._api.get_bytes(url)
-                images.append(
-                    f"data:image/png;base64,{base64.b64encode(raw).decode()}" if raw else url
-                )
+                images.append(await self._proxied_image(url))
 
             if not images:
                 return_data["msg"] = "未获取到有效的名片数据"
                 return return_data
 
-            return_data["data"] = {
-                "images": images,
-                "server": server,
-                "role": name,
-                "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            }
+            return_data["data"] = images
 
         return await self._request_api(
             path="/card/records",
             params={"server": server, "name": name, "token": self.token},
             processor=processor,
-            template="card_gallery.html"
-        ) 
+            template=""
+        )
 
 
     async def qiyuhuizong(self, server: str, num: int) -> Dict[str, Any]:
