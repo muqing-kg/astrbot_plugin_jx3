@@ -513,3 +513,9 @@ git diff --check
 ## License
 
 本项目基于 [GNU Affero General Public License v3.0](LICENSE) 开源。
+
+## 来源与致谢
+
+本插件基于 [qsc20001102/astrbot_plugin_jx3](https://github.com/qsc20001102/astrbot_plugin_jx3) 修改而来。
+
+原项目的架构设计与大量原始功能实现先于本项目存在，原始著作权归原作者所有；本仓库在其基础上继续演进与维护，遵循原项目同款开源许可。在此向原作者致以诚挚感谢，也请使用者在使用与分发时一并尊重原项目及其作者权益。
