@@ -82,6 +82,17 @@ def credential_failure(raw: Any, code: Any = None) -> tuple[str, str] | None:
     return None
 
 
+CREDENTIAL_LABELS = {
+    "token": "接口令牌",
+    "push_token": "推送令牌",
+    "ticket": "推栏标识",
+}
+
+
+def credential_label(kind: str) -> str:
+    return CREDENTIAL_LABELS.get(str(kind or "").strip(), "凭据")
+
+
 def credential_message(kind: str, raw: Any) -> str:
     text = str(raw or "").strip()
     if kind == "ticket":
@@ -90,21 +101,22 @@ def credential_message(kind: str, raw: Any) -> str:
         if "token" in text.lower() or "令牌" in text:
             return "推栏标识校验失败。"
         return text or "推栏标识不可用。"
+    label = credential_label(kind)
     if "expire" in text.lower() or "过期" in text:
-        return "接口令牌已过期。"
+        return f"{label}已过期。"
     if "quota" in text.lower() or "剩余" in text:
-        return "接口令牌次数不足。"
+        return f"{label}次数不足。"
     if any(key in text for key in ("次数", "余额", "额度", "用尽", "不足")):
-        return "接口令牌次数不足。"
-    return text or "接口令牌不可用。"
+        return f"{label}次数不足。"
+    return text or f"{label}不可用。"
 
 
-async def validate_pool_token(jx3api, value: str) -> tuple[bool, str, int | None]:
+async def validate_pool_token(jx3api, value: str, kind: str = "token") -> tuple[bool, str, int | None]:
     """Validate one interface token for the group-owned pool."""
-    result = await jx3api.token_stats(value)
+    result = await jx3api.token_stats(value, kind)
     if result.get("code") != 200 or result.get("valid") is False:
-        detail = str(result.get("msg") or "接口令牌不可用")
-        return False, jx3api._token_error_message(detail), None
+        detail = str(result.get("msg") or f"{credential_label(kind)}不可用")
+        return False, jx3api._token_error_message(detail, kind), None
     detail = result.get("detail") if isinstance(result.get("detail"), dict) else {}
     remaining = detail.get("remaining")
     if remaining is None:
@@ -120,11 +132,13 @@ async def validate_pool_token(jx3api, value: str) -> tuple[bool, str, int | None
 async def inspect_token_status(
     jx3api,
     value: str,
+    kind: str = "token",
 ) -> tuple[str, str, int | None]:
     """Return token state as ok/failed/unknown with a readable reason."""
-    result = await jx3api.token_stats(value)
+    label = credential_label(kind)
+    result = await jx3api.token_stats(value, kind)
     if result.get("_transport_error") or result.get("_invalid_payload"):
-        return "unknown", "接口令牌状态查询暂时失败，请稍后重试。", None
+        return "unknown", f"{label}状态查询暂时失败，请稍后重试。", None
     if result.get("code") == 200 and result.get("valid") is not False:
         detail = result.get("detail") if isinstance(result.get("detail"), dict) else {}
         remaining = detail.get("remaining")
@@ -134,13 +148,13 @@ async def inspect_token_status(
             except (TypeError, ValueError):
                 remaining = None
             if remaining == 0:
-                return "failed", "接口令牌剩余次数为 0。", remaining
+                return "failed", f"{label}剩余次数为 0。", remaining
         return "ok", "", remaining
     detail = str(result.get("msg") or "")
-    kind, raw = credential_failure(detail, result.get("_code"))
-    if kind == "token":
-        return "failed", credential_message("token", raw), None
-    return "unknown", detail or "接口令牌状态查询失败。", None
+    inferred, raw = credential_failure(detail, result.get("_code"))
+    if inferred == "token":
+        return "failed", credential_message(kind, raw), None
+    return "unknown", detail or f"{label}状态查询失败。", None
 
 
 async def validate_pool_ticket(jx3api, value: str, probe_token: str = "") -> tuple[bool, str, bool]:

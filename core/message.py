@@ -1,3 +1,4 @@
+import asyncio
 import json as _json
 from xml.sax.saxutils import escape as _xml_escape
 
@@ -19,6 +20,17 @@ from .yymj_data import YymjGuideService
 from .decorations import build_decorated_payload, estimate_body_length, fetch_poem_line
 from .credentials import CredentialRuntimeError
 from .render_meta import build_page_meta, limit_image_rows
+
+_SEND_RETRY_DELAY = 1.0
+
+
+def _send_outcome_unknown(exc: BaseException) -> bool:
+    """发送超时类异常：结果未知，可能已送达，不可断言失败。"""
+    if isinstance(exc, (asyncio.TimeoutError, TimeoutError)):
+        return True
+    if type(exc).__name__ == "NetworkError":
+        return True
+    return "timeout" in str(exc).lower()
 
 class MessageBuilder:
     """回复消息构建"""
@@ -89,6 +101,36 @@ class MessageBuilder:
             },
         )
 
+    async def _notice(self, event, text: str) -> None:
+        """发送失败提示；提示自身失败不再上抛，避免二次异常。"""
+        try:
+            await event.send(event.plain_result(text))
+        except Exception as e:
+            logger.error(f"失败提示发送失败: {e}")
+
+    async def _deliver(self, event, send, kind: str) -> bool:
+        """执行发送：确定失败重试一次；结果未知不重试、也不谎报失败。"""
+        try:
+            await send()
+            self._log_query_delivery(event, kind)
+            return True
+        except CredentialRuntimeError:
+            raise
+        except Exception as e:
+            if _send_outcome_unknown(e):
+                logger.warning(f"发送结果未知（可能已送达），不重试不提示: {e}")
+                return False
+            logger.error(f"发送失败: {e}")
+        await asyncio.sleep(_SEND_RETRY_DELAY)
+        try:
+            await send()
+            self._log_query_delivery(event, kind)
+            return True
+        except Exception as e:
+            logger.error(f"发送重试仍失败: {e}")
+        await self._notice(event, "消息发送失败，请稍后再试")
+        return False
+
 
     async def html_render(
         self,
@@ -116,126 +158,101 @@ class MessageBuilder:
     async def plain_msg(self, event: AstrMessageEvent, action):
         """最终将数据整理成文本发送"""
         data= await action()
-        try:
-            if data["code"] == 200:
-                await event.send( event.plain_result(data["data"]))
-                self._log_query_delivery(event, "文本")
-            else:
-                await event.send(event.plain_result(data["msg"])) 
-        except CredentialRuntimeError:
-            raise
-        except Exception as e:
-            logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result("处理失败，请稍后再试"))
+        if data["code"] != 200:
+            await self._deliver(event, lambda: event.send(event.plain_result(data["msg"])), "文本")
+            return
+        await self._deliver(event, lambda: event.send(event.plain_result(data["data"])), "文本")
 
 
     async def T2I_image_msg(self, event: AstrMessageEvent, action):
         """最终将数据渲染成图片发送"""
         data = await action()
+        if data["code"] != 200:
+            await self._deliver(event, lambda: event.send(event.plain_result(data["msg"])), "文本")
+            return
+        options = {
+            "quality": 100,
+            "device_scale_factor_level": "normal",
+            "full_page": True,
+            "omit_background": False,
+            "type": "jpeg"
+        }
         try:
-            if data["code"] == 200:
-                options = {
-                    "quality": 100,
-                    "device_scale_factor_level": "normal",
-                    "full_page": True,
-                    "omit_background": False,
-                    "type": "jpeg"
-                }
-                body_length = estimate_body_length(data.get("temp") or "", data["data"], self.icons)
-                poem_line = await fetch_poem_line()
-                data["data"].update(build_decorated_payload(self.icons, body_length, poem_line))
-                if not data["data"].get("page_quote"):
-                    quote = await self.jx3api.shaohua()
-                    if quote.get("code") == 200 and quote.get("data"):
-                        data["data"]["page_quote"] = str(quote["data"]).strip()
-                data["data"] = limit_image_rows(data["temp"], data["data"])
-                if not data["data"].get("page_meta"):
-                    data["data"]["page_meta"] = build_page_meta(data.get("temp") or "", data["data"])
-                note = str(data["data"].get("note") or "").strip()
-                page_note = str(data["data"].get("page_note") or "").strip()
-                if note:
-                    page_note = " · ".join(part for part in (page_note, note) if part)
-                if page_note:
-                    data["data"]["page_note"] = page_note
-                url = await self.html_render(data["temp"], data["data"], options=options)
-                await event.send(event.image_result(url)) 
-                self._log_query_delivery(event, "渲染图片")
-            else:
-                await event.send(event.plain_result(data["msg"])) 
-
+            body_length = estimate_body_length(data.get("temp") or "", data["data"], self.icons)
+            poem_line = await fetch_poem_line()
+            data["data"].update(build_decorated_payload(self.icons, body_length, poem_line))
+            if not data["data"].get("page_quote"):
+                quote = await self.jx3api.shaohua()
+                if quote.get("code") == 200 and quote.get("data"):
+                    data["data"]["page_quote"] = str(quote["data"]).strip()
+            data["data"] = limit_image_rows(data["temp"], data["data"])
+            if not data["data"].get("page_meta"):
+                data["data"]["page_meta"] = build_page_meta(data.get("temp") or "", data["data"])
+            note = str(data["data"].get("note") or "").strip()
+            page_note = str(data["data"].get("page_note") or "").strip()
+            if note:
+                page_note = " · ".join(part for part in (page_note, note) if part)
+            if page_note:
+                data["data"]["page_note"] = page_note
+            url = await self.html_render(data["temp"], data["data"], options=options)
+        except CredentialRuntimeError:
+            raise
         except Exception as e:
-            logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result("渲染图片失败，请稍后再试"))
+            logger.error(f"渲染图片失败: {e}")
+            await self._notice(event, "渲染图片失败，请稍后再试")
+            return
+        await self._deliver(event, lambda: event.send(event.image_result(url)), "渲染图片")
 
 
     async def image_msg(self, event: AstrMessageEvent, action):
         """最终将数据整理成图片发送"""
         data = await action()
-        try:
-            if data["code"] == 200:
-                await event.send(event.image_result(data["data"])) 
-                self._log_query_delivery(event, "图片")
-            else:
-                await event.send(event.plain_result(data["msg"])) 
-
-        except CredentialRuntimeError:
-            raise
-        except Exception as e:
-            logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result("渲染图片失败，请稍后再试"))
+        if data["code"] != 200:
+            await self._deliver(event, lambda: event.send(event.plain_result(data["msg"])), "文本")
+            return
+        await self._deliver(event, lambda: event.send(event.image_result(data["data"])), "图片")
 
     async def raw_image_msg(self, event: AstrMessageEvent, action):
         """渲染不套公共装饰层的独立图片。"""
         data = await action()
+        if data["code"] != 200:
+            await self._deliver(event, lambda: event.send(event.plain_result(data["msg"])), "文本")
+            return
+        options = {
+            "quality": 100,
+            "device_scale_factor_level": "normal",
+            "full_page": True,
+            "omit_background": False,
+            "type": "png"
+        }
         try:
-            if data["code"] == 200:
-                options = {
-                    "quality": 100,
-                    "device_scale_factor_level": "normal",
-                    "full_page": True,
-                    "omit_background": False,
-                    "type": "png"
-                }
-                url = await self.html_render(data["temp"], data["data"], options=options)
-                await event.send(event.image_result(url))
-                self._log_query_delivery(event, "独立图片")
-            else:
-                await event.send(event.plain_result(data["msg"]))
-        except CredentialRuntimeError:
-            raise
+            url = await self.html_render(data["temp"], data["data"], options=options)
         except Exception as e:
-            logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result("渲染图片失败，请稍后再试"))
+            logger.error(f"渲染独立图片失败: {e}")
+            await self._notice(event, "渲染图片失败，请稍后再试")
+            return
+        await self._deliver(event, lambda: event.send(event.image_result(url)), "独立图片")
 
 
     async def plain_chain(self, event: AstrMessageEvent, action):
         """富媒体消息"""
         data= await action()
-        try:
-            if data["code"] == 200:
-                await event.send(event.chain_result(data["data"]))
-                self._log_query_delivery(event, "富媒体链")
-            else:
-                await event.send(event.plain_result(data["msg"])) 
-        except CredentialRuntimeError:
-            raise
-        except Exception as e:
-            logger.error(f"功能函数执行错误: {e}")
-            await event.send(event.plain_result("渲染图片失败，请稍后再试"))
+        if data["code"] != 200:
+            await self._deliver(event, lambda: event.send(event.plain_result(data["msg"])), "文本")
+            return
+        await self._deliver(event, lambda: event.send(event.chain_result(data["data"])), "富媒体链")
 
     async def link_card_msg(self, event: AstrMessageEvent, action):
         """标题/链接/封面打包成平台卡片发送。"""
         data = await action()
         if data["code"] != 200:
-            await event.send(event.plain_result(data["msg"]))
+            await self._deliver(event, lambda: event.send(event.plain_result(data["msg"])), "文本")
             return
         payload = data["data"]
         if self._is_wechat_session(event):
-            await self._send_wechat_appmsg(event, payload)
-            self._log_query_delivery(event, "微信卡片")
+            await self._deliver(event, lambda: self._send_wechat_appmsg(event, payload), "微信卡片")
         elif self._is_qq_session(event):
-            await self._send_qq_card(event, payload)
-            self._log_query_delivery(event, "QQ卡片")
+            await self._deliver(event, lambda: self._send_qq_card(event, payload), "QQ卡片")
         else:
             segment = Share(
                 url=payload["url"],
@@ -243,8 +260,7 @@ class MessageBuilder:
                 content=payload.get("desc") or "",
                 image=payload.get("image") or "",
             )
-            await event.send(event.chain_result([segment]))
-            self._log_query_delivery(event, "分享卡片")
+            await self._deliver(event, lambda: event.send(event.chain_result([segment])), "分享卡片")
 
     @staticmethod
     def _is_wechat_session(event: AstrMessageEvent) -> bool:
@@ -380,7 +396,8 @@ class MessageBuilder:
         resolved = False
         if "发送序号即可" not in text:
             text += f"\n\n发送序号即可，{timeout} 秒后自动选 1"
-        await event.send(event.plain_result(text))
+        if not await self._deliver(event, lambda: event.send(event.plain_result(text)), "菜单"):
+            return
         user_id = event.get_sender_id()
 
         @session_waiter(timeout=timeout)
@@ -392,17 +409,17 @@ class MessageBuilder:
             if msg.startswith("/"):
                 msg = msg[1:].strip()
             if not msg.isdigit():
-                await new_event.send(MessageChain().message("输入异常，结束会话"))
+                await self._deliver(new_event, lambda: new_event.send(MessageChain().message("输入异常，结束会话")), "会话提示")
                 controller.stop()
                 return
             choice = int(msg)
             if allow_zero:
                 if choice < 0 or choice > count:
-                    await new_event.send(MessageChain().message("无效序号，结束会话"))
+                    await self._deliver(new_event, lambda: new_event.send(MessageChain().message("无效序号，结束会话")), "会话提示")
                     controller.stop()
                     return
             elif choice < 1 or choice > count:
-                await new_event.send(MessageChain().message("无效序号，结束会话"))
+                await self._deliver(new_event, lambda: new_event.send(MessageChain().message("无效序号，结束会话")), "会话提示")
                 controller.stop()
                 return
             resolved = True
@@ -410,7 +427,7 @@ class MessageBuilder:
                 await runner(choice, new_event)
             except Exception as e:
                 logger.error(f"执行命令错误: {e}")
-                await new_event.send(MessageChain().message("处理失败，请稍后再试"))
+                await self._notice(new_event, "处理失败，请稍后再试")
             controller.stop()
 
         try:
@@ -422,7 +439,7 @@ class MessageBuilder:
                 await runner(1, event)
             except Exception as e:
                 logger.error(f"默认选项执行错误: {e}")
-                await event.send(event.plain_result("处理失败，请稍后再试"))
+                await self._notice(event, "处理失败，请稍后再试")
         except Exception:
             logger.error("选择等待异常", exc_info=True)
 
@@ -451,19 +468,19 @@ class MessageBuilder:
         """两轮会话：先发文字序号列表，选择后返回正文与图片"""
         data = await action1()
         if data.get("code") != 200:
-            await event.send(event.plain_result(data.get("msg") or "未搜索到相关内容"))
+            await self._deliver(event, lambda: event.send(event.plain_result(data.get("msg") or "未搜索到相关内容")), "文本")
             return
 
         items = data["data"]["list"]
         count = max(0, len(items) - 1)
         if count <= 0:
-            await event.send(event.plain_result("未搜索到相关内容"))
+            await self._deliver(event, lambda: event.send(event.plain_result("未搜索到相关内容")), "文本")
             return
 
         async def runner(num: int, reply_event: AstrMessageEvent):
             detail = await action2(items[num])
             if detail.get("code") != 200:
-                await reply_event.send(MessageChain().message(detail.get("msg") or "获取详细数据失败"))
+                await self._deliver(reply_event, lambda: reply_event.send(MessageChain().message(detail.get("msg") or "获取详细数据失败")), "文本")
                 return
             chain = MessageChain()
             chain.message(detail.get("data") or "")
@@ -471,13 +488,18 @@ class MessageBuilder:
                 from html import escape
                 text = escape(str(detail.get("temp") or ""), quote=True)
                 text = text.replace("{", "&#123;").replace("}", "&#125;").replace("\n", "<br>")
-                url = await self.html_render(
-                    f"<div style='font-family: sans-serif; padding: 12px;'>{text}</div>",
-                    {},
-                    options={},
-                )
+                try:
+                    url = await self.html_render(
+                        f"<div style='font-family: sans-serif; padding: 12px;'>{text}</div>",
+                        {},
+                        options={},
+                    )
+                except Exception as e:
+                    logger.error(f"渲染详情失败: {e}")
+                    await self._notice(reply_event, "渲染图片失败，请稍后再试")
+                    return
                 chain.url_image(url)
-            await reply_event.send(chain)
+            await self._deliver(reply_event, lambda: reply_event.send(chain), "富媒体链")
 
         await self._send_choice_and_wait(
             event,
@@ -492,7 +514,7 @@ class MessageBuilder:
         async def runner(choice: int, reply_event: AstrMessageEvent):
             data = await self.jx3box.zili(name, server, choice)
             if data.get("code") != 200:
-                await reply_event.send(MessageChain().message(data.get("msg", "获取资历数据失败")))
+                await self._deliver(reply_event, lambda: reply_event.send(MessageChain().message(data.get("msg", "获取资历数据失败"))), "文本")
                 return
 
             options = {
@@ -502,17 +524,22 @@ class MessageBuilder:
                 "omit_background": False,
                 "type": "jpeg"
             }
-            body_length = estimate_body_length(data.get("temp") or "", data["data"], self.icons)
-            poem_line = await fetch_poem_line()
-            data["data"].update(build_decorated_payload(self.icons, body_length, poem_line))
-            data["data"]["page_meta"] = " · ".join(part for part in (
-                str(data["data"].get("server") or "").strip(),
-                str(data["data"].get("role_name") or "").strip(),
-                str(data["data"].get("title") or "").strip(),
-                str(data["data"].get("update_time") or "").strip(),
-            ) if str(part or "").strip())
-            url = await self.html_render(data["temp"], data["data"], options=options)
-            await reply_event.send(reply_event.image_result(url))
+            try:
+                body_length = estimate_body_length(data.get("temp") or "", data["data"], self.icons)
+                poem_line = await fetch_poem_line()
+                data["data"].update(build_decorated_payload(self.icons, body_length, poem_line))
+                data["data"]["page_meta"] = " · ".join(part for part in (
+                    str(data["data"].get("server") or "").strip(),
+                    str(data["data"].get("role_name") or "").strip(),
+                    str(data["data"].get("title") or "").strip(),
+                    str(data["data"].get("update_time") or "").strip(),
+                ) if str(part or "").strip())
+                url = await self.html_render(data["temp"], data["data"], options=options)
+            except Exception as e:
+                logger.error(f"渲染资历分布失败: {e}")
+                await self._notice(reply_event, "渲染图片失败，请稍后再试")
+                return
+            await self._deliver(reply_event, lambda: reply_event.send(reply_event.image_result(url)), "渲染图片")
 
         await self._send_choice_and_wait(
             event,

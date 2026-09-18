@@ -457,7 +457,7 @@ def hint_need_token(catalog: dict | None = None) -> str:
         "配置方式（请私聊机器人，不要在群里发送接口令牌）：\n"
         "1. 在目标群聊发送 sid ，复制该群 UMO\n"
         f"2. 私聊发送：{token_cmd} <UMO> <你的接口令牌>\n"
-        f"例如：{token_cmd} <UMO> <你的接口令牌>\n"
+        f"例如：{token_cmd} aiocqhttp:GroupMessage:123456 <你的接口令牌>\n"
         "\n"
         "也可让机器人管理员在插件页面为该会话填写，或在全局凭据区维护接口令牌。"
     )
@@ -484,13 +484,15 @@ def hint_need_ticket(catalog: dict | None = None) -> str:
         "可在插件页面维护全局推栏标识池；如需本会话单独使用，请私聊机器人（不要在群里发送）：\n"
         "1. 在目标群聊发送 sid ，复制该群 UMO\n"
         f"2. 私聊发送：{ticket_cmd} <UMO> <你的推栏标识>\n"
-        f"例如：{ticket_cmd} <UMO> <你的推栏标识>"
+        f"例如：{ticket_cmd} aiocqhttp:GroupMessage:123456 <你的推栏标识>"
     )
 
 
-def hint_group_secret() -> str:
+def hint_group_secret(catalog: dict | None = None) -> str:
+    token_cmd = current_command_name(catalog, "Token")
+    ticket_cmd = current_command_name(catalog, "推栏")
     return (
-        "请勿在群聊中发送 Token 或推栏标识。\n"
+        f"请勿在群聊中发送 {token_cmd} 或 {ticket_cmd}。\n"
         "请先在目标群聊发送 sid 复制 UMO，再私聊机器人完成配置。"
     )
 
@@ -610,16 +612,17 @@ def hint_claim_phrase(catalog: dict | None = None) -> str:
 
 
 def format_command_error(cmd: str, error: BaseException, catalog: dict | None = None) -> str:
+    """按真实原因生成提示：参数问题给用法，凭据问题附原因，其余不误导为用法错误。"""
     detail = str(error or "").strip()
-    if detail.startswith("缺少参数") or "required" in detail.lower():
-        return hint_command_usage(cmd, catalog)
     from .credentials import CredentialRuntimeError
 
-    if not isinstance(error, CredentialRuntimeError):
+    if isinstance(error, CredentialRuntimeError):
+        if detail:
+            return f"{hint_command_usage(cmd, catalog)}\n{detail}"
         return hint_command_usage(cmd, catalog)
-    if detail:
-        return f"{hint_command_usage(cmd, catalog)}\n{detail}"
-    return hint_command_usage(cmd, catalog)
+    if isinstance(error, ValueError) or detail.startswith("缺少参数") or "required" in detail.lower():
+        return hint_command_usage(cmd, catalog)
+    return "处理失败，请稍后再试"
 
 
 def hint_unknown_server() -> str:

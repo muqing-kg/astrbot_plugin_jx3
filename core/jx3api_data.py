@@ -228,15 +228,21 @@ class JX3APIService:
     def _now_text(self) -> str:
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    def _token_error_message(self, raw: Any) -> str:
+    def _token_error_message(self, raw: Any, kind: str = "token") -> str:
+        from .credentials import credential_label
+        from .session_policy import current_command_name
+
+        label = credential_label(kind)
+        query_id = "查询推送令牌" if kind == "push_token" else "查询接口令牌"
+        hint = f"可发送 {current_command_name(self.command_catalog, query_id)} 查看状态。"
         text = str(raw or "").strip()
         lowered = text.lower()
         if any(key in lowered for key in ("expire", "expired")) or "过期" in text:
-            return "JX3API 接口令牌已过期，请更换或续费后再试。可发送 查询接口令牌 查看状态。"
+            return f"JX3API {label}已过期，请更换或续费后再试。{hint}"
         if any(key in lowered for key in ("quota", "limit", "remaining", "insufficient", "count")) or any(key in text for key in ("次数", "余额", "额度", "用尽", "不足")):
-            return "JX3API 接口令牌次数已用尽，请更换或续费后再试。可发送 查询接口令牌 查看剩余次数。"
+            return f"JX3API {label}次数已用尽，请更换或续费后再试。{hint}"
         if "token" in lowered or "令牌" in text:
-            return f"JX3API 接口令牌不可用：{text}。可发送 查询接口令牌 查看状态。"
+            return f"JX3API {label}不可用：{text}。{hint}"
         return text or "接口请求失败"
 
     def _table_data(self, title: str, columns: list[str], rows: list[list[str]], subtitle: str = "", note: str = "") -> dict:
@@ -2442,28 +2448,28 @@ class JX3APIService:
 
         return await self._request_api("/trade/item/search", {"name": name, "token": self.token}, processor, "data_list.html")
 
-    async def token_stats(self, token: str) -> dict:
+    async def token_stats(self, token: str, kind: str = "token") -> dict:
         """查询令牌用量。POST /token/stats"""
         result = self._init_return_data()
         token = (token or "").strip()
         if not token:
-            result["msg"] = "未提供 Token"
+            result["msg"] = "未提供令牌"
             result["valid"] = False
             return result
         data = await self._api.post(self.base_url + "/token/stats", data={"token": token}, out_key=None)
         if not data:
-            result["msg"] = "令牌无效或查询失败"
+            result["msg"] = "令牌无效或状态查询失败"
             result["valid"] = False
             result["_transport_error"] = True
             return result
         if isinstance(data, dict) and data.get("_error"):
-            result["msg"] = self._token_error_message(data["_error"])
+            result["msg"] = self._token_error_message(data["_error"], kind)
             result["valid"] = False
             result["_code"] = data.get("_code")
             return result
         payload = data.get("data") if isinstance(data, dict) and "data" in data else data
         if not isinstance(payload, dict):
-            result["msg"] = "令牌无效或查询失败"
+            result["msg"] = "令牌无效或状态查询失败"
             result["valid"] = False
             result["_invalid_payload"] = True
             return result
@@ -2474,7 +2480,9 @@ class JX3APIService:
         valid = payload.get("valid")
         result["valid"] = True if valid is None else bool(valid)
         if valid is False:
-            result["msg"] = "JX3API Token 已失效，请更换后再试。"
+            from .credentials import credential_label
+
+            result["msg"] = f"JX3API {credential_label(kind)}已失效，请更换后再试。"
             return result
         lines = ["JX3API 令牌状态"]
         if valid is not None:
@@ -2550,7 +2558,7 @@ class JX3APIService:
             return False, "推栏标识需要逐个校验，请一次提交一个。"
         token = (token or "").strip()
         if not token:
-            return False, "校验推栏标识需要 JX3API Token，请先配置可用 Token 后再设置推栏。"
+            return False, "校验推栏标识需要 JX3API 接口令牌，请先配置可用接口令牌后再设置推栏。"
         data = await self._base_request("/school/skills", {"name": "毒经", "token": token, "ticket": ticket})
         if isinstance(data, dict) and data.get("_error"):
             error = str(data["_error"])

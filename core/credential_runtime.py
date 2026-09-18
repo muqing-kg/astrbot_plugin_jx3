@@ -136,7 +136,7 @@ async def restore_recoverable_tokens(jx3api: Any, sessions: Any) -> list[str]:
             value = str(row.get("value") or "").strip()
             if not umo or not value:
                 continue
-            state, _reason, _remaining = await inspect_token_status(jx3api, value)
+            state, _reason, _remaining = await inspect_token_status(jx3api, value, kind)
             if state == "ok" and await sessions.add_active_credential(umo, kind, value):
                 restored.append(value)
         for row in await sessions.list_removed_global_credentials(kind):

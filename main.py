@@ -527,7 +527,7 @@ class Jx3ApiPlugin(Star):
         from .credentials import inspect_token_status
 
         for value in values:
-            state, reason, _remaining = await inspect_token_status(self.jx3api, value)
+            state, reason, _remaining = await inspect_token_status(self.jx3api, value, "push_token")
             if state == "failed":
                 if source == "group":
                     await self.sessions.remove_pool_credential(umo, "push_token", value, reason)
@@ -570,13 +570,13 @@ class Jx3ApiPlugin(Star):
         group_label, global_label = labels[kind]
         blocks = []
         for index, row_data in enumerate(active, 1):
-            data = await self.jx3api.token_stats(str(row_data.get("value") or ""))
+            data = await self.jx3api.token_stats(str(row_data.get("value") or ""), kind)
             body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
             label = group_label if source.startswith("group") else global_label
             blocks.append(f"【{label} {index}】\n{body}")
         for index, row_data in enumerate(removed, 1):
             value = str(row_data.get("value") or "")
-            data = await self.jx3api.token_stats(value)
+            data = await self.jx3api.token_stats(value, kind)
             body = data.get("data") if data.get("code") == 200 else (data.get("msg") or "查询失败")
             label = "群属失效池" if source.startswith("group") else "全局失效池"
             blocks.append(
@@ -659,7 +659,7 @@ class Jx3ApiPlugin(Star):
             push_args=push_arg_map(getattr(self, "push_name_overrides", {}) or {}),
         )
         if parsed.error == GROUP_SECRET_FORBIDDEN:
-            return event.plain_result(hint_group_secret())
+            return event.plain_result(hint_group_secret(self.command_catalog))
         if parsed.error == "claim_private_only":
             return event.plain_result(hint_private_only_claim(self.command_catalog))
         if parsed.error == "group_manage_only":
@@ -820,7 +820,7 @@ class Jx3ApiPlugin(Star):
             if parsed.action == "set_token":
                 from .credentials import validate_pool_token
 
-                ok, message, _remaining = await validate_pool_token(self.jx3api, value)
+                ok, message, _remaining = await validate_pool_token(self.jx3api, value, "token")
                 if not ok:
                     return event.plain_result(f"接口令牌 {mask_for_user(value)} 校验失败：{message}")
                 await self.sessions.add_active_credential(target, "token", value)
@@ -858,7 +858,7 @@ class Jx3ApiPlugin(Star):
                 return event.plain_result("该推送令牌已在可用池中。")
             from .credentials import validate_pool_token
 
-            ok, message, _remaining = await validate_pool_token(self.jx3api, value)
+            ok, message, _remaining = await validate_pool_token(self.jx3api, value, "push_token")
             if not ok:
                 return event.plain_result(f"推送令牌 {mask_for_user(value)} 校验失败：{message}")
             await self.sessions.add_active_credential(target, "push_token", value)
@@ -921,7 +921,7 @@ class Jx3ApiPlugin(Star):
     ):
         handler = self.command_map.get(cmd_id)
         if not handler:
-            return event.plain_result(f"该功能暂不可用：{cmd_id}")
+            return event.plain_result("该功能暂不可用，请稍后再试。")
 
         row = await self.sessions.ensure(
             self._event_umo(event),

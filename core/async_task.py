@@ -213,7 +213,7 @@ class AsyncTask:
         if value not in status_cache:
             from .credentials import inspect_token_status
 
-            state, reason, _remaining = await inspect_token_status(self.jx3api, value)
+            state, reason, _remaining = await inspect_token_status(self.jx3api, value, "push_token")
             status_cache[value] = (state, reason)
         return status_cache[value]
 

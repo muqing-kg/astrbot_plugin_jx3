@@ -317,7 +317,7 @@ class SessionPageAPI:
         if "," in token or "，" in token:
             return self.error_response("一次只能添加一条接口令牌。", status_code=400)
         from .credentials import validate_pool_token
-        ok, message, remaining = await validate_pool_token(self.plugin.jx3api, token)
+        ok, message, remaining = await validate_pool_token(self.plugin.jx3api, token, "token")
         if not ok:
             return self.error_response(f"接口令牌 {mask_for_user(token)} 校验失败：{message}", status_code=400)
         existing = await self.plugin.sessions.get_credential(umo, "token", token)
@@ -343,7 +343,7 @@ class SessionPageAPI:
             return self.error_response("该推送令牌已在可用池中。", status_code=400)
         from .credentials import validate_pool_token
 
-        ok, message, _remaining = await validate_pool_token(self.plugin.jx3api, token)
+        ok, message, _remaining = await validate_pool_token(self.plugin.jx3api, token, "push_token")
         if not ok:
             return self.error_response(f"推送令牌 {mask_for_user(token)} 校验失败：{message}", status_code=400)
         added = await self.plugin.sessions.add_active_credential(umo, "push_token", token)
