@@ -1477,10 +1477,12 @@ class JX3APIService:
             # 已触发的保持上游顺序在前，未触发的统一置后
             for key, target in (("1", "ptqy"), ("2", "jsqy"), ("3", "cwqy")):
                 items = buckets[key]
-                return_data["data"][target] = (
-                    [row for row in items if not row["pending"]]
-                    + [row for row in items if row["pending"]]
-                )
+                done = [row for row in items if not row["pending"]]
+                todo = [row for row in items if row["pending"]]
+                return_data["data"][target] = done + todo
+                # 标题显示「已出-未出」
+                return_data["data"][f"{target}_done"] = len(done)
+                return_data["data"][f"{target}_todo"] = len(todo)
             return_data["data"]["server"] = server
             return_data["data"]["roleName"] = name
 
