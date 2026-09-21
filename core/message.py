@@ -23,6 +23,9 @@ from .render_meta import build_page_meta, limit_image_rows
 
 _SEND_RETRY_DELAY = 1.0
 
+# 外观分类里代表「整套」的关键字；其余分类（上衣、发型、披风、挂件…）按散件处理
+APPEARANCE_SET_CATEGORY_MARKERS = ("礼盒", "套装")
+
 
 def _send_outcome_unknown(exc: BaseException) -> bool:
     """发送超时类异常：结果未知，可能已送达，不可断言失败。"""
@@ -739,37 +742,32 @@ class MessageBuilder:
         """ 物价 外观名称 服务器"""
         candidates = await self.jx3api.wujia_houxuan(Name)
 
-        # 名称或别名精确命中、或只剩一条候选时直接查价，不再让用户选
-        exact = ""
-        for item in candidates:
-            if item.get("name") == Name or item.get("alias") == Name:
-                exact = str(item.get("name") or "")
-                break
-        if not exact and len(candidates) == 1:
-            exact = str(candidates[0].get("name") or "")
+        if not candidates:
+            await self._deliver(
+                event,
+                lambda: event.send(event.plain_result("未找到相关外观，换个关键词试试")),
+                "文本",
+            )
+            return
 
-        if exact or not candidates:
-            data = await self.jx3api.wujia(exact or Name, server)
-            if data.get("code") == 200:
-                async def cached():
-                    return data
-                return await self.T2I_image_msg(event, cached)
-            if not exact:
-                await self._deliver(
-                    event,
-                    lambda: event.send(event.plain_result(data.get("msg") or "未找到相关外观")),
-                    "文本",
-                )
-                return
+        # 只搜到一条就直查；多条才让用户挑
+        if len(candidates) == 1:
+            only = str(candidates[0].get("name") or "")
+            return await self.T2I_image_msg(
+                event,
+                lambda: self.jx3api.wujia(only, server),
+            )
 
-        menu_items = candidates[:10]
-        lines = []
-        for index, item in enumerate(menu_items, 1):
-            label = str(item.get("name") or "").strip()
-            alias = str(item.get("alias") or "").strip()
-            if alias and alias != label:
-                label = f"{label}（{alias}）"
-            lines.append(f"{index}. {label}")
+        # 多条：有整套（外观礼盒/套装）就只列整套，否则全列
+        def _is_set(item: dict) -> bool:
+            category = str(item.get("category") or "").strip()
+            return any(marker in category for marker in APPEARANCE_SET_CATEGORY_MARKERS)
+
+        menu_items = [item for item in candidates if _is_set(item)] or list(candidates)
+        lines = [
+            f"{index}. {str(item.get('name') or '').strip()}"
+            for index, item in enumerate(menu_items, 1)
+        ]
 
         async def runner(choice: int, reply_event: AstrMessageEvent):
             target = str(menu_items[choice - 1].get("name") or "")

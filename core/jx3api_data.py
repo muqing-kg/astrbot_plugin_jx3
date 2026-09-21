@@ -1051,7 +1051,7 @@ class JX3APIService:
                 items.append({
                     "name": candidate,
                     "alias": self._pick(item, "alias", "wblalias"),
-                    "category": self._pick(item, "class", "subclass"),
+                    "category": self._pick(item, "category", "class", "subclass"),
                 })
             return_data["data"] = items[:50]
 
