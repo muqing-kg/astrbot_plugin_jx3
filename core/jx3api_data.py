@@ -35,6 +35,11 @@ _SAND_CASTLE_NAMES = frozenset({
     "世外坡", "霜戈堡", "卧龙坡", "武王城", "逐鹿坪",
 })
 
+# 接口事件总表里混入的非奇遇条目（游戏奇遇名单与官方图集都没有它们），查询时直接跳过
+IGNORED_SERENDIPITY_EVENTS = frozenset({
+    "茶馆悬赏", "英雄客",
+})
+
 
 class JX3APIService:
     def __init__(self, config: AstrBotConfig, sqlite: AsyncSQLiteDB, cache_sqlite: Optional[AsyncSQLiteDB] = None):
@@ -1452,6 +1457,8 @@ class JX3APIService:
 
             for item in data:
                 if not isinstance(item, dict):
+                    continue
+                if str(item.get("event") or "").strip() in IGNORED_SERENDIPITY_EVENTS:
                     continue
                 try:
                     level = int(item.get("level") or 0)

@@ -18,7 +18,13 @@ from .async_task import AsyncTask
 from .plugin_log import logger
 from .yymj_data import YymjGuideService
 from .decorations import build_decorated_payload, estimate_body_length, fetch_poem_line
-from .credentials import CredentialRuntimeError
+from .credentials import (
+    CredentialRuntimeError,
+    current_ticket,
+    current_token,
+    reset_request_credentials,
+    set_request_credentials,
+)
 from .render_meta import build_page_meta, limit_image_rows
 
 _SEND_RETRY_DELAY = 1.0
@@ -402,6 +408,25 @@ class MessageBuilder:
         if not await self._deliver(event, lambda: event.send(event.plain_result(text)), "菜单"):
             return
         user_id = event.get_sender_id()
+        # 选择在独立会话任务里执行，本次请求的凭据上下文不会自动带过去，先固定下来
+        token = current_token()
+        ticket = current_ticket()
+
+        async def run_choice(choice: int, target_event: AstrMessageEvent) -> None:
+            creds = set_request_credentials(token or None, ticket or None)
+            try:
+                await runner(choice, target_event)
+            finally:
+                reset_request_credentials(creds)
+
+        async def report_failure(target_event: AstrMessageEvent, exc: BaseException, label: str) -> None:
+            logger.error(f"{label}: {exc}")
+            detail = str(exc or "").strip()
+            if isinstance(exc, CredentialRuntimeError) and detail:
+                # 凭据类错误直接把接口原话回给用户
+                await self._notice(target_event, detail)
+                return
+            await self._notice(target_event, "处理失败，请稍后再试")
 
         @session_waiter(timeout=timeout)
         async def choice_waiter(controller: SessionController, new_event: AstrMessageEvent):
@@ -427,10 +452,9 @@ class MessageBuilder:
                 return
             resolved = True
             try:
-                await runner(choice, new_event)
+                await run_choice(choice, new_event)
             except Exception as e:
-                logger.error(f"执行命令错误: {e}")
-                await self._notice(new_event, "处理失败，请稍后再试")
+                await report_failure(new_event, e, "执行命令错误")
             controller.stop()
 
         try:
@@ -439,10 +463,9 @@ class MessageBuilder:
             if resolved:
                 return
             try:
-                await runner(1, event)
+                await run_choice(1, event)
             except Exception as e:
-                logger.error(f"默认选项执行错误: {e}")
-                await self._notice(event, "处理失败，请稍后再试")
+                await report_failure(event, e, "默认选项执行错误")
         except Exception:
             logger.error("选择等待异常", exc_info=True)
 
