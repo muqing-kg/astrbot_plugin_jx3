@@ -619,18 +619,55 @@ def hint_claim_phrase(catalog: dict | None = None) -> str:
     return f"用法：{claim} 剑网3机器人"
 
 
-def format_command_error(cmd: str, error: BaseException, catalog: dict | None = None) -> str:
-    """按真实原因生成提示：参数问题给用法，凭据问题附原因，其余不误导为用法错误。"""
-    detail = str(error or "").strip()
+def credential_notice(kind: str, reason: str, catalog: dict | None = None) -> str:
+    """凭据类错误按具体原因给提示：没配置给配置指引，其余给更换或续费提示。"""
+    text = str(reason or "").strip()
+    lowered = text.lower()
+    if kind == "ticket":
+        return text or "推栏标识不可用，请重新配置"
+    if "过期" in text or "expire" in lowered:
+        return "接口令牌已过期，请更换或续费（可发 查询接口令牌 查看当前状态）"
+    if any(key in text for key in ("次数", "余额", "额度", "不足", "用尽")) or "quota" in lowered:
+        return "接口令牌次数不足，请更换或续费（可发 查询接口令牌 查看当前状态）"
+    if "权限" in text or "403" in text or "forbidden" in lowered:
+        return "该令牌无此接口权限，请更换（可发 查询接口令牌 查看当前状态）"
+    return hint_need_token(catalog)
+
+
+def exception_notice(error: BaseException, catalog: dict | None = None) -> str:
+    """按异常类型给出面向用户的简单提醒，不带内部摘要。"""
     from .credentials import CredentialRuntimeError
 
     if isinstance(error, CredentialRuntimeError):
-        if detail:
-            return f"{hint_command_usage(cmd, catalog)}\n{detail}"
-        return hint_command_usage(cmd, catalog)
-    if isinstance(error, ValueError) or detail.startswith("缺少参数") or "required" in detail.lower():
-        return hint_command_usage(cmd, catalog)
+        return credential_notice(error.kind, str(error or ""), catalog)
+    if isinstance(error, FileNotFoundError):
+        return "模板文件缺失，请联系管理员"
+    if isinstance(error, KeyError):
+        return "数据字段缺失，请联系管理员"
+    if isinstance(error, TypeError):
+        return "数据类型异常，请联系管理员"
+    if isinstance(error, (ValueError, IndexError, AttributeError)):
+        return "数据处理失败，请联系管理员"
     return "处理失败，请稍后再试"
+
+
+def is_parameter_error(error: BaseException) -> bool:
+    """参数类错误（缺参数、非法取值）走用法提示。"""
+    if not isinstance(error, ValueError):
+        return False
+    detail = str(error or "").strip()
+    return (
+        detail.startswith("缺少参数")
+        or "仅支持" in detail
+        or "required" in detail.lower()
+    )
+
+
+def format_command_error(cmd: str, error: BaseException, catalog: dict | None = None) -> str:
+    """按真实原因生成提示：参数问题给用法，凭据与内部异常给对应提醒。"""
+    if is_parameter_error(error):
+        return hint_command_usage(cmd, catalog)
+    return exception_notice(error, catalog)
 
 
 def hint_unknown_server() -> str:
@@ -641,4 +678,3 @@ def hint_command_usage(cmd: str, catalog: dict | None = None) -> str:
     from .command_catalog import command_usage
     usage = command_usage(cmd, catalog)
     return f"请发送: 「 {usage} 」"
-

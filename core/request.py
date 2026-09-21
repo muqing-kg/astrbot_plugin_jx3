@@ -2,6 +2,7 @@
 from contextlib import contextmanager
 from contextvars import ContextVar
 import json
+import socket
 import aiohttp
 import asyncio
 from typing import Any, Dict, Optional
@@ -10,6 +11,28 @@ from aiohttp import ClientTimeout, ClientSession
 from .plugin_log import logger
 
 _quiet_debug = ContextVar("jx3_quiet_request_debug", default=False)
+
+
+def network_error_message(exc: BaseException) -> str:
+    """把传输层异常映射成一句面向用户的简单提醒。"""
+    if isinstance(exc, (asyncio.TimeoutError, aiohttp.ServerTimeoutError)):
+        return "接口响应超时，请稍后再试"
+    if isinstance(exc, (aiohttp.ClientConnectorDNSError, socket.gaierror)):
+        return "域名解析失败，请检查网络或代理"
+    if isinstance(exc, aiohttp.ClientConnectorError):
+        return "接口连接失败，请稍后再试"
+    if isinstance(exc, aiohttp.ClientSSLError):
+        return "证书校验失败，请检查代理或证书设置"
+    if isinstance(exc, aiohttp.ClientProxyConnectionError):
+        return "代理连接失败，请检查代理设置"
+    if isinstance(exc, aiohttp.ClientResponseError):
+        status = int(getattr(exc, "status", 0) or 0)
+        if status >= 500:
+            return "接口服务暂时不可用，请稍后再试"
+        return "接口请求被拒绝，请稍后再试"
+    if isinstance(exc, (aiohttp.ContentTypeError, json.JSONDecodeError)):
+        return "接口响应无法解析"
+    return "网络请求失败，请稍后再试"
 
 
 @contextmanager
@@ -38,6 +61,7 @@ class APIClient:
         self.ssl_verify = ssl_verify
         self.proxy = str(proxy or "").strip()
         self._session: Optional[ClientSession] = None
+        self.last_error = ""
 
     async def get_session(self) -> ClientSession:
         """获取或创建单例 Session"""
@@ -74,6 +98,7 @@ class APIClient:
         """
         session = await self.get_session()
         method = method.upper()
+        self.last_error = ""
         
         # 记录日志
         if not _quiet_debug.get():
@@ -95,9 +120,11 @@ class APIClient:
                 
         except aiohttp.ClientError as e:
             logger.error(f"网络请求出错 ({method} {url}): {e}")
+            self.last_error = network_error_message(e)
             return None
         except Exception as e:
             logger.error(f"未知错误 ({method} {url}): {e}")
+            self.last_error = network_error_message(e)
             return None
 
     async def _handle_response(self, response: aiohttp.ClientResponse) -> Any:
@@ -130,6 +157,7 @@ class APIClient:
                     data = await loop.run_in_executor(None, json.loads, text)
                 except json.JSONDecodeError:
                     logger.error(f"无法解析响应为 JSON。原始内容: {text[:100]}...")
+                    self.last_error = "接口响应无法解析"
                     return None
 
             if not _quiet_debug.get():
@@ -138,6 +166,7 @@ class APIClient:
 
         except aiohttp.ClientError as e:
             logger.error(f"HTTP响应错误: {e}")
+            self.last_error = network_error_message(e)
             return None
 
     def _validate_api_payload(self, data: Any) -> Any:

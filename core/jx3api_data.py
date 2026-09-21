@@ -11,7 +11,7 @@ from astrbot.api import AstrBotConfig
 import astrbot.api.message_components as Comp
 
 from .plugin_log import logger
-from .request import APIClient
+from .request import APIClient, network_error_message
 from .sqlite import AsyncSQLiteDB
 from .fun_basic import week_to_num,compare_date_str,format_time,format_duration,format_short_time
 from .template import load_template
@@ -22,7 +22,7 @@ from .credentials import (
     current_token,
     current_ticket,
 )
-from .session_policy import camp_code
+from .session_policy import camp_code, exception_notice
 
 
 
@@ -56,6 +56,8 @@ class JX3APIService:
 
         self.command_catalog: dict | None = None
         self.push_names: dict[str, str] = {}
+        # 最近一次请求层面的失败提醒（超时、连接失败等），由 _base_request 写入
+        self._last_transport_error = ""
         
 
     @property
@@ -105,9 +107,11 @@ class JX3APIService:
         """
         基础请求封装，处理配置获取和API调用。
         """
+        self._last_transport_error = ""
         try:
             if not self._api:
                 logger.error("API client is not initialized")
+                self._last_transport_error = "网络请求失败，请稍后再试"
                 return None
 
             api_url = self.base_url + api_path
@@ -115,11 +119,15 @@ class JX3APIService:
             
             if not data:
                 logger.warning(f"获取接口信息失败或返回空数据: {api_url}")
+                self._last_transport_error = str(
+                    getattr(self._api, "last_error", "") or "网络请求失败，请稍后再试"
+                )
             
             return data
             
         except Exception as e:
             logger.error(f"基础请求调用出错 ({api_path}): {e}")
+            self._last_transport_error = network_error_message(e)
             return None
 
 
@@ -154,14 +162,14 @@ class JX3APIService:
             return_data["msg"] = self._token_error_message(data.get("_error"))
             return return_data
         if data is None:
-            return_data["msg"] = f"接口请求失败：{path}"
+            return_data["msg"] = self._last_transport_error or "网络请求失败，请稍后再试"
             return return_data
 
         try:
             await processor(data, return_data)
         except Exception as e:
             logger.exception(f"数据处理时出错: {e}")
-            return_data["msg"] = f"接口数据处理失败：{path}"
+            return_data["msg"] = exception_notice(e)
             return return_data
 
         if return_data.get("msg") and return_data.get("msg") != "功能函数未执行":
@@ -173,7 +181,7 @@ class JX3APIService:
                 return_data["temp"] = await load_template(template)
             except FileNotFoundError as e:
                 logger.error(f"加载模板失败: {e}")
-                return_data["msg"] = "系统错误：模板文件不存在"
+                return_data["msg"] = "模板文件缺失，请联系管理员"
                 return return_data
 
         return_data["code"] = 200
@@ -1043,8 +1051,8 @@ class JX3APIService:
             template="wujia.html"
         ) 
 
-    async def wujia_houxuan(self, name: str) -> list[dict]:
-        """物价候选：外观名模糊搜索，返回候选（名称与别名，最多 50 条）。"""
+    async def wujia_houxuan(self, name: str) -> tuple[list[dict], str]:
+        """物价候选：外观名模糊搜索，返回（候选列表, 失败提示）。"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
             items: list[dict] = []
             seen: set[str] = set()
@@ -1067,8 +1075,8 @@ class JX3APIService:
             template=""
         )
         if result.get("code") != 200:
-            return []
-        return list(result.get("data") or [])
+            return [], str(result.get("msg") or "")
+        return list(result.get("data") or []), ""
 
 
     async def chengbeng(self, Name: str, server:str, source: int) -> Dict[str, Any]:

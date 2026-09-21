@@ -25,6 +25,7 @@ from .credentials import (
     reset_request_credentials,
     set_request_credentials,
 )
+from .session_policy import exception_notice
 from .render_meta import build_page_meta, limit_image_rows
 
 _SEND_RETRY_DELAY = 1.0
@@ -421,12 +422,7 @@ class MessageBuilder:
 
         async def report_failure(target_event: AstrMessageEvent, exc: BaseException, label: str) -> None:
             logger.error(f"{label}: {exc}")
-            detail = str(exc or "").strip()
-            if isinstance(exc, CredentialRuntimeError) and detail:
-                # 凭据类错误直接把接口原话回给用户
-                await self._notice(target_event, detail)
-                return
-            await self._notice(target_event, "处理失败，请稍后再试")
+            await self._notice(target_event, exception_notice(exc))
 
         @session_waiter(timeout=timeout)
         async def choice_waiter(controller: SessionController, new_event: AstrMessageEvent):
@@ -763,12 +759,13 @@ class MessageBuilder:
 
     async def  wujia(self, event: AstrMessageEvent,Name: str , server: str = ""):
         """ 物价 外观名称 服务器"""
-        candidates = await self.jx3api.wujia_houxuan(Name)
+        candidates, error_msg = await self.jx3api.wujia_houxuan(Name)
 
         if not candidates:
+            # 接口怎么说就怎么发；接口没给话时才用兜底文案
             await self._deliver(
                 event,
-                lambda: event.send(event.plain_result("未找到相关外观，换个关键词试试")),
+                lambda: event.send(event.plain_result(error_msg or "未搜索到该外观")),
                 "文本",
             )
             return
