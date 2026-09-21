@@ -737,36 +737,51 @@ class MessageBuilder:
 
     async def  wujia(self, event: AstrMessageEvent,Name: str , server: str = ""):
         """ 物价 外观名称 服务器"""
-        data = await self.jx3api.wujia(Name, server)
-        if data.get("code") == 200:
-            async def cached():
-                return data
-            return await self.T2I_image_msg(event, cached)
-
-        # 名称没有精确命中时，退回模糊搜索，让用户按序号选
         candidates = await self.jx3api.wujia_houxuan(Name)
-        if not candidates:
-            await self._deliver(
-                event,
-                lambda: event.send(event.plain_result(data.get("msg") or "未找到相关外观")),
-                "文本",
-            )
-            return
 
-        menu = "\n".join(
-            f"{index}. {name}" for index, name in enumerate(candidates, 1)
-        )
+        # 名称或别名精确命中、或只剩一条候选时直接查价，不再让用户选
+        exact = ""
+        for item in candidates:
+            if item.get("name") == Name or item.get("alias") == Name:
+                exact = str(item.get("name") or "")
+                break
+        if not exact and len(candidates) == 1:
+            exact = str(candidates[0].get("name") or "")
+
+        if exact or not candidates:
+            data = await self.jx3api.wujia(exact or Name, server)
+            if data.get("code") == 200:
+                async def cached():
+                    return data
+                return await self.T2I_image_msg(event, cached)
+            if not exact:
+                await self._deliver(
+                    event,
+                    lambda: event.send(event.plain_result(data.get("msg") or "未找到相关外观")),
+                    "文本",
+                )
+                return
+
+        menu_items = candidates[:10]
+        lines = []
+        for index, item in enumerate(menu_items, 1):
+            label = str(item.get("name") or "").strip()
+            alias = str(item.get("alias") or "").strip()
+            if alias and alias != label:
+                label = f"{label}（{alias}）"
+            lines.append(f"{index}. {label}")
 
         async def runner(choice: int, reply_event: AstrMessageEvent):
+            target = str(menu_items[choice - 1].get("name") or "")
             return await self.T2I_image_msg(
                 reply_event,
-                lambda: self.jx3api.wujia(candidates[choice - 1], server),
+                lambda: self.jx3api.wujia(target, server),
             )
 
         await self._send_choice_and_wait(
             event,
-            f"「{Name}」匹配到多个外观，回复序号查询价格\n{menu}",
-            len(candidates),
+            f"「{Name}」匹配到多个外观，回复序号查询价格\n" + "\n".join(lines),
+            len(menu_items),
             runner,
         )
 

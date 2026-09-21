@@ -1038,15 +1038,22 @@ class JX3APIService:
             template="wujia.html"
         ) 
 
-    async def wujia_houxuan(self, name: str) -> list[str]:
-        """物价候选：外观名模糊搜索，最多返回 10 个候选名。"""
+    async def wujia_houxuan(self, name: str) -> list[dict]:
+        """物价候选：外观名模糊搜索，返回候选（名称与别名，最多 50 条）。"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            names: list[str] = []
+            items: list[dict] = []
+            seen: set[str] = set()
             for item in self._as_list(data):
                 candidate = self._pick(item, "name")
-                if candidate and candidate not in names:
-                    names.append(candidate)
-            return_data["data"] = names[:10]
+                if not candidate or candidate in seen:
+                    continue
+                seen.add(candidate)
+                items.append({
+                    "name": candidate,
+                    "alias": self._pick(item, "alias", "wblalias"),
+                    "category": self._pick(item, "class", "subclass"),
+                })
+            return_data["data"] = items[:50]
 
         result = await self._request_api(
             path="/trade/item/search",
