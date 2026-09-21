@@ -1038,6 +1038,26 @@ class JX3APIService:
             template="wujia.html"
         ) 
 
+    async def wujia_houxuan(self, name: str) -> list[str]:
+        """物价候选：外观名模糊搜索，最多返回 10 个候选名。"""
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            names: list[str] = []
+            for item in self._as_list(data):
+                candidate = self._pick(item, "name")
+                if candidate and candidate not in names:
+                    names.append(candidate)
+            return_data["data"] = names[:10]
+
+        result = await self._request_api(
+            path="/trade/item/search",
+            params={"name": name, "token": self.token},
+            processor=processor,
+            template=""
+        )
+        if result.get("code") != 200:
+            return []
+        return list(result.get("data") or [])
+
 
     async def chengbeng(self, Name: str, server:str, source: int) -> Dict[str, Any]:
         """成本计算"""
@@ -1420,22 +1440,42 @@ class JX3APIService:
     
     async def juesheqiyu(self, server: str, name: str, full: int) -> Dict[str, Any]:
         """角色奇遇"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            return_data["data"]["ptqy"] = []
-            return_data["data"]["jsqy"] = []
-            return_data["data"]["cwqy"] = []
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            buckets: Dict[str, list] = {"1": [], "2": [], "3": []}
 
             for item in data:
-                item["time"] = datetime.fromtimestamp(item["time"]).strftime("%Y-%m-%d %H:%M:%S")
-                if item["level"] == 1:
-                    return_data["data"]["ptqy"].append(item)
-                if item["level"] == 2:
-                    return_data["data"]["jsqy"].append(item)
-                if item["level"] == 3:
-                    return_data["data"]["cwqy"].append(item)
+                if not isinstance(item, dict):
+                    continue
+                try:
+                    level = int(item.get("level") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if str(level) not in buckets:
+                    continue
+
+                try:
+                    timestamp = int(item.get("time") or 0)
+                except (TypeError, ValueError):
+                    timestamp = 0
+
+                if timestamp > 0:
+                    item["time"] = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
+                    item["pending"] = False
+                else:
+                    item["time"] = ""
+                    item["pending"] = True
+                buckets[str(level)].append(item)
+
+            # 已触发的保持上游顺序在前，未触发的统一置后
+            for key, target in (("1", "ptqy"), ("2", "jsqy"), ("3", "cwqy")):
+                items = buckets[key]
+                return_data["data"][target] = (
+                    [row for row in items if not row["pending"]]
+                    + [row for row in items if row["pending"]]
+                )
             return_data["data"]["server"] = server
             return_data["data"]["roleName"] = name
-            
+
         return await self._request_api(
             path="/event/records",
             params= {"server": server, "name": name, "full": full, "token": self.token},
@@ -1607,6 +1647,72 @@ class JX3APIService:
             processor=processor,
             template=""
         ) 
+
+
+    async def charen(self, server: str, name: str) -> Dict[str, Any]:
+        """查人：按角色查风纪记录。"""
+        return_data = self._init_return_data()
+        server = (server or "").strip()
+        uid = ""
+        if server:
+            detail = await self._base_request(
+                "/role/detail",
+                {"server": server, "name": name, "history": 0, "token": self.token},
+            )
+            if isinstance(detail, dict) and detail.get("_error"):
+                credential_result = credential_failure(detail.get("_error"), detail.get("_code"))
+                credential_kind, credential_raw = credential_result or ("", "")
+                if not credential_kind and detail.get("_code") in (401, 403):
+                    credential_kind = "token"
+                    credential_raw = detail.get("_error")
+                if credential_kind:
+                    raise CredentialRuntimeError(
+                        credential_kind,
+                        credential_message(credential_kind, credential_raw),
+                    )
+                return_data["msg"] = self._token_error_message(detail.get("_error"))
+                return return_data
+            role = detail if isinstance(detail, dict) else {}
+            uid = self._pick(role, "roleId", "globalId", "globalRoleId")
+            if not uid:
+                return_data["msg"] = f"未查询到角色 {name}，请检查区服与角色名。"
+                return return_data
+
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            records = self._as_list(data)
+            lines = ["风纪记录 · " + " · ".join(part for part in (server, name) if part)]
+            if uid:
+                lines.append(f"角色标识：{uid}")
+            if not records:
+                lines.append("未查询到该角色的风纪记录。")
+            else:
+                lines.append(f"共 {len(records)} 条记录")
+                for index, item in enumerate(records, 1):
+                    if not isinstance(item, dict):
+                        continue
+                    title = self._pick(item, "title").strip()
+                    content = self._clean_newlines(self._pick(item, "content")).strip()
+                    source = self._pick(item, "tieba", "author").strip()
+                    when = format_time(item.get("created"))
+                    lines.append("")
+                    lines.append(f"{index}. {title}" if title else f"{index}.")
+                    if content:
+                        lines.append(content)
+                    if source:
+                        lines.append(f"来源：{source}")
+                    if when:
+                        lines.append(f"时间：{when}")
+            return_data["data"] = "\n".join(lines).strip()
+
+        params = {"server": server, "name": name, "token": self.token}
+        if uid:
+            params["uid"] = uid
+        return await self._request_api(
+            path="/fraud/detail",
+            params=params,
+            processor=processor,
+            template=""
+        )
 
 
     async def zhenyan(self, name: str) -> Dict[str, Any]:

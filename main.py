@@ -298,6 +298,7 @@ class Jx3ApiPlugin(Star):
             "成就": self.jx3cmd.chengjiu,
             "角色": self.jx3cmd.jueshe,
             "在线": self.jx3cmd.unua_online,
+            "查人": self.jx3cmd.charen,
             "阵眼": self.jx3cmd.zhenyan,
             "配装": self.jx3cmd.peizhuang,
             "资历排行": self.jx3cmd.zilipaixing,

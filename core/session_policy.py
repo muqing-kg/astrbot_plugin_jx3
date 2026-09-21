@@ -34,7 +34,7 @@ NEED_TOKEN = frozenset({
     "试炼之地排行", "阵营拍卖", "的卢拍卖", "金价", "物价", "配方", "万宝楼", "诛恶",
     "名片", "全部名片", "随机名片", "查询", "未出", "汇总", "近期", "统计",
     "精耐", "百战", "成就", "角色", "阵眼", "资历排行", "技能", "奇穴", "资历",
-    "掉落",
+    "掉落", "查人",
     "跨服名剑榜", "武林争霸赛", "捕快荣誉榜", "江湖浪客榜", "决斗挑战榜",
     "资历分布", "外观搜索",
     "聊天", "拜师", "收徒", "招募", "团长", "团牌",
@@ -58,11 +58,17 @@ SERVER_ARITY = {
     "开服": 0, "资历": 1, "交易行": 1,
     "跨服名剑榜": 0,
     "资历分布": 1,
+    "查人": 1,
 }
 
 # 跨服/全服榜单：不强制注入绑定区服，缺省查询返回各自真实区服。
 CROSS_SERVER_COMMANDS = frozenset({
     "跨服名剑榜",
+})
+
+# 区服可缺省且允许未绑定：缺省时以空区服请求，由上游按角色名处理。
+OPTIONAL_BINDING_COMMANDS = frozenset({
+    "查人",
 })
 
 # 区服选填榜单：缺省用绑定区服，未绑定则查全服。
@@ -262,6 +268,8 @@ def inject_server_args(cmd: str, args: list[str], bound: str, resolver=None) -> 
             return [official] + core[1:] + tail
 
         if not bound:
+            if cmd in OPTIONAL_BINDING_COMMANDS:
+                return [""] + core + tail
             return UNBOUND_SERVER
         return [bound] + core + tail
 

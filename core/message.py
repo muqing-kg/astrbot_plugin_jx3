@@ -736,8 +736,39 @@ class MessageBuilder:
         return await self.T2I_image_msg(event, lambda: self.jx3api.jinjia( server,limit))
 
     async def  wujia(self, event: AstrMessageEvent,Name: str , server: str = ""):
-        """ 物价 外观名称 服务器"""    
-        return await self.T2I_image_msg(event, lambda: self.jx3api.wujia(Name, server))
+        """ 物价 外观名称 服务器"""
+        data = await self.jx3api.wujia(Name, server)
+        if data.get("code") == 200:
+            async def cached():
+                return data
+            return await self.T2I_image_msg(event, cached)
+
+        # 名称没有精确命中时，退回模糊搜索，让用户按序号选
+        candidates = await self.jx3api.wujia_houxuan(Name)
+        if not candidates:
+            await self._deliver(
+                event,
+                lambda: event.send(event.plain_result(data.get("msg") or "未找到相关外观")),
+                "文本",
+            )
+            return
+
+        menu = "\n".join(
+            f"{index}. {name}" for index, name in enumerate(candidates, 1)
+        )
+
+        async def runner(choice: int, reply_event: AstrMessageEvent):
+            return await self.T2I_image_msg(
+                reply_event,
+                lambda: self.jx3api.wujia(candidates[choice - 1], server),
+            )
+
+        await self._send_choice_and_wait(
+            event,
+            f"「{Name}」匹配到多个外观，回复序号查询价格\n{menu}",
+            len(candidates),
+            runner,
+        )
 
     async def  chengbeng(self, event: AstrMessageEvent, server: str ,Name: str ,source : int = 0):
         """ 成本 服务器 物品名称 """    
@@ -785,7 +816,7 @@ class MessageBuilder:
 
     async def  juesheqiyu(self, event: AstrMessageEvent, server: str, name: str):
         """ 查询 服务器 角色 """
-        return await self.T2I_image_msg(event, lambda: self.jx3api.juesheqiyu(server,name, 0))
+        return await self.T2I_image_msg(event, lambda: self.jx3api.juesheqiyu(server,name, 1))
 
     async def  qiyutongji(self, event: AstrMessageEvent,adventureName: str, server: str = "",limit: int = 20):
         """ 统计 奇遇 服务器 数量"""
@@ -810,6 +841,10 @@ class MessageBuilder:
     async def  jueshe(self, event: AstrMessageEvent,server: str, name: str):
         """ 角色 服务器 名称 """
         return await self.plain_msg(event, lambda: self.jx3api.jueshe(server, name, 1))
+
+    async def  charen(self, event: AstrMessageEvent, server: str, name: str):
+        """ 查人 服务器 角色 """
+        return await self.plain_msg(event, lambda: self.jx3api.charen(server, name))
 
     async def  unua_online(self, event: AstrMessageEvent, server: str, name: str):
         """ 在线 服务器 角色名 """
