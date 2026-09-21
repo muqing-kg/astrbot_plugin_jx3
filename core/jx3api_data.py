@@ -1453,17 +1453,25 @@ class JX3APIService:
                 if str(level) not in buckets:
                     continue
 
+                # 未触发以 status 判定；已触发但无时间戳的记录仍然算已触发
+                try:
+                    status = int(item.get("status"))
+                except (TypeError, ValueError):
+                    status = None
                 try:
                     timestamp = int(item.get("time") or 0)
                 except (TypeError, ValueError):
                     timestamp = 0
 
-                if timestamp > 0:
+                if status is None:
+                    pending = timestamp <= 0
+                else:
+                    pending = status == 0
+                item["pending"] = pending
+                if not pending and timestamp > 0:
                     item["time"] = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d %H:%M:%S")
-                    item["pending"] = False
                 else:
                     item["time"] = ""
-                    item["pending"] = True
                 buckets[str(level)].append(item)
 
             # 已触发的保持上游顺序在前，未触发的统一置后
