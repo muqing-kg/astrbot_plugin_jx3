@@ -2,6 +2,10 @@
 
 ### version: 3.5.0：
 
+奇遇珍卷字体改为内嵌：官网正文跟随系统字体（Windows 为微软雅黑），而插件渲染在远端 T2I 服务上，系统字体不可控、四种字体栈实测输出完全一致。现取官网同源的 Noto Sans SC（OFL 协议，官网自身打包的 web 字体）按珍卷用字子集化，固定文案与全部奇遇名共 313 个汉字，woff2 仅约 100KB，渲染时以 data URI 内联；角色名含子集外生僻字时回退渲染端中文字体。许可文件随字体一并入库（`templates/font/NotoSansSC-OFL.txt`），维护脚本 `tools/build_card_font.py`。
+
+修复奇遇珍卷卷轴转轴四角不对称：纸面高 900px 而轴头图 940px 垂直居中，多出的部分上端露出、下端被截图边界裁掉。现画布高度改为 940px 并让纸面垂直居中，左右轴头上下两端完整露出且对称。
+
 修复配置 schema 重复键：`_conf_schema.json` 中 `jx3api_base_url` 原有两个同名条目，现只保留一份，避免配置校验报重复键。
 
 图片资源目录收拢：`templates/sect`（门派与心法图标）与 `templates/serendipity`（奇遇徽记）移入 `templates/img/` 下，现在所有图片都在 `templates/img`（顶层散图 + `sect` / `serendipity` / `奇遇珍卷` 三个子目录），加载逻辑与图标键名不变。

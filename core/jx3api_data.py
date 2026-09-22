@@ -85,6 +85,15 @@ def _zhenjuan_logo() -> str:
     return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
 
+@lru_cache(maxsize=1)
+def _zhenjuan_card_font() -> str:
+    """珍卷内嵌字体（Noto Sans SC 按珍卷用字子集，OFL 协议），缺文件返回空串。"""
+    path = Path(__file__).resolve().parent.parent / "templates" / "font" / "珍卷字体.woff2"
+    if not path.exists():
+        return ""
+    return "data:font/woff2;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
 @lru_cache(maxsize=256)
 def _zhenjuan_pet_icon(name: str) -> str:
     """宠物奇遇图标：本地 2 倍图（templates/img/宠物奇遇/<奇遇名>），按奇遇名取用。"""
@@ -1749,6 +1758,7 @@ class JX3APIService:
                     "%Y/%m/%d %H:%M:%S"
                 ),
                 "logo": _zhenjuan_logo(),
+                "cardFont": _zhenjuan_card_font(),
                 "school": school,
                 "schoolIcon": school_icon,
                 "assets": {
