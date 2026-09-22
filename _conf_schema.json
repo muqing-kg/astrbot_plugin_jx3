@@ -30,12 +30,6 @@
     "default": "https://www.jx3api.com",
     "invisible": true
   },
-  "jx3api_base_url": {
-    "description": "运行字段：JX3API 基础地址",
-    "type": "string",
-    "default": "https://www.jx3api.com",
-    "invisible": true
-  },
   "jx3api_push_token": {
     "description": "迁移字段：全局推送令牌",
     "type": "string",

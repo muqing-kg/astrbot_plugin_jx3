@@ -222,21 +222,30 @@ class MessageBuilder:
             return
         await self._deliver(event, lambda: event.send(event.image_result(data["data"])), "图片")
 
-    async def raw_image_msg(self, event: AstrMessageEvent, action):
+    async def raw_image_msg(self, event: AstrMessageEvent, action, options: dict | None = None):
         """渲染不套公共装饰层的独立图片。"""
         data = await action()
         if data["code"] != 200:
             await self._deliver(event, lambda: event.send(event.plain_result(data["msg"])), "文本")
             return
-        options = {
+        render_options = {
             "quality": 100,
             "device_scale_factor_level": "normal",
             "full_page": True,
             "omit_background": False,
             "type": "png"
         }
+        if options:
+            render_options.update(options)
         try:
-            url = await self.html_render(data["temp"], data["data"], options=options)
+            try:
+                url = await self.html_render(data["temp"], data["data"], options=render_options)
+            except Exception as e:
+                if render_options.get("device_scale_factor_level") == "normal":
+                    raise
+                logger.warning(f"高分辨率渲染失败，回退普通档: {e}")
+                render_options["device_scale_factor_level"] = "normal"
+                url = await self.html_render(data["temp"], data["data"], options=render_options)
         except Exception as e:
             logger.error(f"渲染独立图片失败: {e}")
             await self._notice(event, "渲染图片失败，请稍后再试")
@@ -850,6 +859,26 @@ class MessageBuilder:
     async def  juesheqiyu(self, event: AstrMessageEvent, server: str, name: str):
         """ 查询 服务器 角色 """
         return await self.T2I_image_msg(event, lambda: self.jx3api.juesheqiyu(server,name, 1))
+
+    async def  zhenjuan(self, event: AstrMessageEvent, server: str, name: str):
+        """ 奇遇珍卷 服务器 角色 """
+        async def action():
+            catalog = await self.jx3box.qiyuliebiao()
+            school = await self.jx3api.role_school(server, name)
+            icon = (self.icons.get("sect") or {}).get(school, "") if school else ""
+            return await self.jx3api.zhenjuan(
+                server,
+                name,
+                catalog,
+                school=school,
+                school_icon=icon,
+            )
+
+        return await self.raw_image_msg(
+            event,
+            action,
+            options={"device_scale_factor_level": "high"},
+        )
 
     async def  qiyutongji(self, event: AstrMessageEvent,adventureName: str, server: str = "",limit: int = 20):
         """ 统计 奇遇 服务器 数量"""

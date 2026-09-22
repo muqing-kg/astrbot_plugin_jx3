@@ -75,7 +75,7 @@ from .core.plugin_settings import PluginSettings
 @register("astrbot_plugin_jx3",
           "muqing-kg",
           "聚合剑网三游戏数据，提供查询、图片渲染和后台推送。",
-          "3.4.0",
+          "3.5.0",
           "https://github.com/muqing-kg/astrbot_plugin_jx3"
 )
 class Jx3ApiPlugin(Star):
@@ -173,8 +173,8 @@ class Jx3ApiPlugin(Star):
         self.local_data_path = self.local_data_dir / "local_data.db"
         self.plugin_data_path = self.plugin_data_dir / "plugin_data.db"
         self.plugin_temp_img = self.plugin_temp_dir / "img"
-        self.plugin_temp_sect = self.plugin_temp_dir / "sect"
-        self.plugin_temp_serendipity = self.plugin_temp_dir / "serendipity"
+        self.plugin_temp_sect = self.plugin_temp_dir / "img" / "sect"
+        self.plugin_temp_serendipity = self.plugin_temp_dir / "img" / "serendipity"
 
     def load_local_base64(self):
         self.icons = {
@@ -288,6 +288,7 @@ class Jx3ApiPlugin(Star):
             "全部名片": self.jx3cmd.shuoyoumingpian,
             "随机名片": self.jx3cmd.shuijimingpian,
             "查询": self.jx3cmd.juesheqiyu,
+            "奇遇珍卷": self.jx3cmd.zhenjuan,
             "未出": self.jx3cmd.weizuoqiyu,
             "汇总": self.jx3cmd.qiyuhuizong,
             "近期": self.jx3cmd.jinqiqiyu,

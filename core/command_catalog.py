@@ -194,6 +194,13 @@ DEFAULT_COMMAND_ROWS = [
         'desc': '奇遇宠物 / 角色奇遇',
     },
     {
+        'id': '奇遇珍卷',
+        'group': '奇遇宠物',
+        'command': '奇遇珍卷',
+        'command_tpl': '奇遇珍卷 [服务器] [角色]',
+        'desc': '奇遇宠物 / 奇遇珍卷',
+    },
+    {
         'id': '未出',
         'group': '奇遇宠物',
         'command': '未出',

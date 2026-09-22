@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <title>奇遇珍卷</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 2050px;
+            font-family: KaiTi, STKaiti, "楷体", "Microsoft YaHei", serif;
+            background: #fff;
+        }
+
+        .m-scroll-scene {
+            position: relative;
+            margin: 0 auto;
+            width: max-content;
+            min-height: 900px;
+        }
+
+        .m-content {
+            position: relative;
+            margin: 0 auto;
+            width: max-content;
+            height: 900px;
+            background-size: auto 100%;
+            background-position: 50%;
+            display: flex;
+        }
+
+        .m-content img {
+            display: block;
+            pointer-events: none;
+        }
+
+        .m-content .u-content__bg {
+            position: absolute;
+            left: -43px;
+            bottom: 33px;
+        }
+
+        .m-content .m-left {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            transform: translateY(-50%);
+            z-index: 100;
+        }
+
+        .m-content .m-right {
+            position: absolute;
+            top: 50%;
+            right: 0;
+            transform: translateY(-50%);
+            z-index: 100;
+        }
+
+        .m-content .m-left .u-left__img,
+        .m-content .m-right .u-right__img {
+            position: relative;
+            z-index: 5;
+        }
+
+        .m-qy-box {
+            margin-top: 88px;
+            margin-left: 60px;
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+        }
+
+        .m-qy {
+            display: flex;
+        }
+
+        .m-qy-list {
+            display: flex;
+            flex-direction: row-reverse;
+        }
+
+        .m-qy__row {
+            display: block;
+        }
+
+        .m-qy__item {
+            position: relative;
+            width: 47px;
+        }
+
+        .m-qy__item .u-qy__img {
+            width: 47px;
+        }
+
+        .m-qy.m-pet .m-qy__item .u-qy__img {
+            border-radius: 50%;
+        }
+
+        .m-qy__item .u-qy__border {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            width: 47px;
+        }
+
+        .m-qy__item .m-qy__text {
+            position: absolute;
+            right: -11px;
+            top: -5px;
+            width: 20px;
+        }
+
+        .m-qy__item .m-qy__text .u-qy__bg {
+            width: 20px;
+            display: block;
+        }
+
+        .m-qy__item .m-qy__text .u-qy__text {
+            position: absolute;
+            top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #fff;
+            line-height: 12px;
+        }
+
+        .m-qy.m-ordinary .m-qy__row .m-qy__item:not(:first-child) {
+            margin-top: 19px;
+        }
+
+        .m-qy.m-ordinary .m-qy-list .m-qy__row:not(:first-child) {
+            margin-right: 23px;
+        }
+
+        .m-qy.m-ordinary {
+            min-height: 343px;
+        }
+
+        .m-qy.m-pet {
+            margin-top: 35px;
+        }
+
+        .m-qy.m-pet .m-qy__row .m-qy__item:not(:first-child) {
+            margin-top: 11px;
+        }
+
+        .m-qy.m-pet .m-qy__row:not(:first-child) {
+            margin-right: 16px;
+        }
+
+        .m-qy__count {
+            position: relative;
+            height: max-content;
+            margin-left: 27px;
+        }
+
+        .m-qy__count .u-count__img {
+            width: 32px;
+        }
+
+        .m-qy__count .m-count-info {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            font-weight: 700;
+            color: #995115;
+            text-align: center;
+            opacity: .5;
+            line-height: 20px;
+        }
+
+        .m-world {
+            position: relative;
+            width: 700px;
+            height: 700px;
+            margin-top: 88px;
+        }
+
+        .m-world .u-world__bg {
+            position: absolute;
+            left: 55px;
+            bottom: 36px;
+            width: 579px;
+        }
+
+        .m-world .u-item__img {
+            display: block;
+            position: absolute;
+        }
+
+        .m-world .m-item__text {
+            position: absolute;
+            z-index: 99;
+        }
+
+        .m-world .m-item__text .u-item__bg {
+            width: 20px;
+        }
+
+        .m-world .m-item__text .u-item__text {
+            position: absolute;
+            top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 12px;
+            color: #fff;
+            line-height: 12px;
+        }
+
+        .m-world-count {
+            position: absolute;
+            top: 0;
+            right: 41px;
+        }
+
+        .m-world-count .u-count__img {
+            width: 32px;
+        }
+
+        .m-world-count .m-count-info {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            font-weight: 700;
+            color: #995115;
+            text-align: center;
+            opacity: .5;
+            line-height: 20px;
+        }
+
+        .m-title {
+            margin-top: 57px;
+            margin-left: -37px;
+            margin-right: 10px;
+        }
+
+        .m-title .u-logo {
+            width: 244px;
+        }
+
+        .m-title .m-title-info {
+            display: flex;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .m-title .m-title-info .m-user {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-left: 15px;
+        }
+
+        .m-title .m-title-info .m-user .u-icon {
+            width: 36px;
+            height: auto;
+            max-height: 36px;
+        }
+
+        .m-title .m-title-info .m-user .u-name {
+            margin-top: 8px;
+            color: #112d24;
+            font-size: 24px;
+            font-weight: 700;
+            width: 33px;
+            text-align: center;
+            line-height: 25px;
+        }
+
+        .m-title .m-title-info .m-tip {
+            height: 300px;
+        }
+
+        .m-producer {
+            position: absolute;
+            right: 10px;
+            bottom: 48px;
+            display: flex;
+            flex-wrap: wrap;
+            width: 400px;
+            justify-content: flex-end;
+            padding-right: 30px;
+        }
+
+        .m-producer .u-producer {
+            width: 112px;
+        }
+
+        .m-producer .u-producer__text {
+            font-size: 16px;
+            margin-top: 5px;
+            color: #ad9f9a;
+        }
+
+        .m-qy-progress {
+            position: absolute;
+            left: 40px;
+            bottom: 45px;
+            font-size: 22px;
+            line-height: 20px;
+            text-align: left;
+        }
+
+        .m-qy-progress .u-progress {
+            color: #a30505;
+        }
+
+        .m-qy-progress .u-time {
+            margin-top: 11px;
+            color: #112d24;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="m-scroll-scene">
+        <div class="m-content" style="background-image: url('{{ assets.bg }}')">
+            <img class="u-content__bg" src="{{ assets.contentBg }}" alt="">
+            <div class="m-left"><img class="u-left__img" src="{{ assets.leftRod }}" alt=""></div>
+            <div class="m-right"><img class="u-right__img" src="{{ assets.rightRod }}" alt=""></div>
+            <div class="m-qy-box">
+                <div class="m-qy m-ordinary">
+                    <div class="m-qy-list">
+                        {% for row in ptqy %}
+                        <div class="m-qy__row">
+                            {% for item in row %}
+                            <div class="m-qy__item">
+                                <img class="u-qy__img" src="{{ item.image }}">
+                                <div class="m-qy__text">
+                                    <img class="u-qy__bg" src="{{ assets.ptTextBg }}">
+                                    <span class="u-qy__text">{{ item.name | e }}</span>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="m-qy__count">
+                        <img class="u-count__img" src="{{ assets.ptBadge }}">
+                        <div class="m-count-info">
+                            <div>{{ ptDone }}</div>
+                            <div>/</div>
+                            <div>{{ ptAll }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="m-qy m-pet">
+                    <div class="m-qy-list">
+                        {% for row in cwqy %}
+                        <div class="m-qy__row">
+                            {% for item in row %}
+                            <div class="m-qy__item">
+                                <img class="u-qy__img" src="{{ item.image }}">
+                                <img class="u-qy__border" src="{{ assets.petBorder }}">
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    <div class="m-qy__count">
+                        <img class="u-count__img" src="{{ assets.petBadge }}">
+                        <div class="m-count-info">
+                            <div>{{ cwDone }}</div>
+                            <div>/</div>
+                            <div>{{ cwAll }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="m-world">
+                <img class="u-world__bg" src="{{ assets.worldBg }}">
+                <div class="m-world-count">
+                    <img class="u-count__img" src="{{ assets.worldBadge }}">
+                    <div class="m-count-info">
+                        <div>{{ jsDone }}</div>
+                        <div>/</div>
+                        <div>{{ jsAll }}</div>
+                    </div>
+                </div>
+                {% for item in jsqy %}
+                <img class="u-item__img" style="{{ item.imageStyle }}" src="{{ item.image }}">
+                <div class="m-item__text" style="{{ item.labelStyle }}">
+                    <img class="u-item__bg" src="{{ assets.worldTextBgAct if item.act else assets.worldTextBg }}">
+                    <span class="u-item__text">{{ item.name | e }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="m-title">
+                <img class="u-logo" src="{{ assets.titleIcon }}">
+                <div class="m-title-info">
+                    <img class="m-tip" src="{{ assets.poetry }}">
+                    <div class="m-user">
+                        {% if schoolIcon %}<img class="u-icon" src="{{ schoolIcon }}" alt="{{ school | e }}">{% endif %}
+                        <div class="u-name">{{ roleName | e }}</div>
+                    </div>
+                </div>
+            </div>
+            <div class="m-producer">
+                <img class="u-producer" src="{{ logo }}">
+            </div>
+            <div class="m-qy-progress">
+                <div class="u-progress">【奇遇进度】{{ progress }}%</div>
+                <div class="u-time">【记录时间】{{ recordTime }}</div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

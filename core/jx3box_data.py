@@ -1,5 +1,6 @@
 import json
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -117,6 +118,8 @@ class JX3BOXService:
         # 引用sqlite
         self._sql_db = sqlite
         self._cache_db = cache_sqlite or sqlite
+        # 奇遇名表缓存（名称->dwID/图标路径的映射，变化很慢）
+        self._serendipity_cache: tuple[float, List[Dict[str, Any]]] = (0.0, [])
 
     @property
     def token(self) -> str:
@@ -224,6 +227,22 @@ class JX3BOXService:
 
 
 
+
+    async def qiyuliebiao(self) -> List[Dict[str, Any]]:
+        """JX3BOX 全量奇遇名表，提供名称与 dwID / 奖励图标路径的映射。"""
+        cached_at, cached = self._serendipity_cache
+        if cached and time.monotonic() - cached_at < 21600:
+            return cached
+        data = await self._base_request(
+            "node",
+            "/serendipities",
+            params={"_no_page": 1},
+            out="list",
+        )
+        if isinstance(data, list) and data:
+            self._serendipity_cache = (time.monotonic(), data)
+            return data
+        return cached
 
     async def qiyugonglue(self, name: str) -> Dict[str, Any]:
         """奇遇攻略"""

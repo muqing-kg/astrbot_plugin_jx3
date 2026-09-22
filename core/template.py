@@ -40,6 +40,7 @@ _PAGE_KICKER = {
     "jinqiqiyu": "RECENT ADV.",
     "juesheliaotian": "CHAT LOG",
     "juesheqiyu": "ADVENTURE",
+    "zhenjuan": "ADVENTURE",
     "mingjianpaihang": "ARENA RANK",
     "mingjiantongji": "ARENA STATS",
     "qiwu": "FURNISHINGS",

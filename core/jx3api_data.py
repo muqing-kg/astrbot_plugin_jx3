@@ -23,6 +23,7 @@ from .credentials import (
     current_ticket,
 )
 from .session_policy import camp_code, exception_notice
+from .treasure_data import CDN_ROOT, IMG_ROOT, PERFECT_ITEMS, PERFECT_ORDER
 
 
 
@@ -39,6 +40,94 @@ _SAND_CASTLE_NAMES = frozenset({
 IGNORED_SERENDIPITY_EVENTS = frozenset({
     "茶馆悬赏", "英雄客",
 })
+
+
+def _chunk(items: list, size: int) -> list:
+    return [items[i:i + size] for i in range(0, len(items), size)]
+
+
+def _style_text(style: Optional[dict]) -> str:
+    """把布局数字转成 px 内联样式，字符串值原样保留。"""
+    parts = []
+    for key in ("top", "right", "bottom", "left", "width", "height", "fontSize", "lineHeight", "transform"):
+        value = (style or {}).get(key)
+        if value is None or value == "":
+            continue
+        if isinstance(value, (int, float)):
+            value = f"{value}px"
+        parts.append(f"{key}:{value}")
+    return ";".join(parts)
+
+
+_INVALID_NAME_CHARS = re.compile(r'[\\/:*?"<>|]')
+
+
+def _asset_name(name: Any) -> str:
+    """把接口给的奇遇名变成安全文件名片段：去掉路径分隔符与保留字符。"""
+    return _INVALID_NAME_CHARS.sub("_", str(name or "").strip()).lstrip(".")
+
+
+def _is_inside(base: Path, target: Path) -> bool:
+    try:
+        base_resolved = base.resolve()
+        target_resolved = target.resolve()
+    except OSError:
+        return False
+    return base_resolved == target_resolved or base_resolved in target_resolved.parents
+
+
+@lru_cache(maxsize=1)
+def _zhenjuan_logo() -> str:
+    """珍卷右下角的剑网3标识（本地裁切素材），随模板一并下发。"""
+    path = Path(__file__).resolve().parent.parent / "templates" / "img" / "剑网3标识.png"
+    if not path.exists():
+        return ""
+    return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
+@lru_cache(maxsize=256)
+def _zhenjuan_pet_icon(name: str) -> str:
+    """宠物奇遇图标：本地 2 倍图（templates/img/宠物奇遇/<奇遇名>），按奇遇名取用。"""
+    if not name:
+        return ""
+    name = _asset_name(name)
+    if not name:
+        return ""
+    base = (
+        Path(__file__).resolve().parent.parent
+        / "templates"
+        / "img"
+        / "奇遇珍卷"
+        / "宠物奇遇"
+    )
+    for file_name, mime in ((f"{name}.webp", "image/webp"), (f"{name}.png", "image/png")):
+        path = base / file_name
+        if path.exists() and _is_inside(base, path):
+            return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+    return ""
+
+
+_TREASURE_DIR = Path(__file__).resolve().parent.parent / "templates" / "img"
+_ASSET_MIME = {
+    ".webp": "image/webp",
+    ".png": "image/png",
+    ".svg": "image/svg+xml",
+    ".jpg": "image/jpeg",
+}
+
+
+@lru_cache(maxsize=256)
+def _treasure_asset(rel_path: str) -> str:
+    """本地奇遇珍卷素材（templates/img，中文命名），返回 data URI；缺失返回空串。"""
+    if not rel_path or ".." in Path(rel_path).parts:
+        return ""
+    path = _TREASURE_DIR / rel_path
+    if not path.exists() or not _is_inside(_TREASURE_DIR, path):
+        return ""
+    mime = _ASSET_MIME.get(path.suffix.lower(), "application/octet-stream")
+    return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
 
 
 class JX3APIService:
@@ -1515,6 +1604,190 @@ class JX3APIService:
             template="juesheqiyu.html"
         ) 
 
+
+    async def role_school(self, server: str, name: str) -> str:
+        """角色当前门派（forceName），用于珍卷标题区门派图标；失败返回空串。"""
+        try:
+            data = await self._base_request(
+                "/role/detail",
+                params={"server": server, "name": name, "token": self.token},
+                out="data",
+            )
+        except Exception:
+            logger.exception("获取角色门派失败")
+            return ""
+        if not isinstance(data, dict):
+            return ""
+        return str(data.get("forceName") or "").strip()
+
+    async def zhenjuan(
+        self,
+        server: str,
+        name: str,
+        serendipities: Any,
+        school: str = "",
+        school_icon: str = "",
+    ) -> Dict[str, Any]:
+        """奇遇珍卷，复用全量奇遇记录并叠加 JX3BOX 奇遇图素材布局。"""
+        if not isinstance(serendipities, list) or not serendipities:
+            return_data = self._init_return_data()
+            return_data["msg"] = "奇遇名表暂时不可用，请稍后再试"
+            return return_data
+        by_name: Dict[str, dict] = {}
+        catalog_order: Dict[str, int] = {}
+        for index, row in enumerate(serendipities):
+            if isinstance(row, dict):
+                key = str(row.get("szName") or "").strip()
+                if key:
+                    by_name[key] = row
+                    catalog_order.setdefault(key, index)
+
+        def pet_url(event: str) -> str:
+            row = by_name.get(event) or {}
+            local_icon = _zhenjuan_pet_icon(event)
+            if local_icon:
+                return local_icon
+            path = str(row.get("szOpenRewardPath") or "").strip().lower().replace("\\", "/")
+            if not path:
+                return f"{CDN_ROOT}pt/default.png"
+            path = path.replace("ui/image/adventure/", "")
+            return IMG_ROOT + re.sub(r"\.tga$", ".png", path)
+
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            buckets: Dict[int, list] = {1: [], 2: [], 3: []}
+
+            for item in data:
+                if not isinstance(item, dict):
+                    continue
+                if str(item.get("event") or "").strip() in IGNORED_SERENDIPITY_EVENTS:
+                    continue
+                try:
+                    level = int(item.get("level") or 0)
+                except (TypeError, ValueError):
+                    continue
+                if level not in buckets:
+                    continue
+                try:
+                    status = int(item.get("status"))
+                except (TypeError, ValueError):
+                    status = None
+                try:
+                    timestamp = int(item.get("time") or 0)
+                except (TypeError, ValueError):
+                    timestamp = 0
+                pending = status == 0 if status is not None else timestamp <= 0
+                event_name = str(item.get("event") or "").strip()
+                buckets[level].append({
+                    "name": event_name,
+                    "pending": pending,
+                    "info": by_name.get(event_name) or {},
+                })
+
+            def pt_row(item: dict) -> dict:
+                name = item["name"]
+                image = _treasure_asset(f"奇遇珍卷/普通奇遇/{_asset_name(name)}.webp")
+                if not image and item["info"].get("dwID"):
+                    image = f"{CDN_ROOT}pt/{item['info']['dwID']}.png"
+                if not image:
+                    image = (
+                        _treasure_asset("奇遇珍卷/普通奇遇缺省.png")
+                        or f"{CDN_ROOT}pt/default.png"
+                    )
+                return {"name": name, "image": image}
+
+            def js_row(item: dict, index: int) -> dict:
+                dw_id = item["info"].get("dwID")
+                try:
+                    dw_id = int(dw_id)
+                except (TypeError, ValueError):
+                    dw_id = 0
+                image_style, label_style = PERFECT_ITEMS.get(dw_id) or ({}, {})
+                style_prefix = _style_text(image_style)
+                name = _asset_name(item["name"])
+                act = not item["pending"]
+                # 只内联本次真正要画的那张（已出彩图或未出剪影），减半素材负载
+                image = _treasure_asset(
+                    f"奇遇珍卷/绝世奇遇/{name}{'_已出' if act else ''}.webp"
+                )
+                return {
+                    "name": item["name"],
+                    "act": act,
+                    "image": image
+                    or (
+                        f"{CDN_ROOT}world/{dw_id}{'_act' if act else ''}.png"
+                        if dw_id
+                        else ""
+                    ),
+                    "imageStyle": style_prefix,
+                    "labelStyle": _style_text(label_style),
+                    "_order": PERFECT_ORDER.get(dw_id, 10 ** 6 + index),
+                }
+
+            def cw_row(item: dict) -> dict:
+                return {"name": item["name"], "image": pet_url(item["name"])}
+
+            pt_done = [row for row in buckets[1] if not row["pending"]]
+            js_done = sum(1 for row in buckets[2] if not row["pending"])
+            cw_done = [row for row in buckets[3] if not row["pending"]]
+            for rows in (pt_done, cw_done):
+                rows.sort(
+                    key=lambda row: catalog_order.get(row["name"], 10 ** 6)
+                )
+            # 层叠关系与官方一致：按布局表绘制顺序叠加，点亮与否不改变层级
+            js_items = [js_row(row, index) for index, row in enumerate(buckets[2])]
+            js_items.sort(key=lambda row: row["_order"])
+            for z_index, row in enumerate(js_items):
+                row.pop("_order")
+                style_prefix = row.pop("imageStyle")
+                row["imageStyle"] = (
+                    f"{style_prefix};z-index:{z_index}" if style_prefix else f"z-index:{z_index}"
+                )
+            data_out = {
+                "server": server,
+                "roleName": name,
+                "recordTime": datetime.now(ZoneInfo("Asia/Shanghai")).strftime(
+                    "%Y/%m/%d %H:%M:%S"
+                ),
+                "logo": _zhenjuan_logo(),
+                "school": school,
+                "schoolIcon": school_icon,
+                "assets": {
+                    "bg": _treasure_asset("奇遇珍卷/卷轴底.png"),
+                    "contentBg": _treasure_asset("奇遇珍卷/卷轴纸.png"),
+                    "leftRod": _treasure_asset("奇遇珍卷/卷轴轴头左.png"),
+                    "rightRod": _treasure_asset("奇遇珍卷/卷轴轴头右.png"),
+                    "ptBadge": _treasure_asset("奇遇珍卷/普通奇遇计数条.png"),
+                    "petBadge": _treasure_asset("奇遇珍卷/宠物奇遇计数条.png"),
+                    "worldBadge": _treasure_asset("奇遇珍卷/绝世奇遇计数条.png"),
+                    "ptTextBg": _treasure_asset("奇遇珍卷/普通奇遇名条.png"),
+                    "petBorder": _treasure_asset("奇遇珍卷/宠物奇遇边框.png"),
+                    "worldBg": _treasure_asset("奇遇珍卷/绝世底图.svg"),
+                    "worldTextBg": _treasure_asset("奇遇珍卷/绝世名条.png"),
+                    "worldTextBgAct": _treasure_asset("奇遇珍卷/绝世名条已出.png"),
+                    "titleIcon": _treasure_asset("奇遇珍卷/奇遇珍卷标题.png"),
+                    "poetry": _treasure_asset("奇遇珍卷/题诗.png"),
+                },
+                "ptqy": _chunk([pt_row(row) for row in pt_done], 3),
+                "ptDone": len(pt_done),
+                "ptAll": len(buckets[1]),
+                "jsqy": js_items,
+                "jsDone": js_done,
+                "jsAll": len(buckets[2]),
+                "cwqy": _chunk([cw_row(row) for row in cw_done], 5),
+                "cwDone": len(cw_done),
+                "cwAll": len(buckets[3]),
+            }
+            total = data_out["ptAll"] + data_out["jsAll"] + data_out["cwAll"]
+            done = data_out["ptDone"] + js_done + data_out["cwDone"]
+            data_out["progress"] = f"{done / total * 100:.2f}" if total else "0.00"
+            return_data["data"] = data_out
+
+        return await self._request_api(
+            path="/event/records",
+            params={"server": server, "name": name, "full": 1, "token": self.token},
+            processor=processor,
+            template="standalone/zhenjuan.html",
+        )
 
     async def qiyutongji(self, name: str, server: str, limit: int) -> Dict[str, Any]:
         """奇遇统计"""
