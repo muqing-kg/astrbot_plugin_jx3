@@ -904,10 +904,6 @@ class MessageBuilder:
         """ 角色 服务器 名称 """
         return await self.plain_msg(event, lambda: self.jx3api.jueshe(server, name, 1))
 
-    async def  charen(self, event: AstrMessageEvent, server: str, name: str):
-        """ 查人 服务器 角色 """
-        return await self.plain_msg(event, lambda: self.jx3api.charen(server, name))
-
     async def  unua_online(self, event: AstrMessageEvent, server: str, name: str):
         """ 在线 服务器 角色名 """
         tong_name = ""
