@@ -1,5 +1,13 @@
 ## 更新记录
 
+### version: 3.5.1：
+
+区服清单新增「九天」：`core/server_catalog.py` 的 `OFFICIAL_SERVERS` 由 15 个增至 16 个，`PRESET_ALIASES` 同步补位。绑定区服校验、页面区服行与别名覆盖都由该清单生成，无其它改动。
+
+修复 @ 唤醒绕过 AstrBot 默认模型链路的问题：原先被 @ 且消息未命中本插件指令时，插件自行构造 `ProviderRequest` 并 yield，AstrBot 会直接采用该请求，从而跳过人格设定、会话历史与技能注入，本轮也不会写回会话记忆。现改为只把正文交给事件（`message_str`、`is_wake`、`is_at_or_wake_command`），请求构造、人格与上下文装配、历史写回都交回 AstrBot 默认链路；会话关闭模型对话开关时改为显式调用 `should_call_llm(True)` 压制默认回复。裸 @（无正文）按「你好」处理，以满足默认链路对空消息的拦截条件。
+
+@ 唤醒随之回归 AstrBot 的两处配置语义：`provider_settings.wake_prefix` 配了非空前缀时，@ 消息同样需要带该前缀才会得到回复；`provider_settings.enable` 为 false 时不再回复。此前这两种情况下插件都会强行回话。
+
 ### version: 3.5.0：
 
 奇遇珍卷宽度改为随内容自适应：原先页面固定 2050px 宽，奇遇少时内容只有约 1700px，输出图两侧各留约 170px 空白；现按内容宽度出图，同时卡片容器裁掉卷轴纸多出的 43px 外溢，轴头回到卡片外缘（与官网观感一致），不再出现纸边压在轴头外侧的错位。

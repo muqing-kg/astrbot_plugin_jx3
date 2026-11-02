@@ -1011,8 +1011,13 @@ class Jx3ApiPlugin(Star):
                     self._event_display_name(event),
                     is_private=self._is_private(event),
                 )
+                # 不 yield 自造 ProviderRequest：那会绕过 AstrBot 的人格、会话历史与技能注入。
                 if self.sessions.is_llm_enabled(row):
-                    yield self._forced_llm(event, clean_text)
+                    event.is_wake = True
+                    event.is_at_or_wake_command = True
+                    event.message_str = clean_text or "你好"
+                else:
+                    event.should_call_llm(True)
             return
 
         umo = self._event_umo(event)
@@ -1049,7 +1054,11 @@ class Jx3ApiPlugin(Star):
         if not cmd:
             if bot_at:
                 if self.sessions.is_llm_enabled(row):
-                    yield self._forced_llm(event, clean_text)
+                    event.is_wake = True
+                    event.is_at_or_wake_command = True
+                    event.message_str = clean_text or "你好"
+                else:
+                    event.should_call_llm(True)
                 return
             if self._looks_like_command(event.message_str):
                 suggested = suggest_command(self.command_catalog, trigger)
@@ -1124,18 +1133,3 @@ class Jx3ApiPlugin(Star):
                 extra={"log_source": "query", "log_umo": umo, "log_action": cmd},
             )
             yield event.plain_result(format_command_error(cmd, e, self.command_catalog))
-
-    def _forced_llm(self, event: AstrMessageEvent, text: str):
-        """被 @ 后强制走 LLM 回话，并屏蔽默认链路避免重复回复。"""
-        prompt = (text or "").strip() or "你好"
-        try:
-            event.is_at_or_wake_command = True
-            event.is_wake = True
-        except Exception:
-            pass
-        try:
-            event.should_call_llm(True)
-        except Exception:
-            pass
-        return event.request_llm(prompt=prompt)
-

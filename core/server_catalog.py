@@ -18,6 +18,7 @@ OFFICIAL_SERVERS = [
     "梦江南",
     "绝代天骄",
     "幽月轮",
+    "九天",
 ]
 
 # Sourced from jx3-help/external/jx3instructions/src/tools/dicts.ts
@@ -38,6 +39,7 @@ PRESET_ALIASES: dict[str, list[str]] = {
     "梦江南": ["双梦"],
     "绝代天骄": [],
     "幽月轮": [],
+    "九天": [],
 }
 
 BLOCKED_SERVERS = {"共結來緣", "共结来缘"}
