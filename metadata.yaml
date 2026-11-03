@@ -10,4 +10,4 @@ support_platforms:
   - weixin_oc
 pages:
   - name: dashboard
-    title: 插件配置
+    title: 剑网3查询工具
