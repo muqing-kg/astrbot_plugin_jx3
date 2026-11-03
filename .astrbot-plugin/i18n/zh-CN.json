@@ -5,7 +5,7 @@
   },
   "pages": {
     "dashboard": {
-      "title": "插件配置",
+      "title": "剑网3查询工具",
       "description": "会话、命令、区服都在这一页。用标签切换。",
       "sessions": "会话配置",
       "commands": "命令配置",
