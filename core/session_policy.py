@@ -320,10 +320,13 @@ def remap_admin_parts(parts: list[str], catalog: dict | None) -> list[str]:
     if not catalog:
         return parts
     current_names = {}
+    alias_names = {}
     for command_id in ADMIN_COMMAND_IDS:
-        current_names[command_id] = str((catalog.get(command_id) or {}).get("command") or command_id)
+        row = catalog.get(command_id) or {}
+        current_names[command_id] = str(row.get("command") or command_id)
+        alias_names[command_id] = list(row.get("aliases") or [])
     for command_id, current in current_names.items():
-        if trigger == current:
+        if trigger == current or trigger in alias_names[command_id]:
             return [command_id, *parts[1:]]
         if command_id == "Token" and current == "Token" and trigger.lower() == "token":
             return ["Token", *parts[1:]]

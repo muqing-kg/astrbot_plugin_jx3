@@ -62,8 +62,8 @@ class PluginSettings:
             await self.set_command_overrides(overrides)
         return overrides
 
-    async def server_aliases(self) -> dict[str, str]:
-        raw = await self._get("server_aliases")
+    async def _str_map(self, key: str) -> dict[str, str]:
+        raw = await self._get(key)
         if not raw:
             return {}
         try:
@@ -73,15 +73,24 @@ class PluginSettings:
         if not isinstance(data, dict):
             return {}
         out = {}
-        for key, value in data.items():
+        for name, value in data.items():
             if isinstance(value, list):
-                out[str(key)] = "，".join(str(item) for item in value if str(item).strip())
+                out[str(name)] = "，".join(str(item) for item in value if str(item).strip())
             else:
-                out[str(key)] = str(value)
+                out[str(name)] = str(value)
         return out
+
+    async def server_aliases(self) -> dict[str, str]:
+        return await self._str_map("server_aliases")
 
     async def set_server_aliases(self, aliases: dict[str, str]) -> None:
         await self._set("server_aliases", json.dumps(aliases, ensure_ascii=False))
+
+    async def command_aliases(self) -> dict[str, str]:
+        return await self._str_map("command_aliases")
+
+    async def set_command_aliases(self, aliases: dict[str, str]) -> None:
+        await self._set("command_aliases", json.dumps(aliases, ensure_ascii=False))
 
     async def push_name_overrides(self) -> dict[str, str]:
         raw = await self._get("push_name_overrides")

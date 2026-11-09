@@ -3,6 +3,9 @@ from __future__ import annotations
 from unicodedata import category
 from difflib import SequenceMatcher
 
+from .server_catalog import parse_aliases
+from .plugin_log import logger
+
 DEFAULT_COMMAND_ROWS = [
     {
         'id': '日常',
@@ -801,13 +804,33 @@ def _clone(catalog: dict) -> dict:
     return deepcopy(catalog)
 
 
-def apply_command_overrides(overrides: dict[str, str] | None) -> dict:
+def apply_command_overrides(
+    overrides: dict[str, str] | None,
+    aliases: dict[str, str | list[str]] | None = None,
+) -> dict:
     catalog = _clone(DEFAULT_COMMANDS)
     for command_id, name in (overrides or {}).items():
         catalog, error = set_command_name(catalog, command_id, name)
         if error:
+            logger.warning("命令改名未生效：%s -> %s（%s）", command_id, name, error)
+            continue
+    for command_id, raw in (aliases or {}).items():
+        catalog, error = set_command_aliases(catalog, command_id, raw)
+        if error:
+            logger.warning("命令别名未生效：%s -> %s（%s）", command_id, raw, error)
             continue
     return catalog
+
+
+def _used_triggers(catalog: dict, skip_id: str = "") -> dict[str, str]:
+    used: dict[str, str] = {}
+    for command_id, row in catalog.items():
+        if command_id == skip_id:
+            continue
+        used[str(row.get("command") or command_id)] = command_id
+        for alias in row.get("aliases") or []:
+            used[str(alias)] = command_id
+    return used
 
 
 def command_collision(catalog: dict, command_id: str, name: str) -> str:
@@ -816,14 +839,11 @@ def command_collision(catalog: dict, command_id: str, name: str) -> str:
         return "命令不能为空"
     if any(char.isspace() for char in name):
         return "命令不能包含空格"
-    current = catalog.get(command_id)
-    if not current:
+    if not catalog.get(command_id):
         return "未知命令"
-    for other_id, row in catalog.items():
-        if other_id == command_id:
-            continue
-        if str(row.get("command") or "") == name:
-            return f"命令已被「{other_id}」占用"
+    owner = _used_triggers(catalog, skip_id=command_id).get(name)
+    if owner:
+        return f"命令已被「{owner}」占用"
     return ""
 
 
@@ -833,6 +853,28 @@ def set_command_name(catalog: dict, command_id: str, name: str) -> tuple[dict, s
     if error:
         return catalog, error
     catalog[command_id]["command"] = name.strip()
+    return catalog, ""
+
+
+def set_command_aliases(
+    catalog: dict,
+    command_id: str,
+    raw: str | list[str] | None,
+) -> tuple[dict, str]:
+    catalog = _clone(catalog)
+    if not catalog.get(command_id):
+        return catalog, "未知命令"
+    primary = str(catalog[command_id].get("command") or command_id)
+    used = _used_triggers(catalog, skip_id=command_id)
+    aliases: list[str] = []
+    for word in parse_aliases(raw):
+        if word == primary:
+            continue
+        owner = used.get(word)
+        if owner:
+            return catalog, f"别名已被「{owner}」占用"
+        aliases.append(word)
+    catalog[command_id]["aliases"] = aliases
     return catalog, ""
 
 
@@ -957,7 +999,7 @@ def resolve_command(catalog: dict, trigger: str) -> str | None:
     if not trigger:
         return None
     for command_id, row in catalog.items():
-        if str(row.get("command") or "") == trigger:
+        if str(row.get("command") or "") == trigger or trigger in (row.get("aliases") or []):
             return command_id
     return None
 
@@ -1098,6 +1140,7 @@ def public_command_rows(catalog: dict | None = None) -> list[dict]:
             "id": item["id"],
             "group": item["group"],
             "command": new,
+            "aliases": list(row.get("aliases") or []),
             "params": _replace_command_text(item["command_tpl"], old, new),
             "desc": desc,
         })

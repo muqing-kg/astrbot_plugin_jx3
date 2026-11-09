@@ -514,15 +514,21 @@ class SessionPageAPI:
         ]
         return self.json_response({
             "commands": rows,
-            "notice": "命令修改全局生效。改名后只认新命令，不再认旧命令。",
+            "notice": "命令修改全局生效。多个命令用英文逗号分隔，第一个作为正名，其余为别名；正名与别名都能触发。命令名与别名不能含空格或斜杠。",
         })
 
     async def save_command(self):
-        from .command_catalog import apply_command_overrides, set_command_name
+        from .command_catalog import apply_command_overrides, set_command_aliases, set_command_name
+        from .server_catalog import parse_aliases
         data = await self._payload()
         command_id = str(data.get("id") or "").strip()
-        name = str(data.get("command") or "").strip()
-        _, error = set_command_name(self.plugin.command_catalog, command_id, name)
+        words = parse_aliases(str(data.get("command") or ""))
+        if not words:
+            return self.error_response("命令不能为空", status_code=400)
+        name, aliases = words[0], words[1:]
+        catalog, error = set_command_name(self.plugin.command_catalog, command_id, name)
+        if not error:
+            _, error = set_command_aliases(catalog, command_id, aliases)
         if error:
             return self.error_response(error, status_code=400)
         overrides = await self.plugin.settings.command_overrides()
@@ -531,13 +537,20 @@ class SessionPageAPI:
         else:
             overrides[command_id] = name
         await self.plugin.settings.set_command_overrides(overrides)
-        self.plugin.command_catalog = apply_command_overrides(overrides)
+        stored = await self.plugin.settings.command_aliases()
+        if aliases:
+            stored[command_id] = "，".join(aliases)
+        else:
+            stored.pop(command_id, None)
+        await self.plugin.settings.set_command_aliases(stored)
+        self.plugin.command_catalog = apply_command_overrides(overrides, stored)
         self.plugin.jx3api.command_catalog = self.plugin.command_catalog
         return self.json_response({"ok": True})
 
     async def reset_commands(self):
         from .command_catalog import apply_command_overrides
         await self.plugin.settings.set_command_overrides({})
+        await self.plugin.settings.set_command_aliases({})
         self.plugin.command_catalog = apply_command_overrides({})
         self.plugin.jx3api.command_catalog = self.plugin.command_catalog
         return self.json_response({"ok": True})

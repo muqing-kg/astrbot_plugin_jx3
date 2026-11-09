@@ -535,7 +535,7 @@ function renderCommands(payload) {
     const el = document.createElement("div");
     el.className = "row";
     el.innerHTML = `
-      <input data-k="command" value="${escapeHtml(row.command || "")}" />
+      <input data-k="command" value="${escapeHtml([row.command, ...(row.aliases || [])].join(", "))}" placeholder="正名, 别名1, 别名2" />
       <div class="cell-text">${escapeHtml(row.params || "")}</div>
       <div class="cell-text">${escapeHtml(row.desc || "")}</div>
       <button data-act="save" type="button">保存</button>

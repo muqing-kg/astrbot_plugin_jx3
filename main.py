@@ -129,7 +129,10 @@ class Jx3ApiPlugin(Star):
             self.jx3api._api.ssl_verify = bool(global_config["jx3api_ssl_verify"])
             self.jx3box._api.ssl_verify = bool(global_config["jx3api_ssl_verify"])
             self.aijx3._api.ssl_verify = bool(global_config["jx3api_ssl_verify"])
-            self.command_catalog = apply_command_overrides(await self.settings.command_overrides())
+            self.command_catalog = apply_command_overrides(
+                await self.settings.command_overrides(),
+                await self.settings.command_aliases(),
+            )
             self.server_catalog = apply_alias_overrides(await self.settings.server_aliases())
             self.push_name_overrides = await self.settings.push_name_overrides()
             self.jx3api.push_names = dict(self.push_name_overrides)
@@ -1034,12 +1037,11 @@ class Jx3ApiPlugin(Star):
                 self._sender_name(event),
             )
             row = await self.sessions.get(umo) or row
-        claim_cmd = ((self.command_catalog.get("认领") or {}).get("command") or "认领")
-        claim_and_voice_cmds = {claim_cmd, current_command_name(self.command_catalog, "张嘴"), current_command_name(self.command_catalog, "闭嘴")}
+        claim_and_voice_cmds = {"认领", "张嘴", "闭嘴"}
         if (
             not self.sessions.is_bot_enabled(row)
             and not bot_at
-            and parts[0] not in claim_and_voice_cmds
+            and remap_admin_parts(parts, self.command_catalog)[0] not in claim_and_voice_cmds
         ):
             return
 
