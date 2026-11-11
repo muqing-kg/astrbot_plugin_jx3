@@ -9,11 +9,21 @@ _JINJA = Environment(autoescape=False)
 
 _proxy: str = ""
 
+DEFAULT_BOT_NAME = "唐小珂"
+
+_bot_name: str = DEFAULT_BOT_NAME
+
 
 def set_proxy(value: str) -> None:
     """配置出站代理；空串表示直连。"""
     global _proxy
     _proxy = str(value or "").strip()
+
+
+def set_bot_name(value: str) -> None:
+    """设置卡片品牌栏显示的机器人名字；空值回退默认名。"""
+    global _bot_name
+    _bot_name = str(value or "").strip() or DEFAULT_BOT_NAME
 
 _DECOR_COLORS = ("#f3b6c4", "#efb3c3", "#f5cdd7", "#f9dbe3")
 _DECOR_KINDS = ("heart", "star", "sparkle", "diamond", "paw", "flower", "moon", "cloud")
@@ -200,7 +210,7 @@ def _body_decor_range(body_length: int) -> tuple[int, int]:
 def build_decorated_payload(icons: dict, body_length: int = 0, poem_line: str = "") -> dict:
     """为模板补充随机顶卡动作图和卡片淡色矢量装饰。"""
     actions = [name for name in (icons.get("img") or {}) if name.startswith("动作")]
-    brand = '<span class="jx3-bot-name">唐小珂 · 江湖小助手</span>'
+    brand = f'<span class="jx3-bot-name">{html.escape(_bot_name)} · 江湖小助手</span>'
     if poem_line.strip():
         deco_caption = brand + f'<span class="jx3-bot-poem">{html.escape(poem_line.strip())}</span>'
     else:

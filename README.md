@@ -26,7 +26,7 @@
 | 数据源 | 代码入口 | 主要用途 |
 | --- | --- | --- |
 | [JX3API](https://www.jx3api.com) | `core/jx3api_data.py` | 绝大多数游戏查询、官方资讯、排行、角色和推送数据 |
-| [JX3BOX](https://www.jx3box.com/) | `core/jx3box_data.py` | 宏、资历、交易行及刷马/赤兔推送消息 |
+| [JX3BOX](https://www.jx3box.com/) | `core/jx3box_data.py` | 宏、资历、交易行 |
 | 本地 SQLite | core/sqlite.py | 心法别名、推送状态和基础数据缓存 |
 
 外部数据源的可用性、数据时效和字段结构均不由本插件控制。接口变更、网络异常、凭据权限不足或上游限流都可能导致查询失败。
@@ -75,7 +75,7 @@ pip install -r data/plugins/astrbot_plugin_jx3/requirements.txt
 
 ## 插件配置
 
-插件配置统一在 WebUI 维护。「全局配置」页包括 JX3API 基础地址、事件通道地址、TLS 校验、指令前缀，以及全局接口令牌、全局推送令牌和全局推栏标识。会话配置页维护群属凭据和失效池。运行日志页监控 WebSocket、事件投递、补推和赤兔链路。多条可用凭据都会轮询使用。启动时会迁移历史配置字段并清空迁移源。
+插件配置统一在 WebUI 维护。「全局配置」页包括 JX3API 基础地址、事件通道地址、TLS 校验、指令前缀，以及全局接口令牌、全局推送令牌和全局推栏标识。会话配置页维护群属凭据和失效池。运行日志页监控 WebSocket、事件投递和补推。多条可用凭据都会轮询使用。启动时会迁移历史配置字段并清空迁移源。
 
 全局配置页顺序为：JX3API 基础地址、全局接口令牌、JX3API 事件通道地址、全局推送令牌、全局推栏标识、TLS 校验和指令前缀。基础地址只用于 JX3API HTTP 请求；事件通道地址只用于主动推送 WebSocket；JX3BOX、UNUA 等第三方固定地址不受影响。
 
@@ -289,17 +289,14 @@ flowchart LR
     B --> C["command_map 查找处理器"]
     C --> D["MessageBuilder 参数适配"]
     D --> E1["JX3APIService"]
-    D --> E2["AIJX3Service"]
     D --> E3["JX3BOXService"]
     D --> E4["BiLeidata / AsyncTask"]
     E1 --> F["APIClient"]
-    E2 --> F
     E3 --> F
     F --> G["外部 HTTP 数据源"]
     E3 --> H["plugin_data.db / local_data.db"]
     E4 --> H
     E1 --> I["标准返回对象"]
-    E2 --> I
     E3 --> I
     E4 --> I
     I --> J1["纯文本"]
@@ -314,7 +311,7 @@ flowchart LR
 1. 读取前缀、全局 Token、全局推栏。
 2. 计算插件目录、AstrBot 数据目录、模板目录和两个 SQLite 文件路径。
 3. 把 `templates/img`（含子目录 `sect`、`serendipity`、`奇遇珍卷`）中的图片读取为 base64 Data URL。
-4. 创建本地数据库、随包数据库、三个数据服务、会话绑定存储、推送调度器和消息构建器。
+4. 创建本地数据库、随包数据库、各数据服务、会话绑定存储、推送调度器和消息构建器。
 
 异步初始化阶段会连接数据库并创建以下本地表：
 
@@ -340,11 +337,10 @@ flowchart LR
 
 ### 3. 数据服务
 
-三个数据服务按上游来源拆分：
+两个数据服务按上游来源拆分：
 
 - `JX3APIService`：以 `https://www.jx3api.com` 为根地址，通过 GET 请求实现主体功能。
-- `AIJX3Service`：负责剩余剑侠茶馆请求。
-- `JX3BOXService`：通过统一请求入口访问 JX3BOX 的 Node、CMS 和 Next2 服务，负责宏、资历、交易行及刷马/赤兔推送消息。
+- `JX3BOXService`：通过统一请求入口访问 JX3BOX 的 Node、CMS 和 Next2 服务，负责宏、资历、交易行。
 
 服务方法通常返回统一结构：
 
@@ -380,7 +376,6 @@ flowchart LR
 
 - `plain_msg()`：纯文本。
 - `T2I_image_msg()`：向模板注入业务数据和本地图标，再调用 AstrBot HTML 渲染器生成 JPEG。
-- `image_msg()`：直接发送远程图片 URL 或图片数据。
 - `plain_chain()`：发送文本与多张图片组成的消息链。
 - `handler_plain_image_msg()`：宏查询的两轮会话。
 - `handler_zili_msg()`：资历查询的两轮会话。
@@ -432,7 +427,7 @@ AstrBot 的渲染接口接收完整 HTML 字符串，因此插件不会依赖渲
 
 免费事件不读取、不校验、不依赖推送令牌。付费事件必须有可用推送令牌；令牌失效或无可用回退时，只暂停付费推送。推送状态按 `action/server/umo` 记录，不同群之间互不影响。发送失败的目标会写入本地补推队列，并在事件时间起 60 秒内重试；超过 60 秒后标记为已消费。上游没有发来的历史事件不补发。
 
-赤兔后台任务每 20 秒使用 `JX3BOXService.machangxiaoxi()` 请求 Next2 通用马场记录（`type=horse`），只推送 1 分钟内的到达信号，并用按群事件状态避免重复推送；事件通道收到 action `0` 时直接忽略。插件卸载时会等待内部任务退出、关闭 WebSocket 并停止调度器。
+插件卸载时会等待内部任务退出、关闭 WebSocket 并停止调度器。
 
 ## 目录结构
 
@@ -449,7 +444,6 @@ astrbot_plugin_jx3/
 │   └── plugin_data.db       # 随包只读基础数据：心法别名与配装标识（配装 / 宏 查询用，运行期不写入）
 ├── core/
 │   ├── jx3api_data.py       # JX3API 业务服务
-│   ├── aijx3_data.py        # 剑侠茶馆业务服务
 │   ├── jx3box_data.py       # JX3BOX 业务服务与缓存逻辑
 │   ├── message.py           # 文本、图片、消息链和两轮会话构建
 │   ├── request.py           # aiohttp 请求封装
@@ -480,7 +474,7 @@ tools/                       # 素材维护脚本：抓取/重建/校验奇遇�
 
 新增查询功能时，建议按当前分层复用现有能力：
 
-1. 根据数据来源选择 `JX3APIService`、`AIJX3Service` 或 `JX3BOXService`。
+1. 根据数据来源选择 `JX3APIService` 或 `JX3BOXService`。
 2. 在业务服务中新增异步方法，复用 `APIClient`，完成请求、空数据检查、字段整理和标准返回对象构建。
 3. 需要图片输出时新增或复用 `templates/pages/*.html`，优先组合 `data-table`、`card-grid`、`ability-card`、`object-card` 等公共组件，并通过 `template-components` 元数据声明所需组件；只有无法复用的复杂布局才添加同名的 `templates/styles/pages/*.css`，不要在业务层拼装最终图片消息。
 4. 在 `MessageBuilder` 中增加薄包装方法，选择文本、HTML 图片、远程图片、消息链或会话处理器。
@@ -505,7 +499,7 @@ git diff --check
 1. 每个群聊独立绑定一个区服；查询未写区服时使用绑定服，写了区服则以当场写的为准。QQ/微信私聊不再提供查询和主动推送，仅保留 `认领`、`接口令牌`、`推送令牌`、`推栏` 配置入口。
 2. 主动推送按会话开关和绑定区服发送，不再使用配置页里的 `kfts` / `xwts` / `smts` / `ctts`。
 3. 接口令牌、推送令牌和推栏标识按类型独立回退。群属可用池为空时，必须由管理员勾选对应「使用全局」才使用全局池；群属可用池恢复后自动取消勾选。
-4. WebUI 的「全局配置」页维护 JX3API 基础地址、全局接口令牌、事件通道地址、全局推送令牌、全局推栏标识、TLS 和指令前缀；会话配置页维护群属凭据和失效池；运行日志页监控 WebSocket、事件投递、补推和赤兔链路。
+4. WebUI 的「全局配置」页维护 JX3API 基础地址、全局接口令牌、事件通道地址、全局推送令牌、全局推栏标识、TLS 和指令前缀；会话配置页维护群属凭据和失效池；运行日志页监控 WebSocket、事件投递和补推。
 5. `APIClient` 默认校验 TLS 证书，可在全局配置页关闭。请求日志会脱敏 `token` 和 `ticket`。
 
 ## 注意事项

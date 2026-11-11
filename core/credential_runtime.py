@@ -12,9 +12,6 @@ from .credentials import (
 from .plugin_log import logger
 
 
-LABELS = {"token": "接口令牌", "ticket": "推栏标识"}
-
-
 def _rotated(values: list[str], start: int) -> list[str]:
     if not values:
         return []

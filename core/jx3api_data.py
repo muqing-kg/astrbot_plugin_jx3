@@ -2193,7 +2193,7 @@ class JX3APIService:
                 k = item["kungfu"]
                 color = item["color"]
                 cls = item["class"]
-                name = item["name"]
+                item_name = item["name"]
 
                 if k not in result:
                     result[k] = {
@@ -2204,7 +2204,7 @@ class JX3APIService:
                     }
 
                 cell_value = {
-                    "name": name,
+                    "name": item_name,
                     "boost": str(item.get("boost") or "").strip(),
                 }
                 if color == "紫":
@@ -2903,28 +2903,6 @@ class JX3APIService:
         ) if str(part or "").strip())
         return_data["code"] = 200
         return return_data
-
-    async def validate_ticket(self, ticket: str, token: str = "") -> tuple[bool, str]:
-        """对推栏标识做一次真实接口调用校验。"""
-        ticket = (ticket or "").strip()
-        if not ticket:
-            return False, "未提供推栏标识，请更换后再试。"
-        if "," in ticket or "，" in ticket:
-            return False, "推栏标识需要逐个校验，请一次提交一个。"
-        token = (token or "").strip()
-        if not token:
-            return False, "校验推栏标识需要 JX3API 接口令牌，请先配置可用接口令牌后再设置推栏。"
-        data = await self._base_request("/school/skills", {"name": "毒经", "token": token, "ticket": ticket})
-        if isinstance(data, dict) and data.get("_error"):
-            error = str(data["_error"])
-            lowered = error.lower()
-            token_error = any(key in lowered for key in ("token", "expire", "expired", "quota", "limit", "remaining", "insufficient", "count")) or any(key in error for key in ("令牌", "过期", "次数", "余额", "额度", "用尽", "不足"))
-            if token_error:
-                return False, self._token_error_message(error)
-            return False, "推栏标识校验失败，可能是标识已过期或无效，请更换后再试。"
-        if not data:
-            return False, "推栏标识校验失败，请检查网络后更换重试。"
-        return True, "推栏标识校验通过"
 
     async def validate_ticket_ex(self, ticket: str, token: str = "") -> tuple[bool, str, bool]:
         """Validate one ticket and mark network failures as retryable."""

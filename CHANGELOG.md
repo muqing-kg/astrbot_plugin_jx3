@@ -1,5 +1,19 @@
 ## 更新记录
 
+### version: 3.5.3：
+
+新增「机器人名字」配置项 `bot_name`：卡片顶栏品牌行原先把「唐小珂 · 江湖小助手」写死在 `core/decorations.py`，现在改由该配置渲染，默认值仍为「唐小珂」，留空或只填空格时回退默认。插件 WebUI 的全局配置页新增输入框，保存后立即生效；同时写入 `_conf_schema.json`，AstrBot 自带的插件配置页也能看到并修改（该页改动需重载插件后生效）。名字经 HTML 转义后输出，含尖括号等字符不会破坏卡片结构。
+
+移除赤兔到达推送（`赤兔到达与分享消息通知`，action 0）：该推送轮询 JX3BOX 马场 feed（`next2.jx3box.com/api/game/reporter/horse`）并只认「下一匹赤兔即将出世」且发布于 60 秒内的条目，而该源对赤兔从不给出该句式——飞龙在天与天鹅坪各 6 页共 90 条历史里命中 0 条，同源里其它马种（里飞沙、绝尘、赤蛇）该句式正常；官方事件推送亦无 action 0，只有收费的 1002/1003（马驹刷新与捕获，LV.3）。因此该推送自部署以来从未触发成功，只产生持续的上游请求失败日志，故整条移除。升级后由迁移 `cleanup_chitu_push_v1` 自动清理库中残留的 action 0 订阅、推送状态与补推队列。`赤兔` 与 `本周赤兔` 两条查询命令保留，仍走官方 `/chitu/records`、`/chitu/week/records`。
+
+移除空壳服务 `core/aijx3_data.py`（AIJX3Service）：只有构造、关闭与请求骨架，没有任何业务方法，全项目零调用。插件的数据服务由三个收敛为两个（JX3API 与 JX3BOX）。
+
+修复 `小药` 命令必失败：`core/jx3api_data.py` 的 xiaoyao 处理器里 `name = item["name"]` 把 `name` 变成局部变量，导致前面的 `query_name = name` 每次抛 `UnboundLocalError`，命令无法出图。
+
+修复群名读取分支失效：`main.py` 的 `_valid_display_name` 调用的 `valid_display_name` 从未导入，`NameError` 被外层 `except Exception: pass` 吞掉，`get_group_name` 这条分支实际从未执行，群名只能靠消息对象兜底。
+
+清理死代码：`core/jx3api_data.py` 的 `validate_ticket`（已被 `validate_ticket_ex` 取代）、`core/message.py` 的 `image_msg`、`core/session_store.py` 的 `has_group_credential_records`、`is_claimed_admin`、`servers_with_push`、`core/sqlite.py` 的 `execute_many`、`core/fun_basic.py` 的 `format_remaining`、`core/request.py` 的 `quiet_request_debug`（唯一调用点随赤兔推送移除而消失），以及未使用的常量 `PUSH_RETRY_TEXT_MAX_CHARS`、`LABELS`。
+
 ### version: 3.5.2：
 
 命令支持多个触发词（一对多别名）：WebUI 命令页的输入框改用英文逗号分隔，第一段为正名，其余为别名，例如把 `功能` 写成 `功能, 帮助, 使用说明` 后三个词都能唤出同一份帮助。命令名与别名统一走 `core/server_catalog.py` 的 `parse_aliases` 切词，因此分隔符同时支持中英文逗号、分号、斜杠、顿号与空格。别名存放在新增的独立键 `command_aliases`（`dict[id] = "帮助，使用说明"`），正名仍写原有的 `command_overrides`，旧配置无需迁移。别名与正名互相占用：任一新词若要与其他命令的正名或别名重复都会被拒绝，改名时也不能抢占别人的别名。管理命令（认领、绑定、Token、推栏等）的别名同样生效，`core/session_policy.py` 的 `remap_admin_parts` 一并纳入。帮助菜单与所有提示语仍只显示正名。

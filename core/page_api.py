@@ -191,6 +191,7 @@ class SessionPageAPI:
     async def save_global_config(self):
         from urllib.parse import urlsplit
 
+        from .decorations import DEFAULT_BOT_NAME, set_bot_name
         from .plugin_settings import normalize_base_url
 
         data = await self._payload()
@@ -206,12 +207,14 @@ class SessionPageAPI:
         prefix_enable = bool(data.get("prefix_enable"))
         if prefix_enable and not prefix_text:
             return self.error_response("启用插件前缀时必须填写前缀内容。", status_code=400)
+        bot_name = str(data.get("bot_name") or "").strip()
         values = {
             "jx3api_base_url": base_url,
             "jx3api_ws_url": ws_url,
             "jx3api_ssl_verify": bool(data.get("jx3api_ssl_verify", True)),
             "prefix_enable": prefix_enable,
             "prefix_text": prefix_text or "剑三",
+            "bot_name": bot_name or DEFAULT_BOT_NAME,
         }
         await self.plugin.settings.set_global_config(values)
         self.plugin.conf.update(values)
@@ -219,9 +222,9 @@ class SessionPageAPI:
             "enable": values["prefix_enable"],
             "text": values["prefix_text"],
         }
+        set_bot_name(values["bot_name"])
         self.plugin.jx3api._api.ssl_verify = values["jx3api_ssl_verify"]
         self.plugin.jx3box._api.ssl_verify = values["jx3api_ssl_verify"]
-        self.plugin.aijx3._api.ssl_verify = values["jx3api_ssl_verify"]
         await self.plugin.jx3at.refresh_jobs()
         save = getattr(self.plugin.conf, "save_config_async", None)
         if callable(save):
@@ -259,7 +262,7 @@ class SessionPageAPI:
             labels = {"token": "接口令牌", "push_token": "推送令牌", "ticket": "推栏标识"}
             label = labels[kind]
             return self.error_response(f"该全局{label}已在可用池中。", status_code=400)
-        added = await self.plugin.sessions.add_global_credential(kind, value)
+        await self.plugin.sessions.add_global_credential(kind, value)
         if kind == "push_token":
             await self.plugin.jx3at.refresh_jobs()
         return self.json_response({"ok": True})

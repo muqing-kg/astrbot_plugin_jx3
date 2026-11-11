@@ -51,7 +51,7 @@ def _source_for_record(record: logging.LogRecord) -> str:
         return "query"
     if module == "page_api":
         return "webui"
-    if module in {"jx3api_data", "jx3box_data", "aijx3_data", "unua_data", "yymj_data"}:
+    if module in {"jx3api_data", "jx3box_data", "unua_data", "yymj_data"}:
         return "query"
     if module == "message":
         return "query"
@@ -61,8 +61,6 @@ def _source_for_record(record: logging.LogRecord) -> str:
         message = record.getMessage()
         if "补推" in message:
             return "retry"
-        if "赤兔" in message:
-            return "chitu"
         return "event"
     return "plugin"
 

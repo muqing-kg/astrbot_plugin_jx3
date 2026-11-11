@@ -1,4 +1,9 @@
 {
+  "bot_name": {
+    "description": "机器人名字：显示在卡片顶栏品牌行，默认 唐小珂",
+    "type": "string",
+    "default": "唐小珂"
+  },
   "prefix": {
     "description": "指令前缀",
     "type": "object",

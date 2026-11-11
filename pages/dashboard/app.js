@@ -26,7 +26,6 @@ const LOG_SOURCE_TEXT = {
   event: "事件",
   push: "推送",
   retry: "补推",
-  chitu: "赤兔",
   query: "接口请求",
   webui: "WebUI",
   plugin: "插件",
@@ -260,6 +259,12 @@ function renderGlobalCredentials(payload) {
           <label class="toggle">
             <input data-k="prefix_enable" type="checkbox" ${config.prefix_enable ? "checked" : ""} />
             启用插件指令前缀
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>机器人名字</span>
+            <input data-k="bot_name" value="${escapeHtml(config.bot_name || "")}" placeholder="唐小珂" />
           </label>
         </div>
         <div class="row">
@@ -682,6 +687,7 @@ globalConfigEl.addEventListener("click", async (ev) => {
         jx3api_ssl_verify: checked("jx3api_ssl_verify"),
         prefix_enable: checked("prefix_enable"),
         prefix_text: value("prefix_text"),
+        bot_name: value("bot_name"),
       });
       setStatus("全局配置已保存");
       await loadGlobalCredentials();

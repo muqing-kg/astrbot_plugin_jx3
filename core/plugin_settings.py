@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from urllib.parse import urlsplit, urlunsplit
 
+from .decorations import DEFAULT_BOT_NAME
 from .sqlite import AsyncSQLiteDB
 
 
@@ -140,6 +141,7 @@ class PluginSettings:
             "prefix_text": stored_prefix_text or str(
                 (fallback.get("prefix") or {}).get("text") or "剑三"
             ),
+            "bot_name": str(fallback.get("bot_name") or DEFAULT_BOT_NAME),
         }
 
     async def set_global_config(self, values: dict[str, object]) -> None:

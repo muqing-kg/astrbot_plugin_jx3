@@ -11,7 +11,6 @@ from astrbot.core.utils.session_waiter import (
 )
 
 from .jx3api_data import JX3APIService
-from .aijx3_data import AIJX3Service
 from .jx3box_data import JX3BOXService
 from .unua_data import UnuaService
 from .async_task import AsyncTask
@@ -84,7 +83,6 @@ class MessageBuilder:
     def __init__(self, 
                  server: str, 
                  jx3api: JX3APIService, 
-                 aijx3: AIJX3Service,
                  jx3box: JX3BOXService,  
                  unua: UnuaService,
                  jx3at: AsyncTask, 
@@ -94,7 +92,6 @@ class MessageBuilder:
             ):
         self.server = server
         self.jx3api = jx3api
-        self.aijx3 = aijx3
         self.jx3box = jx3box
         self.unua = unua
         self.jx3at = jx3at
@@ -213,14 +210,6 @@ class MessageBuilder:
             return
         await self._deliver(event, lambda: event.send(event.image_result(url)), "渲染图片")
 
-
-    async def image_msg(self, event: AstrMessageEvent, action):
-        """最终将数据整理成图片发送"""
-        data = await action()
-        if data["code"] != 200:
-            await self._deliver(event, lambda: event.send(event.plain_result(data["msg"])), "文本")
-            return
-        await self._deliver(event, lambda: event.send(event.image_result(data["data"])), "图片")
 
     async def raw_image_msg(self, event: AstrMessageEvent, action, options: dict | None = None):
         """渲染不套公共装饰层的独立图片。"""

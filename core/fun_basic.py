@@ -106,16 +106,6 @@ def format_time(ts):
     except (TypeError, ValueError, OSError):
         return ""
 
-def format_remaining(ts):
-    try:
-        seconds = max(0, int(ts) - int(datetime.now().timestamp()))
-        hours, seconds = divmod(seconds, 3600)
-        minutes, seconds = divmod(seconds, 60)
-        return f"{hours}时{minutes:02d}分{seconds:02d}秒"
-    except (TypeError, ValueError):
-        return ""
-
-
 def format_duration(seconds) -> str:
     try:
         total = int(seconds or 0)

@@ -11,13 +11,12 @@ from .core.plugin_log import logger
 from .core.sqlite import AsyncSQLiteDB
 from .core.group_info import ensure_group_display_name
 from .core.jx3api_data import JX3APIService
-from .core.aijx3_data import AIJX3Service
 from .core.jx3box_data import JX3BOXService
 from .core.unua_data import UnuaService
 from .core.async_task import AsyncTask
 from .core.message import MessageBuilder
 from .core.yymj_data import YymjGuideService
-from .core.decorations import set_proxy
+from .core.decorations import set_bot_name, set_proxy
 from .core.fun_basic import load_as_base64
 from .core.session_store import SessionStore
 from .core.session_policy import (
@@ -31,6 +30,7 @@ from .core.session_policy import (
     mask_for_user,
     CLAIM_PHRASE,
     resolve_display_name,
+    valid_display_name,
     hint_authorize_usage,
     hint_bind_ok,
     hint_claim_ok,
@@ -122,13 +122,13 @@ class Jx3ApiPlugin(Star):
             self.conf["jx3api_base_url"] = str(global_config["jx3api_base_url"])
             self.conf["jx3api_ws_url"] = str(global_config["jx3api_ws_url"])
             self.conf["jx3api_ssl_verify"] = bool(global_config["jx3api_ssl_verify"])
+            set_bot_name(str(global_config["bot_name"]))
             self.prefix = {
                 "enable": bool(global_config["prefix_enable"]),
                 "text": str(global_config["prefix_text"]),
             }
             self.jx3api._api.ssl_verify = bool(global_config["jx3api_ssl_verify"])
             self.jx3box._api.ssl_verify = bool(global_config["jx3api_ssl_verify"])
-            self.aijx3._api.ssl_verify = bool(global_config["jx3api_ssl_verify"])
             self.command_catalog = apply_command_overrides(
                 await self.settings.command_overrides(),
                 await self.settings.command_aliases(),
@@ -154,7 +154,6 @@ class Jx3ApiPlugin(Star):
         for closer in (
             self.jx3at.destroy if self.jx3at else None,
             self.jx3api.close if self.jx3api else None,
-            self.aijx3.close if self.aijx3 else None,
             self.jx3box.close if self.jx3box else None,
             self.unua.close if self.unua else None,
             self.yymj.close if self.yymj else None,
@@ -195,7 +194,6 @@ class Jx3ApiPlugin(Star):
         self.plugin_sql_db = AsyncSQLiteDB(str(self.plugin_data_path))
         self.sessions = SessionStore(self.local_sql_db)
         self.jx3api = JX3APIService(self.conf, self.plugin_sql_db, self.local_sql_db)
-        self.aijx3 = AIJX3Service(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.jx3box = JX3BOXService(self.conf, self.plugin_sql_db, self.local_sql_db)
         proxy_url = str(self.conf.get("proxy", "") or "").strip()
         set_proxy(proxy_url)
@@ -213,7 +211,6 @@ class Jx3ApiPlugin(Star):
         self.jx3cmd = MessageBuilder(
             "",
             self.jx3api,
-            self.aijx3,
             self.jx3box,
             self.unua,
             self.jx3at,

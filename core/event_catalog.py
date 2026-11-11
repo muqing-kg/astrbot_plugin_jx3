@@ -8,7 +8,6 @@ from zoneinfo import ZoneInfo
 
 # 官方事件版 OpenAPI 的接口说明。
 EVENT_DESCRIPTIONS = {
-    0: "赤兔到达与分享消息通知",
     1001: "奇遇触发通知",
     1002: "马驹刷新通知",
     1003: "马驹捕获通知",
@@ -47,11 +46,10 @@ EVENT_DESCRIPTIONS = {
 GLOBAL_KINDS = frozenset({"新闻", "更新", "八卦", "云从", "微博"})
 
 # JX3API 事件版免费档；其余事件需要付费推送令牌。
-FREE_PUSH_ACTIONS = frozenset({"0", "2001", "2002", "2003", "2004", "2006"})
+FREE_PUSH_ACTIONS = frozenset({"2001", "2002", "2003", "2004", "2006"})
 
 # 官方 action -> 开关名。
 ACTION_KIND = {
-    0: "赤兔",
     2001: "开服",
     2002: "新闻",
     2003: "更新",
@@ -95,7 +93,6 @@ EVENT_GROUPS = [
             {"action": 2003, "name": "版本更新", "kind": "更新"},
             {"action": 2004, "name": "八卦速报", "kind": "八卦"},
             {"action": 2006, "name": "云从预告", "kind": "云从"},
-            {"action": 0, "name": "赤兔消息", "kind": "赤兔"},
         ],
     },
     {
@@ -174,7 +171,6 @@ LEGACY_PUSH_FIELDS = {
     "宣战": "push_xuanzhan",
     "据点": "push_judian",
     "微博": "push_weibo",
-    "赤兔": "push_chitu",
 }
 KIND_ACTIONS = {
     kind: [str(item["action"]) for item in EVENT_ITEMS if item["kind"] == kind]

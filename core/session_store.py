@@ -487,6 +487,28 @@ class SessionStore:
                 """,
                 ("legacy_push_state_actions_v1", _now()),
             )
+        chitu_cleanup_row = await self.sql.select_one(
+            "schema_migrations", "name=?", ("cleanup_chitu_push_v1",)
+        )
+        if not chitu_cleanup_row:
+            await self.sql.execute("DELETE FROM session_push_events WHERE action='0'")
+            await self.sql.execute("DELETE FROM push_state WHERE kind='0'")
+            await self.sql.execute("DELETE FROM push_retry_queue WHERE action='0'")
+            config_columns = {
+                str(row.get("name") or "")
+                for row in await self.sql.fetch_all("PRAGMA table_info(session_config)")
+            }
+            if "push_chitu" in config_columns:
+                await self.sql.execute(
+                    "UPDATE session_config SET push_chitu=0 WHERE push_chitu<>0"
+                )
+            await self.sql.execute(
+                """
+                INSERT OR IGNORE INTO schema_migrations (name, completed_at)
+                VALUES (?, ?)
+                """,
+                ("cleanup_chitu_push_v1", _now()),
+            )
         await self.sql.execute(
             """
             CREATE TABLE IF NOT EXISTS plugin_claimants (
@@ -1200,9 +1222,6 @@ class SessionStore:
             return "global", global_values
         return "global_missing", []
 
-    async def has_group_credential_records(self, umo: str, kind: str) -> bool:
-        return bool(await self.list_all_credentials(umo, kind))
-
     async def purge_expired_removed_credentials(self, days: int = 30) -> int:
         cutoff = (datetime.now() - timedelta(days=max(0, int(days)))).strftime(
             "%Y-%m-%d %H:%M:%S"
@@ -1272,35 +1291,6 @@ class SessionStore:
             row for row in rows
             if self.is_bot_enabled(row) and is_group_umo(row.get("umo", ""))
         ]
-
-    async def servers_with_push(self, action: str) -> list[str]:
-        action = str(action or "").strip()
-        if action not in ACTION_IDS:
-            return []
-        rows = await self.sql.fetch_all(
-            """
-            SELECT session_config.*
-            FROM session_config
-            JOIN session_push_events
-              ON session_push_events.umo=session_config.umo
-            WHERE session_push_events.action=?
-              AND session_config.bot_enabled=1
-            """,
-            (action,),
-        )
-        servers = []
-        resolver = getattr(self, "resolve_server", None)
-        for row in rows:
-            if not self.is_bot_enabled(row) or not is_group_umo(row.get("umo", "")):
-                continue
-            server = (row.get("server") or "").strip()
-            if callable(resolver):
-                official = resolver(server)
-                if official:
-                    server = official
-            if server and server not in servers:
-                servers.append(server)
-        return servers
 
     async def get_push_state(self, action: str, server: str, token_key: str = "__scheduled__") -> str:
         row = await self.sql.select_one(
@@ -1497,12 +1487,6 @@ class SessionStore:
         )
         row = await self.sql.select_one("plugin_claimants", "user_id=?", (user_id,))
         return True, name or str((row or {}).get("name") or "") or user_id
-
-    async def is_claimed_admin(self, user_id: str) -> bool:
-        user_id = str(user_id or "").strip()
-        if not user_id:
-            return False
-        return bool(await self.sql.select_one("plugin_claimants", "user_id=?", (user_id,)))
 
     async def mark_astrbot_admin_claims(self, admin_ids: list[str] | tuple[str, ...]) -> None:
         for admin_id in admin_ids:

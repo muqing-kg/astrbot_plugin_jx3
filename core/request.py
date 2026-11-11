@@ -1,6 +1,4 @@
 # core/request.py
-from contextlib import contextmanager
-from contextvars import ContextVar
 import json
 import socket
 import aiohttp
@@ -9,8 +7,6 @@ from typing import Any, Dict, Optional
 from aiohttp import ClientTimeout, ClientSession
 
 from .plugin_log import logger
-
-_quiet_debug = ContextVar("jx3_quiet_request_debug", default=False)
 
 
 def network_error_message(exc: BaseException) -> str:
@@ -34,15 +30,6 @@ def network_error_message(exc: BaseException) -> str:
         return "接口响应无法解析"
     return "网络请求失败，请稍后再试"
 
-
-@contextmanager
-def quiet_request_debug():
-    """Hide routine request DEBUG lines for a caller; errors stay visible."""
-    token = _quiet_debug.set(True)
-    try:
-        yield
-    finally:
-        _quiet_debug.reset(token)
 
 class APIClient:
     """
@@ -101,10 +88,9 @@ class APIClient:
         self.last_error = ""
         
         # 记录日志
-        if not _quiet_debug.get():
-            logger.debug(f"发起 {method} 请求: {url}")
-            if params: logger.debug(f"Query参数: {self._redact(params)}")
-            if json_data: logger.debug(f"Body数据: {self._redact(json_data)}")
+        logger.debug(f"发起 {method} 请求: {url}")
+        if params: logger.debug(f"Query参数: {self._redact(params)}")
+        if json_data: logger.debug(f"Body数据: {self._redact(json_data)}")
 
         try:
             # aiohttp 会自动处理 json=json_data 时的 Content-Type
@@ -130,8 +116,7 @@ class APIClient:
     async def _handle_response(self, response: aiohttp.ClientResponse) -> Any:
         """处理响应：自动识别二进制或JSON"""
         try:
-            if not _quiet_debug.get():
-                logger.debug(f"响应状态: {response.status}")
+            logger.debug(f"响应状态: {response.status}")
             if response.status in (401, 403):
                 try:
                     detail = (await response.text()).strip()
@@ -160,8 +145,7 @@ class APIClient:
                     self.last_error = "接口响应无法解析"
                     return None
 
-            if not _quiet_debug.get():
-                logger.debug(f"响应数据: {type(data).__name__}, 长度 {len(data) if hasattr(data, '__len__') else '未知'}")
+            logger.debug(f"响应数据: {type(data).__name__}, 长度 {len(data) if hasattr(data, '__len__') else '未知'}")
             return self._validate_api_payload(data)
 
         except aiohttp.ClientError as e:
