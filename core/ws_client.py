@@ -14,6 +14,7 @@ DEFAULT_WS_URL = "wss://socket.nicemoe.cn"
 HEARTBEAT_INTERVAL = 30
 RECONNECT_BASE_DELAY = 1
 RECONNECT_MAX_DELAY = 30
+CLIENT_TIMEOUT = aiohttp.ClientTimeout(total=None, sock_connect=10, sock_read=60)
 
 SyncOrAsyncCallback = Callable[..., Any]
 
@@ -61,7 +62,13 @@ class JX3WSClient:
         if url:
             self.url = url.rstrip("/")
         self.token = token
-        if wanted and (not self._wanted or token_changed or url_changed):
+        if wanted and (
+            not self._wanted
+            or token_changed
+            or url_changed
+            or self._task is None
+            or self._task.done()
+        ):
             if self._wanted:
                 await self.stop()
             await self.start()
@@ -75,6 +82,34 @@ class JX3WSClient:
         self._stop.clear()
         self._wanted = True
         self._task = asyncio.create_task(self._run(), name="jx3-ws")
+        self._task.add_done_callback(self._log_task_exit)
+
+    def _log_task_exit(self, task: asyncio.Task) -> None:
+        if task.cancelled():
+            return
+        exc = task.exception()
+        if exc is not None:
+            logger.error(
+                f"JX3API 事件通道任务异常退出: {self._connection_info()}, "
+                f"error={type(exc).__name__}: {exc}",
+                extra={"log_source": "websocket"},
+            )
+        elif self._wanted and not self._stop.is_set():
+            logger.warning(
+                f"JX3API 事件通道任务已退出，等待重新拉起: {self._connection_info()}",
+                extra={"log_source": "websocket"},
+            )
+        if self._wanted and not self._stop.is_set():
+            asyncio.create_task(self._restart_later(), name="jx3-ws-restart")
+
+    async def _restart_later(self) -> None:
+        try:
+            await asyncio.wait_for(self._stop.wait(), timeout=RECONNECT_MAX_DELAY)
+            return
+        except asyncio.TimeoutError:
+            pass
+        if self._wanted and not self._stop.is_set():
+            await self.start()
 
     async def stop(self) -> None:
         self._wanted = False
@@ -86,6 +121,8 @@ class JX3WSClient:
             try:
                 await task
             except asyncio.CancelledError:
+                pass
+            except Exception:
                 pass
 
     def _ws_url(self) -> str:
@@ -145,7 +182,7 @@ class JX3WSClient:
                     logger.warning(f"JX3API 事件通道关闭失败: {type(close_exc).__name__}")
 
     async def _run(self) -> None:
-        timeout = aiohttp.ClientTimeout(total=None, sock_connect=10, sock_read=None)
+        timeout = CLIENT_TIMEOUT
         while self._wanted and not self._stop.is_set():
             try:
                 async with aiohttp.ClientSession(timeout=timeout) as session:
