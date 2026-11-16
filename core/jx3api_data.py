@@ -104,6 +104,44 @@ def _style_text(style: Optional[dict]) -> str:
 
 
 
+_RANK_FIELD_ALIASES = {
+    "szName": "name",
+    "szTongName": "tongName",
+    "szCampName": "campName",
+    "szForceName": "forceName",
+    "szMasterName": "masterName",
+    "szCastleName": "castleName",
+    "szCorpsName": "corpsName",
+    "nScore": "totalScore",
+    "nLevel": "level",
+    "byLevel": "level",
+    "nRank": "rank",
+    "nMemberCount": "memberCount",
+    "nMaxMemberCount": "maxMemberCount",
+    "nMaxLimit": "maxLimit",
+    "nTitlePoint": "titlePoint",
+    "nTotalPoint": "totalPoint",
+    "nSupplyPoint": "supplyPoint",
+    "nContribution": "contribution",
+    "byForceID": "forceId",
+    "nForceID": "forceId",
+    "dwForceID": "forceId",
+    "eCamp": "campId",
+    "dwSeasonWinCount": "seasonWinCount",
+    "dwSeasonLoseCount": "seasonLoseCount",
+    "dwSeasonTotalCount": "seasonTotalCount",
+    "nCorpsLevel": "corpsLevel",
+}
+
+
+def _alias_rank_item(item: dict) -> dict:
+    """把榜单项里的缩写字段（szName/nScore…）补成模板沿用的旧名。"""
+    for source, target in _RANK_FIELD_ALIASES.items():
+        if item.get(target) in (None, "") and item.get(source) not in (None, ""):
+            item[target] = item[source]
+    return item
+
+
 class JX3APIService:
     def __init__(self, config: AstrBotConfig, sqlite: AsyncSQLiteDB, cache_sqlite: Optional[AsyncSQLiteDB] = None):
         # 实例化 API Client
@@ -262,8 +300,17 @@ class JX3APIService:
 
     def _rank_items(self, data: Any, inherit: bool = True) -> list:
         flat = []
+        outer = data if isinstance(data, dict) else None
+        if outer is not None and outer.get("zone") and not outer.get("zoneName"):
+            outer = {**outer, "zoneName": outer["zone"]}
         for item in self._as_list(data):
             if isinstance(item, dict):
+                _alias_rank_item(item)
+                if outer is not None and inherit:
+                    for key in ("server", "serverName", "zoneName", "campName"):
+                        value = outer.get(key)
+                        if value:
+                            item.setdefault(key, value)
                 nested = None
                 for key in ("data", "list", "items", "records"):
                     value = item.get(key)
@@ -932,6 +979,8 @@ class JX3APIService:
         else:
             template_name = "rank_role.html"
         category = (RANK_NAME_INDEX.get(name) or ("个人排行", "name"))[0]
+        if category in ("绝境战场", "据点贡献"):
+            template_name = "data_list.html"
 
         # 数据处理
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
@@ -941,6 +990,11 @@ class JX3APIService:
                 items = []
             limit = 100 if "一百强" in name else 50
             items = items[:limit]
+            for item in items:
+                if isinstance(item, dict):
+                    _alias_rank_item(item)
+                    if category == "据点贡献":
+                        item.setdefault("totalScore", item.get("contribution"))
             if name in GUILD_WEEKLY_NAMES:
                 for item in items:
                     if isinstance(item, dict):
@@ -959,6 +1013,41 @@ class JX3APIService:
                 page_kicker = "BATTLE RANK"
             elif category == "据点贡献":
                 page_kicker = "CASTLE RANK"
+            if category == "绝境战场":
+                rows = [
+                    [
+                        self._pick(item, "rank", default=str(index)),
+                        self._pick(item, "name", default="-"),
+                        self._pick(item, "tongName", default="-"),
+                        self._pick(item, "AVRG_EQUIP_SCORE", default="-"),
+                        self._pick(item, "KILL_COUNT", default="0"),
+                        self._pick(item, "TOTAL_DAMAGE", default="0"),
+                    ]
+                    for index, item in enumerate(items, 1)
+                    if isinstance(item, dict)
+                ]
+                self._set_table(
+                    return_data, rank_name, ["排名", "角色", "帮会", "平均装分", "击杀", "总伤害"],
+                    rows, f"{server or '全服'} · 更新时间：{self._now_text()}", "暂无排行数据",
+                )
+                return
+            if category == "据点贡献":
+                rows = [
+                    [
+                        str(index),
+                        self._pick(item, "name", default="-"),
+                        self._pick(item, "tongName", default="-"),
+                        self._pick(item, "level", default="-"),
+                        self._pick(item, "contribution", "totalScore", default="0"),
+                    ]
+                    for index, item in enumerate(items, 1)
+                    if isinstance(item, dict)
+                ]
+                self._set_table(
+                    return_data, rank_name, ["排名", "角色", "帮会", "等级", "贡献"],
+                    rows, f"{server or '全服'} · 更新时间：{self._now_text()}", "暂无排行数据",
+                )
+                return
             return_data["data"] = {
                 "items": items,
                 "server": server,
@@ -2276,13 +2365,12 @@ class JX3APIService:
                     str(index),
                     self._pick(item, "corpsName", "name", "roleName"),
                     self._pick(item, "corpsLevel", "level"),
-                    self._pick(item, "server", "serverName"),
                     str(total),
                     win_rate,
                 ])
             title = f"跨服名剑 {mode_name}"
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
-            self._set_table(return_data, title, ["排名", "战队", "战队等级", "区服", "总场次", "胜率"], rows, subtitle, "暂无排行数据")
+            self._set_table(return_data, title, ["排名", "战队", "战队等级", "总场次", "胜率"], rows, subtitle, "暂无排行数据")
             if return_data.get("data"):
                 return_data["data"]["server"] = server
                 return_data["data"]["rank_name"] = "跨服名剑榜"
@@ -2308,12 +2396,11 @@ class JX3APIService:
                     self._pick(item, "rankNum", "rank", default=str(index)),
                     self._pick(item, "tongName", "tong_name", "name"),
                     self._pick(item, "masterName", "master_name"),
-                    self._pick(item, "serverName", "server"),
                     self._pick(item, "score", "totalScore", "titlePoint", "value"),
                 ])
             title = f"武林争霸赛 · {camp_name}"
             subtitle = "全服 · 更新时间：{0}".format(self._now_text())
-            self._set_table(return_data, title, ["排名", "帮会", "帮主", "区服", "积分"], rows, subtitle, "暂无排行数据")
+            self._set_table(return_data, title, ["排名", "帮会", "帮主", "积分"], rows, subtitle, "暂无排行数据")
             if return_data.get("data"):
                 if len(raw_items) > 100:
                     return_data["data"]["note"] = "仅展示前 100 名"
@@ -2572,12 +2659,11 @@ class JX3APIService:
                 rows.append([
                     self._pick(item, "rankNum", "rank", default=str(index)),
                     self._pick(item, "roleName", "name", "role_name"),
-                    self._pick(item, "forceName", "force"),
-                    self._pick(item, "serverName", "server"),
+                    self._pick(item, "serverName", "server", default=server or "全服"),
                     self._pick(item, "score", "totalScore", "value", "bounty"),
                 ])
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
-            self._set_table(return_data, "江湖浪客", ["排名", "角色", "门派", "区服", "积分"], rows, subtitle, "暂无排行数据")
+            self._set_table(return_data, "江湖浪客", ["排名", "角色", "区服", "积分"], rows, subtitle, "暂无排行数据")
             if return_data.get("data"):
                 return_data["data"]["server"] = server
                 return_data["data"]["rank_name"] = "江湖浪客榜"
@@ -2600,13 +2686,12 @@ class JX3APIService:
                 rows.append([
                     self._pick(item, "rankNum", "rank", default=str(index)),
                     self._pick(item, "roleName", "name", "role_name"),
-                    self._pick(item, "forceName", "force"),
-                    self._pick(item, "serverName", "server"),
+                    self._pick(item, "serverName", "server", default=server or "全服"),
                     self._pick(item, "money", "score", "totalScore", "value", "bounty"),
                 ])
             title = f"决斗挑战 {mode_name}"
             subtitle = f"{server or '全服'} · 更新时间：{self._now_text()}"
-            self._set_table(return_data, title, ["排名", "角色", "门派", "区服", "赏金"], rows, subtitle, "暂无排行数据")
+            self._set_table(return_data, title, ["排名", "角色", "区服", "赏金"], rows, subtitle, "暂无排行数据")
             if return_data.get("data"):
                 return_data["data"]["server"] = server
                 return_data["data"]["rank_name"] = "决斗挑战榜"
