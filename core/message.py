@@ -1,10 +1,7 @@
 import asyncio
-import json as _json
-from xml.sax.saxutils import escape as _xml_escape
 
 from astrbot.core import html_renderer
 from astrbot.api.event import AstrMessageEvent, MessageChain
-from astrbot.api.message_components import Share
 from astrbot.core.utils.session_waiter import (
     SessionController,
     session_waiter,
@@ -15,7 +12,6 @@ from .jx3box_data import JX3BOXService
 from .unua_data import UnuaService
 from .async_task import AsyncTask
 from .plugin_log import logger
-from .yymj_data import YymjGuideService
 from .decorations import build_decorated_payload, estimate_body_length, fetch_poem_line
 from .credentials import (
     CredentialRuntimeError,
@@ -82,17 +78,13 @@ class MessageBuilder:
                  jx3box: JX3BOXService,  
                  unua: UnuaService,
                  jx3at: AsyncTask, 
-                 yymj: YymjGuideService,
                  icons: dict[str, dict[str, str]],
-                 qq_card_style: str = "wechat"
             ):
         self.server = server
         self.jx3api = jx3api
         self.jx3box = jx3box
         self.unua = unua
         self.jx3at = jx3at
-        self.yymj = yymj
-        self.qq_card_style = str(qq_card_style or "wechat").strip().lower()
         self.icons = icons
 
     def _log_query_delivery(self, event, kind):
@@ -245,137 +237,6 @@ class MessageBuilder:
             await self._deliver(event, lambda: event.send(event.plain_result(data["msg"])), "文本")
             return
         await self._deliver(event, lambda: event.send(event.chain_result(data["data"])), "富媒体链")
-
-    async def link_card_msg(self, event: AstrMessageEvent, action):
-        """标题/链接/封面打包成平台卡片发送。"""
-        data = await action()
-        if data["code"] != 200:
-            await self._deliver(event, lambda: event.send(event.plain_result(data["msg"])), "文本")
-            return
-        payload = data["data"]
-        if self._is_wechat_session(event):
-            await self._deliver(event, lambda: self._send_wechat_appmsg(event, payload), "微信卡片")
-        elif self._is_qq_session(event):
-            await self._deliver(event, lambda: self._send_qq_card(event, payload), "QQ卡片")
-        else:
-            segment = Share(
-                url=payload["url"],
-                title=payload["title"],
-                content=payload.get("desc") or "",
-                image=payload.get("image") or "",
-            )
-            await self._deliver(event, lambda: event.send(event.chain_result([segment])), "分享卡片")
-
-    @staticmethod
-    def _is_wechat_session(event: AstrMessageEvent) -> bool:
-        """AstrBot 平台 ID 由用户配置；WeChatBridge 常见为“微信-*”。"""
-        group_id = str(event.get_group_id() or "").strip()
-        marker = " ".join(
-            (
-                str(event.get_platform_id() or ""),
-                str(event.get_platform_name() or ""),
-            )
-        ).lower()
-        return (
-            group_id.endswith("@chatroom")
-            or "微信" in marker
-            or "wechat" in marker
-            or "weixin" in marker
-        )
-
-    @staticmethod
-    def _is_qq_session(event: AstrMessageEvent) -> bool:
-        marker = " ".join(
-            (
-                str(event.get_platform_id() or ""),
-                str(event.get_platform_name() or ""),
-            )
-        ).lower()
-        return "qq" in marker or str(event.get_platform_name() or "") == "aiocqhttp"
-
-    async def _send_onebot_segments(self, event: AstrMessageEvent, segments: list[dict]):
-        bot = getattr(event, "bot", None)
-        if bot is None:
-            raise RuntimeError("当前平台不支持原生卡片")
-        group_id = str(event.get_group_id() or "").strip()
-        caller = getattr(bot, "call_action", None)
-        params = {"timeout": 30_000}
-        if group_id:
-            if caller:
-                await caller(
-                    "send_group_msg",
-                    group_id=group_id,
-                    message=segments,
-                    **params,
-                )
-            else:
-                await bot.send_group_msg(
-                    group_id=group_id,
-                    message=segments,
-                    **params,
-                )
-        else:
-            user_id = str(event.get_sender_id() or event.get_session_id() or "").strip()
-            if caller:
-                await caller(
-                    "send_private_msg",
-                    user_id=user_id,
-                    message=segments,
-                    **params,
-                )
-            else:
-                await bot.send_private_msg(
-                    user_id=user_id,
-                    message=segments,
-                    **params,
-                )
-
-    async def _send_wechat_appmsg(self, event: AstrMessageEvent, payload: dict):
-        title = _xml_escape(str(payload.get("title") or "攻略"))
-        desc = _xml_escape(str(payload.get("desc") or ""))
-        url = _xml_escape(str(payload.get("url") or ""))
-        cover = _xml_escape(str(payload.get("image") or ""))
-        appmsg_parts = [
-            '<appmsg appid="" sdkver="0">',
-            f"<title>{title}</title>",
-            f"<des>{desc}</des>",
-            "<action>view</action>",
-            "<type>5</type>",
-            f"<url>{url}</url>",
-        ]
-        if cover:
-            appmsg_parts.append(f"<thumburl>{cover}</thumburl>")
-        appmsg_parts.append(
-            "<appinfo><version>1</version><appname>链接</appname></appinfo>"
-        )
-        appmsg_parts.append("</appmsg>")
-        appmsg = "".join(appmsg_parts)
-        segment = {
-            "type": "wechat_appmsg",
-            "data": {
-                "content": appmsg,
-                "type": "5",
-            },
-        }
-        await self._send_onebot_segments(event, [segment])
-
-    async def _send_qq_card(self, event: AstrMessageEvent, payload: dict):
-        signed_card = await self.yymj.sign_card(
-            payload,
-            self.qq_card_style,
-        )
-        segment = {
-            "type": "json",
-            "data": {
-                "data": _json.dumps(
-                    signed_card,
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                )
-            },
-        }
-        await self._send_onebot_segments(event, [segment])
-
 
     @property
     def command_catalog(self):
@@ -1011,7 +872,7 @@ class MessageBuilder:
 
     async def  qiyugonglue(self, event: AstrMessageEvent,name: str):
         """ 攻略 奇遇"""
-        return await self.link_card_msg(event, lambda: self.yymj.qiyugonglue(name))
+        return await self.plain_msg(event, lambda: self.jx3box.qiyugonglue(name))
 
     async def  jingnai(self, event: AstrMessageEvent, server: str, name: str):
         """ 精耐 服务器 角色 """
@@ -1041,6 +902,10 @@ class MessageBuilder:
         except Exception:
             pass
         return await self.plain_msg(event, lambda: self.unua.role_online(server, name, tong_name))
+
+    async def  shuxing(self, event: AstrMessageEvent, server: str, name: str):
+        """ 属性 服务器 角色名 """
+        return await self.raw_image_msg(event, lambda: self.jx3api.calcd_attribute(server, name))
 
     async def  zhenyan(self, event: AstrMessageEvent, name: str):
         """ 阵眼 心法"""

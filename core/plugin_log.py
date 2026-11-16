@@ -51,7 +51,7 @@ def _source_for_record(record: logging.LogRecord) -> str:
         return "query"
     if module == "page_api":
         return "webui"
-    if module in {"jx3api_data", "jx3box_data", "unua_data", "yymj_data"}:
+    if module in {"jx3api_data", "jx3box_data", "unua_data"}:
         return "query"
     if module == "message":
         return "query"

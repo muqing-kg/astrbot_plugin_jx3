@@ -185,9 +185,6 @@ def build_page_meta(template: str, payload: dict) -> str:
     if filename == "richangyuche.html":
         return _meta_join(_meta_pick(payload, "scope"), update_time)
 
-    if filename == "qiyugonglue.html":
-        return _meta_join(_meta_pick(payload, "qiyuname", "name"), update_time)
-
     if filename == "zilipaixing.html":
         return _meta_join(server, _meta_pick(payload, "school") or "资历排行", update_time)
 

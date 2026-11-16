@@ -45,7 +45,6 @@ _PAGE_KICKER = {
     "qixue": "TALENTS",
     "qiyuhuizong": "ADV. SUMMARY",
     "qiyuliebiao": "ADV. LIST",
-    "qiyugonglue": "GUIDE",
     "rank_role": "ROLE RANK",
     "rank_tong0": "GUILD RANK",
     "rank_tong1": "GUILD RANK",

@@ -1,5 +1,4 @@
 import json
-import re
 import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
@@ -10,7 +9,6 @@ from .plugin_log import logger
 from .request import APIClient
 from .sqlite import AsyncSQLiteDB
 from .fun_basic import gold_to_parts
-from .html_safe import sanitize_html
 from .template import load_template
 from .credentials import current_token
 
@@ -142,63 +140,53 @@ class JX3BOXService:
         return cached
 
     async def qiyugonglue(self, name: str) -> Dict[str, Any]:
-        """奇遇攻略"""
+        """奇遇攻略：返回魔盒正文页链接。"""
         return_data = self._init_return_data()
-        
-        # 1. 调用基础请求
+
         data = await self._base_request(
             "node",
             "/serendipities",
             params={"name": name},
             out="list",
         )
-        if not data:
-            return_data["msg"] = "未找到该奇遇"
-            return return_data
-        
-        # 提取dwID
         first = data[0] if isinstance(data, list) and data and isinstance(data[0], dict) else {}
         dwID = first.get("dwID")
         if not dwID:
-            return_data["msg"] = "获取奇遇标识失败"
+            return_data["msg"] = "未找到该奇遇"
             return return_data
+
         data1 = await self._base_request(
             "node",
             f"/serendipity/{dwID}/achievement",
             out=None,
         )
-        if not isinstance(data1, dict) or data1.get("_error") or not data1.get("achievement_id"):
-            return_data["msg"] = "获取攻略数据异常"
+        achievement_id = data1.get("achievement_id") if isinstance(data1, dict) else None
+        if not achievement_id:
+            return_data["msg"] = "未找到该奇遇的魔盒攻略"
             return return_data
 
-        # 获取奇遇攻略
         data2 = await self._base_request(
             "cms",
-            f"/api/cms/wiki/post/type/achievement/source/{data1['achievement_id']}",
+            f"/api/cms/wiki/post/type/achievement/source/{achievement_id}",
         )
-        if not data2:
-            return_data["msg"] = "获取攻略数据异常"
+        post = data2.get("post") if isinstance(data2, dict) else None
+        if not isinstance(post, dict) or not post.get("id"):
+            return_data["msg"] = "未找到该奇遇的魔盒攻略"
             return return_data
-        
-        # 4. 处理数据
+
         try:
-            return_data["data"] = {}
-            content = data2["post"]["content"]
-            content = re.sub(r"<h1(?=[\s>])", "<h2", content, flags=re.IGNORECASE)
-            content = re.sub(r"</h1>", "</h2>", content, flags=re.IGNORECASE)
-            content = sanitize_html(content)
-            return_data["data"]["content"] = content
-            return_data["data"]["qiyuname"] = name
-            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            return_data["temp"] = await load_template("qiyugonglue.html")
+            title = str(post.get("title") or name).strip()
+            url = f"https://www.jx3box.com/wiki/{post['id']}"
+            return_data["data"] = f"{title} · 魔盒攻略\n{url}"
         except Exception:
             logger.exception("处理返回数据失败")
             return_data["msg"] = "处理返回数据失败"
             return return_data
 
         return_data["code"] = 200
+        return_data["msg"] = "ok"
 
-        return return_data        
+        return return_data
 
 
     async def peizhuang(self, name: str, tags: str) -> Dict[str, Any]:

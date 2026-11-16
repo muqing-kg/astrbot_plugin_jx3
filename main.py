@@ -15,7 +15,6 @@ from .core.jx3box_data import JX3BOXService
 from .core.unua_data import UnuaService
 from .core.async_task import AsyncTask
 from .core.message import MessageBuilder
-from .core.yymj_data import YymjGuideService
 from .core.decorations import set_bot_name, set_proxy
 from .core.fun_basic import load_as_base64
 from .core.session_store import SessionStore
@@ -158,7 +157,6 @@ class Jx3ApiPlugin(Star):
             self.jx3api.close if self.jx3api else None,
             self.jx3box.close if self.jx3box else None,
             self.unua.close if self.unua else None,
-            self.yymj.close if self.yymj else None,
             self.local_sql_db.close if self.local_sql_db else None,
             self.plugin_sql_db.close if self.plugin_sql_db else None,
         ):
@@ -200,9 +198,6 @@ class Jx3ApiPlugin(Star):
         proxy_url = str(self.conf.get("proxy", "") or "").strip()
         set_proxy(proxy_url)
         self.unua = UnuaService(proxy=proxy_url)
-        self.yymj = YymjGuideService(proxy=proxy_url)
-        card_config = self.conf.get("guide_card_config", {}) or {}
-        self.qq_card_style = str(card_config.get("qq_style") or "wechat").strip().lower()
         self.jx3at = AsyncTask(
             cast(Context, self.context),
             self.conf,
@@ -216,9 +211,7 @@ class Jx3ApiPlugin(Star):
             self.jx3box,
             self.unua,
             self.jx3at,
-            self.yymj,
             self.icons,
-            self.qq_card_style,
         )
         self.settings = PluginSettings(self.local_sql_db)
         self.command_catalog = apply_command_overrides({})
@@ -309,6 +302,7 @@ class Jx3ApiPlugin(Star):
             "成就": self.jx3cmd.chengjiu,
             "角色": self.jx3cmd.jueshe,
             "在线": self.jx3cmd.unua_online,
+            "属性": self.jx3cmd.shuxing,
             "阵眼": self.jx3cmd.zhenyan,
             "配装": self.jx3cmd.peizhuang,
             "资历排行": self.jx3cmd.zilipaixing,

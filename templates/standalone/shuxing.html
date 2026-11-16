@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ data.roleName }} - 角色属性</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", sans-serif;
+            background: #faf5f7;
+            padding: 18px;
+            width: 1140px;
+        }
+        .deco { position: absolute; pointer-events: none; opacity: 0.1; z-index: 0; }
+        .container { display: flex; gap: 14px; max-width: 1104px; margin: 0 auto; align-items: stretch; }
+        .sidebar { width: 268px; flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; }
+        .card {
+            position: relative; overflow: hidden;
+            background: #fff; border: 1px solid #f0e0e8;
+            border-radius: 14px; padding: 14px 16px;
+            box-shadow: 0 2px 8px rgba(200, 160, 180, 0.08);
+        }
+        .role-name { font-size: 22px; font-weight: 600; color: #9d174d; text-align: center; }
+        .role-sub { font-size: 11px; color: #c4a0b0; text-align: center; margin-top: 3px; }
+        .section-title {
+            font-size: 13px; font-weight: 600; color: #9d174d;
+            margin-bottom: 8px; padding-left: 7px; border-left: 3px solid #d4a0b8;
+        }
+        .attr-row { display: flex; justify-content: space-between; gap: 10px; padding: 2.5px 0; font-size: 12.5px; }
+        .attr-row .label { color: #8b7a82; }
+        .attr-row .value { color: #8b7a82; text-align: right; word-break: break-all; }
+        .card-img { max-width: 100%; border-radius: 10px; display: block; margin: 6px auto 0; image-rendering: pixelated; }
+                .main-area { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+        .page-title {
+            position: relative; overflow: hidden;
+            text-align: center; padding: 12px; border-radius: 14px;
+            background: #fff; border: 1px solid #f0e0e8;
+            box-shadow: 0 2px 8px rgba(200, 160, 180, 0.08);
+        }
+        .page-title .kicker { font-size: 9px; color: #d4a0b8; letter-spacing: 5px; text-transform: uppercase; }
+        .page-title h1 { font-size: 24px; color: #9d174d; font-weight: 700; margin-top: 2px; }
+        .page-title .meta { font-size: 11px; color: #c4a0b0; margin-top: 4px; }
+        .equip-list { flex: 1; display: flex; flex-direction: column; justify-content: space-between; gap: 6px; }
+        .equip-item {
+            display: grid; grid-template-columns: 52px minmax(0, 1fr) 196px 76px;
+            gap: 4px 12px; align-items: center;
+            background: #fff; border: 1px solid #f0e0e8;
+            border-radius: 12px; padding: 8px 12px;
+            box-shadow: 0 1px 4px rgba(200, 160, 180, 0.05);
+        }
+        .equip-icon {
+            width: 46px; height: 46px; border-radius: 10px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .equip-icon img { width: 38px; height: 38px; border-radius: 8px; }
+        .equip-info { min-width: 0; }
+        .equip-title { display: flex; align-items: baseline; gap: 6px; }
+        .equip-name { font-size: 13px; font-weight: 700; }
+        .equip-level { font-size: 10.5px; color: #b48a9c; }
+        .chips { display: flex; gap: 4px; margin-top: 2px; }
+        .chip { font-size: 9.5px; color: #8b7a82; background: #faf0f4; border-radius: 4px; padding: 0 4px; }
+        .chip:first-child { color: #d9534f; background: #fdeeee; }
+        .equip-source { font-size: 10px; color: #a08a94; margin-top: 2px; }
+        .equip-affix { display: flex; flex-direction: column; gap: 3px; border-left: 1px solid #f6e3ec; padding-left: 10px; }
+        .affix-row { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: #6b5a62; }
+        .affix-row img { width: 16px; height: 16px; border-radius: 3px; flex-shrink: 0; }
+        .affix-none { font-size: 10px; color: #c4a0b0; }
+        .equip-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+        .stars { font-size: 11px; color: #fbbf24; letter-spacing: 1px; }
+        .gems { display: flex; gap: 2px; justify-content: flex-end; }
+        .gems img { width: 13px; height: 13px; border-radius: 2px; }
+        .talent-card {
+            position: relative; overflow: hidden;
+            background: #fff; border: 1px solid #f0e0e8;
+            border-radius: 14px; padding: 10px 14px;
+            box-shadow: 0 2px 8px rgba(200, 160, 180, 0.08);
+        }
+        .footer-note { text-align: center; font-size: 9.5px; color: #d4a0b8; opacity: 0.4; margin-top: 4px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="card" style="text-align: center; padding: 18px 14px;">
+                <svg class="deco" style="right:-6px;top:-8px;width:28px;height:28px" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#ec4899"/></svg>
+                <svg class="deco" style="left:8px;bottom:4px;width:16px;height:16px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#f9a8d4"/></svg>
+                <div class="role-name">{{ data.roleName }}</div>
+                <div class="role-sub">{{ data.serverName }} · {{ data.equipType }}</div>
+            </div>
+            <div class="card">
+                <svg class="deco" style="right:-4px;top:-6px;width:20px;height:20px" viewBox="0 0 24 24"><path d="M12 2L9 12h7l-5 8 1-6h-6l3-8z" fill="#f9a8d4"/></svg>
+                <svg class="deco" style="right:14px;top:45%;width:14px;height:14px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#ec4899"/></svg><svg class="deco" style="right:50%;bottom:10px;width:10px;height:10px" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#f9a8d4"/></svg>
+                <div class="section-title">角色信息</div>
+                <div class="attr-row"><span class="label">门派</span><span class="value">{{ data.forceName }}</span></div>
+                <div class="attr-row"><span class="label">心法</span><span class="value">{{ data.kungfuName }}{% if data.kungfuType %} · {{ data.kungfuType }}{% endif %}</span></div>
+                <div class="attr-row"><span class="label">体型</span><span class="value">{{ data.bodyName }}</span></div>
+                <div class="attr-row"><span class="label">阵营</span><span class="value">{{ data.campName }}</span></div>
+                <div class="attr-row"><span class="label">装分</span><span class="value">{{ data.equipScore }}</span></div>
+                <div class="attr-row"><span class="label">装备类型</span><span class="value">{{ data.equipType }}</span></div>
+                <div class="attr-row"><span class="label">赛季</span><span class="value">{{ data.seasonName }}</span></div>
+                <div class="attr-row"><span class="label">区服</span><span class="value">{{ data.zoneName }} · {{ data.serverName }}</span></div>
+                {% if data.tongName %}
+                <div class="attr-row"><span class="label">帮会</span><span class="value">{{ data.tongName }}</span></div>
+                {% endif %}
+            </div>
+            {% if data.effects %}
+            <div class="card">
+                <div class="section-title">附魔效果</div>
+                {% for e in data.effects %}
+                <div class="attr-row"><span class="label">{{ e.label }}</span><span class="value">{{ e.value }}{% if e.desc %} · {{ e.desc }}{% endif %}</span></div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="card">
+                <svg class="deco" style="right:10px;bottom:-4px;width:18px;height:18px" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#f9a8d4"/></svg><svg class="deco" style="left:45%;top:55%;width:12px;height:12px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="#f9a8d4"/></svg>
+                <div class="section-title">属性面板（{{ data.qualities|length }} 项）</div>
+                {% for q in data.qualities %}
+                <div class="attr-row"><span class="label">{{ q.label }}</span><span class="value">{{ q.value }}{% if q.percent %}（{{ q.percent }}%）{% endif %}</span></div>
+                {% endfor %}
+            </div>
+            {% if data.cardUrl %}
+            <div class="card">
+                <div class="section-title">角色名片</div>
+                <img class="card-img" src="{{ data.cardUrl }}" alt="" onerror="this.style.display='none'">
+                            </div>
+            {% endif %}
+        </div>
+        <div class="main-area">
+            <div class="page-title">
+                <svg class="deco" style="right:20px;top:8px;width:22px;height:22px" viewBox="0 0 24 24"><path d="M12 2L9 12h7l-5 8 1-6h-6l3-8z" fill="#f9a8d4"/></svg>
+                <svg class="deco" style="left:16px;bottom:6px;width:14px;height:14px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="#ec4899"/></svg><svg class="deco" style="right:38%;top:12px;width:10px;height:10px" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="#f9a8d4"/></svg>
+                <div class="kicker">JX3 · Character Archive · 角色档案</div>
+                <h1>装备档案（{{ data.equipments|length }} 件）</h1>
+                <div class="meta">{{ data.zoneName }} · {{ data.serverName }} · {{ data.kungfuName }} · 装分 {{ data.equipScore }}</div>
+            </div>
+            <div class="equip-list">
+                {% for eq in data.equipments %}
+                <div class="equip-item">
+                    <div class="equip-icon" style="background: {{ eq.color }}12; border: 2px solid {{ eq.color }}40;">
+                        <img src="{{ eq.icon }}" alt="">
+                    </div>
+                    <div class="equip-info">
+                        <div class="equip-title">
+                            <span class="equip-name" style="color: {{ eq.color }};">{{ eq.name }}</span>
+                            <span class="equip-level">{% if eq.level %}{{ "{:,}".format(eq.level) }}{% endif %}</span>
+                        </div>
+                        <div class="chips">
+                            {% for tag in (eq.magic_type or '').split(',') if tag.strip() %}<span class="chip">{{ tag }}</span>{% endfor %}
+                        </div>
+                        <div class="equip-source">{{ eq.source }}{% if eq.school_name %}{% if eq.source %} · {% endif %}{{ eq.school_name }}{% endif %}</div>
+                    </div>
+                    <div class="equip-affix">
+                        {% if eq.diamond %}<div class="affix-row"><img src="{{ eq.diamond.icon }}" alt=""><span>{{ eq.diamond.name }}</span></div>{% endif %}
+                        {% if eq.enchant %}<div class="affix-row"><img src="{{ eq.enchant.icon }}" alt=""><span>{{ eq.enchant.name }}</span></div>{% endif %}
+                        {% if eq.enchant2 %}<div class="affix-row"><img src="{{ eq.enchant2.icon }}" alt=""><span>{{ eq.enchant2.name }}</span></div>{% endif %}
+                        {% if not eq.diamond and not eq.enchant and not eq.enchant2 %}<div class="affix-none">• 无附魔</div>{% endif %}
+                    </div>
+                    <div class="equip-right">
+                        <div class="stars">{% for i in range(eq.strength_level|default(0)|int) %}★{% endfor %}</div>
+                        <div class="gems">{% for m in eq.mounts %}{% for i in range(m.count|int) %}<img src="{{ m.icon }}" alt="">{% endfor %}{% endfor %}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if data.suits %}
+            <div class="talent-card">
+                <div class="section-title" style="text-align: center; border: none; padding: 0;">套装效果</div>
+                {% for s in data.suits %}
+                <div class="attr-row" style="margin-top: 4px;">
+                    <span class="label" style="color: #9d174d; font-weight: 600;">{{ s.name }}</span>
+                    <span class="value">{{ s.count }} 件</span>
+                </div>
+                {% for a in s.attributes %}
+                <div class="attr-row" style="padding-left: 8px;">
+                    <span class="label">{{ a.name or '—' }}（{{ a.pieces }} 件）</span>
+                    <span class="value">+{{ a.value }}</span>
+                </div>
+                {% endfor %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="footer-note">数据来源：JX3API · 收录于 {{ data.updateTime }}{% if data.cacheTime %} · cacheTime {{ data.cacheTime }}{% endif %}</div>
+        </div>
+    </div>
+</body>
+</html>

@@ -22,6 +22,10 @@
 
 移除事件推送里已失效的 action `2006`（云从预告）：新版事件接口的 39 个 action 中没有该编号，这项开关永远收不到推送，涉及 `core/event_catalog.py` 的分组条目、渲染说明、免费档名单、开关名映射、旧列迁移字段与通知渲染分支。「云从社」查询命令走 `/active/celebs`，不受影响。
 
+恢复「属性 服务器 角色」命令，数据源改为 JX3API `/calcd/attribute`（`core/jx3api_data.py` 的 `calcd_attribute`）：返回该角色已收录的装备与属性面板，含装分、心法、体型、阵营、帮会、赛季、属性条目（带百分比的按值+百分比显示）与套装效果。装备图标按 `iconId` 拼 `https://icon.jx3box.com/icon/{iconId}.png` 直出，与既有 JX3BOX 页面同一图源；名片图取 `showInfo.showAvatar`。模板 `templates/standalone/shuxing.html` 由 `unua_attribute.html` 改名并按新字段重排（角色信息卡补装分与赛季、「奇穴」段换为「套装效果」、删去无数据源的竞技场战绩段）。命令表映射改为 `MessageBuilder.shuxing`，`属性` 计入需令牌命令；第三方 UNUA 仅保留在线状态查询。接口返回的字段全部渲染：每件装备补装备属性、词条（`itemMagic`）、附魔（`minEnchant`/`maxEnchant`）、五彩石（`colorDiamond`，`at*` 键经 `_ATTRIBUTE_LABELS` 转中文）、镶嵌五行石（`mountDiamond`，同名合并计数）、品阶、需求等级、类型、来源、门派、说明与 `setId`/`tab`/`itemIndex` 等索引；左侧补心法类型、装备类型、大区、`roleId`/`globalId` 等资料编号、`enchantEffects`、名片 `showHash`/`showIndex`，属性面板不再过滤 0 值。
+
+「攻略 奇遇」改为返回魔盒攻略链接（`core/jx3box_data.py` 的 `qiyugonglue`）。定位由三跳取得：`node.jx3box.com/api/node/serendipities?name=` 取 `dwID`，`node.jx3box.com/api/node/serendipity/{dwID}/achievement` 取 `achievement_id`，`cms.jx3box.com/api/cms/wiki/post/type/achievement/source/{achievement_id}` 取 `post.id`；输出两行：「<奇遇名> · 魔盒攻略」与 `https://www.jx3box.com/wiki/{post.id}`。命令改走 `plain_msg` 文本发送，不再走隐元秘鉴公众号卡片与图片渲染；魔盒链接不在 `_ALLOWED_LINK_HOSTS` 白名单内，卡片与 T2I 两条路都出不来。JX3API 的 `/event/strategy` 只有类型、等级与图鉴编号，没有正文，不能替代该链路。隐元秘鉴卡片链随之删除：`core/yymj_data.py`、`link_card_msg` 及 `_send_qq_card`、`_send_wechat_appmsg`、`Share` 分支与 `_is_wechat_session`/`_is_qq_session`/`_send_onebot_segments` 三个仅服务的辅助函数，以及 `guide_card_config` 配置项和 `MessageBuilder` 的 `qq_card_style` 参数。
+
 ### version: 3.5.4：
 
 修复事件推送通道断线后不再重连：`core/ws_client.py` 的 `configure()` 原先只在「由关转开」或令牌、地址变化时启动连接任务，任务一旦意外结束，`_wanted` 仍为真，后续每次刷新都命中不了重启条件而空转，通道就此永久停摆。现条件补上「连接任务不存在或已结束」也重新启动。

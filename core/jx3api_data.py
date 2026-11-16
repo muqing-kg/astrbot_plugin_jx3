@@ -37,6 +37,40 @@ _RANK_ENDPOINTS = {
 
 
 
+# /calcd/attribute 的五彩石与词条用 at* 英文键，属性面板用中文名，这里统一成中文
+_ATTRIBUTE_LABELS = {
+    "atVitalityBase": "体质",
+    "atSpunkBase": "元气",
+    "atStrengthBase": "力道",
+    "atAgilityBase": "身法",
+    "atSpiritBase": "根骨",
+    "atMagicAttackPowerBase": "内功攻击",
+    "atPhysicsAttackPowerBase": "外功攻击",
+    "atPoisonAttackPowerBase": "毒性内功攻击",
+    "atAllTypeAttackPowerBase": "全攻击",
+    "atMagicCriticalStrike": "内功会心",
+    "atPhysicsCriticalStrike": "外功会心",
+    "atPoisonCriticalStrike": "毒性内功会心",
+    "atAllTypeCriticalStrike": "全会心",
+    "atMagicCriticalDamagePowerBase": "内功会心效果",
+    "atPhysicsCriticalDamagePowerBase": "外功会心效果",
+    "atPoisonCriticalDamagePowerBase": "毒性内功会心效果",
+    "atAllTypeCriticalDamagePowerBase": "全会心效果",
+    "atMagicOvercomeBase": "内功破防",
+    "atPhysicsOvercomeBase": "外功破防",
+    "atPoisonOvercomeBase": "毒性内功破防",
+    "atAllTypeOvercomeBase": "全破防",
+    "atToughnessBase": "御劲",
+    "atDecriticalDamagePowerBase": "化劲",
+    "atHasteBase": "加速",
+    "atStrainBase": "无双",
+    "atSurplusValueBase": "破招",
+    "atPVXAllRound": "全能",
+    "atMaxHealthBase": "气血上限",
+    "atMagicShieldBase": "内功防御",
+    "atPhysicsShieldBase": "外功防御",
+}
+
 _SAND_CASTLE_NAMES = frozenset({
     "不空关", "大理山城", "啖杏林", "飞沙关", "枫湖寨", "凤鸣堡", "扶风郡",
     "红莲岗", "激流坞", "金门关", "惊虬谷", "澜沧城", "烈日岗", "凛风堡",
@@ -2291,6 +2325,219 @@ class JX3APIService:
         params = {"camp": camp_id, "token": self.token}
         return await self._request_api("/rank/contest", params, processor, "data_list.html")
 
+    async def calcd_attribute(self, server: str, name: str) -> Dict[str, Any]:
+        """角色属性（已收录的装备与属性面板）"""
+        quality_colors = {0: "#9ca3af", 1: "#9ca3af", 2: "#22c55e", 3: "#60a5fa", 4: "#c084fc", 5: "#fb923c"}
+
+        def as_int(value: Any) -> int:
+            try:
+                return int(str(value).strip())
+            except (TypeError, ValueError):
+                return 0
+
+        def as_text(value: Any) -> str:
+            return "" if value is None else str(value).strip()
+
+        def icon_url(icon_id: Any) -> str:
+            text = as_text(icon_id)
+            return f"https://icon.jx3box.com/icon/{text}.png" if text.isdigit() else ""
+
+        def attr_rows(pairs: Any) -> list:
+            rows = []
+            for pair in pairs or []:
+                if not isinstance(pair, dict):
+                    continue
+                label = as_text(pair.get("name")) or as_text(pair.get("typeName"))
+                if not label:
+                    continue
+                rows.append({"label": label, "value": pair.get("value")})
+            return rows
+
+        def attr_label(key: Any) -> str:
+            text = as_text(key)
+            return _ATTRIBUTE_LABELS.get(text, text[2:] if text.startswith("at") else text)
+
+        def magic_rows(items: Any) -> list:
+            rows = []
+            for magic in items or []:
+                if not isinstance(magic, dict):
+                    continue
+                label = as_text(magic.get("itemName")) or attr_label(magic.get("typeName"))
+                if not label:
+                    continue
+                span = magic.get("itemValue") if isinstance(magic.get("itemValue"), dict) else {}
+                low, high = span.get("Param1Min"), span.get("Param1Max")
+                rows.append({
+                    "label": label,
+                    "value": f"{low} - {high}" if low != high else low,
+                    "type": attr_label(magic.get("typeName")),
+                    "desc": as_text(magic.get("itemDesc")),
+                })
+            return rows
+
+        def enchant_entry(enchant: Any) -> Dict[str, Any]:
+            if not isinstance(enchant, dict) or not enchant:
+                return {}
+            return {
+                "name": as_text(enchant.get("itemName")),
+                "effect": as_text(enchant.get("attribute1Name")),
+                "score": enchant.get("itemScore"),
+                "icon": icon_url(enchant.get("itemId")),
+                "target": as_text(enchant.get("destItemSubType")),
+            }
+
+        def diamond_entry(diamond: Any) -> Dict[str, Any]:
+            if not isinstance(diamond, dict) or not diamond:
+                return {}
+            attrs = []
+            raw = diamond.get("itemAttr") if isinstance(diamond.get("itemAttr"), dict) else {}
+            for key, value in raw.items():
+                attrs.append({"label": attr_label(key), "value": value})
+            return {
+                "name": as_text(diamond.get("itemName")),
+                "quality": as_int(diamond.get("itemQuality")),
+                "score": diamond.get("itemScore"),
+                "icon": icon_url(diamond.get("iconId")),
+                "attrs": attrs,
+            }
+
+        def mount_rows(mounts: Any) -> list:
+            merged: Dict[str, Dict[str, Any]] = {}
+            for mount in mounts or []:
+                if not isinstance(mount, dict):
+                    continue
+                label = as_text(mount.get("itemName"))
+                if not label:
+                    continue
+                entry = merged.setdefault(label, {
+                    "name": label,
+                    "quality": as_int(mount.get("itemQuality")),
+                    "icon": icon_url(mount.get("iconId")),
+                    "count": 0,
+                })
+                entry["count"] += 1
+            return list(merged.values())
+
+        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
+            if not isinstance(data, dict) or not data:
+                return_data["msg"] = "未收录该角色的装备与属性数据"
+                return
+            equipments = []
+            for index, item in enumerate(data.get("equipList") or []):
+                if not isinstance(item, dict):
+                    continue
+                item_name = str(item.get("itemName") or "").strip()
+                if not item_name:
+                    continue
+                quality = as_int(item.get("itemQuality"))
+                icon_id = str(item.get("iconId") or "").strip()
+                equipments.append({
+                    "order": item.get("itemIndex", index),
+                    "name": item_name,
+                    "icon": icon_url(icon_id),
+                    "quality": quality,
+                    "color": quality_colors.get(quality, "#9ca3af"),
+                    "strength_level": as_int(item.get("strengthLevel")),
+                    "max_strength_level": as_int(item.get("maxStrengthLevel")),
+                    "level": item.get("itemLevel"),
+                    "need_level": item.get("needLevel"),
+                    "type": as_text(item.get("itemType")),
+                    "kind": as_text(item.get("itemKind")),
+                    "source": as_text(item.get("itemSource")),
+                    "school_name": as_text(item.get("schoolName")),
+                    "school_id": as_text(item.get("itemSchool")),
+                    "belong_school": as_text(item.get("belongSchool")),
+                    "magic_type": as_text(item.get("magicType")),
+                    "set_id": as_text(item.get("setId")),
+                    "tab_id": item.get("tabId"),
+                    "tab_index": item.get("tabIndex"),
+                    "plus": item.get("itemPlus"),
+                    "attribs": attr_rows(item.get("itemAttrib")),
+                    "magic": magic_rows(item.get("itemMagic")),
+                    "enchant": enchant_entry(item.get("minEnchant")),
+                    "enchant2": enchant_entry(item.get("maxEnchant")),
+                    "diamond": diamond_entry(item.get("colorDiamond")),
+                    "mounts": mount_rows(item.get("mountDiamond")),
+                    "desc": [as_text(line) for line in (item.get("itemDesc") or []) if as_text(line)],
+                })
+            qualities = []
+            for panel in data.get("panelList") or []:
+                if not isinstance(panel, dict):
+                    continue
+                label = str(panel.get("name") or "").strip()
+                if not label:
+                    continue
+                entry = {"label": label, "value": panel.get("value")}
+                if panel.get("percent") not in (None, ""):
+                    entry["percent"] = panel.get("percent")
+                qualities.append(entry)
+            suits = []
+            for suit in data.get("suits") or []:
+                if not isinstance(suit, dict):
+                    continue
+                suit_name = str(suit.get("name") or "").strip()
+                if not suit_name:
+                    continue
+                attributes = [
+                    {
+                        "name": str(attr.get("name") or ""),
+                        "pieces": attr.get("pieces"),
+                        "value": attr.get("value"),
+                    }
+                    for attr in (suit.get("attributes") or [])
+                    if isinstance(attr, dict)
+                ]
+                suits.append({"name": suit_name, "count": suit.get("count"), "attributes": attributes})
+            show = data.get("showInfo") if isinstance(data.get("showInfo"), dict) else {}
+            effects = []
+            for effect in data.get("enchantEffects") or []:
+                if isinstance(effect, dict):
+                    effects.append({
+                        "label": as_text(effect.get("name")) or as_text(effect.get("itemName")) or as_text(effect.get("typeName")),
+                        "value": effect.get("value"),
+                        "desc": as_text(effect.get("desc")),
+                    })
+                elif as_text(effect):
+                    effects.append({"label": as_text(effect), "value": ""})
+            return_data["data"] = {
+                "roleName": str(data.get("roleName") or name),
+                "serverName": str(data.get("serverName") or server),
+                "zoneName": str(data.get("zoneName") or ""),
+                "forceName": str(data.get("forceName") or ""),
+                "kungfuName": str(data.get("kungfuName") or ""),
+                "kungfuType": str(data.get("kungfuType") or ""),
+                "bodyName": str(data.get("bodyName") or ""),
+                "campName": str(data.get("campName") or ""),
+                "tongName": str(data.get("tongName") or ""),
+                "equipScore": data.get("equipScore"),
+                "equipType": str(data.get("equipType") or ""),
+                "seasonName": str(data.get("seasonName") or ""),
+                "cardUrl": str(show.get("showAvatar") or ""),
+                "showHash": as_text(show.get("showHash")),
+                "showIndex": show.get("showIndex"),
+                "ids": [
+                    {"label": "roleId", "value": data.get("roleId")},
+                    {"label": "globalId", "value": data.get("globalId")},
+                    {"label": "forceId", "value": data.get("forceId")},
+                    {"label": "kungfuId", "value": data.get("kungfuId")},
+                    {"label": "bodyId", "value": data.get("bodyId")},
+                    {"label": "campId", "value": data.get("campId")},
+                ],
+                "effects": effects,
+                "qualities": qualities,
+                "equipments": equipments,
+                "suits": suits,
+                "updateTime": self._chinese_date(data.get("cacheTime")) if data.get("cacheTime") else self._now_text(),
+                "cacheTime": data.get("cacheTime"),
+            }
+
+        return await self._request_api(
+            "/calcd/attribute",
+            {"server": server, "name": name, "token": self.token},
+            processor,
+            "standalone/shuxing.html",
+        )
+
     async def bukuai(self, server: str = "") -> Dict[str, Any]:
         """捕快荣誉"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
@@ -2439,7 +2686,7 @@ class JX3APIService:
                 "subtitle": f"{server} · 更新时间：{self._now_text()}",
             }
 
-        params = {"server": server, "name": name, "class": class_id, "token": self.token, "ticket": self.ticket}
+        params = {"server": server, "name": name, "class": class_id, "token": self.token}
         if subclass:
             params["subclass"] = subclass
         return await self._request_api("/role/achievement", params, processor, "data_list.html")
