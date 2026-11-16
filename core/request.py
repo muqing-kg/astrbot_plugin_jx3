@@ -166,6 +166,16 @@ class APIClient:
             except json.JSONDecodeError:
                 return None
         
+        # JX3API 新版信封 {"status": 200, "detail": ...}：HTTP 恒为 200，业务状态在正文。
+        # 归一化成内部统一的 {code, msg, data}，下游 out_key="data" 与 _error/_code 判定不变。
+        if isinstance(data, dict) and "status" in data and "detail" in data and "code" not in data:
+            status = data.get("status")
+            detail = data.get("detail")
+            if status != 200:
+                logger.error(f"API业务报错: status={status}, detail={detail}")
+                return {"_error": str(detail or "接口返回错误"), "_code": status}
+            return {"code": 200, "msg": "ok", "data": detail}
+
         if isinstance(data, dict) and 'code' in data:
             code = data.get('code')
             # 按 JX3API 当前接口文档维护成功码白名单，上游新增成功码时需同步。

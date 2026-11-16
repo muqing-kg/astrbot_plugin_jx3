@@ -26,6 +26,7 @@ from .core.session_policy import (
     PRIVATE_ONLY_COMMAND_IDS,
     UNBOUND_SERVER,
     UNKNOWN_SERVER,
+    inject_optional_server_args,
     is_group_umo,
     mask_for_user,
     CLAIM_PHRASE,
@@ -68,6 +69,7 @@ from .core.mentions import mentioned_bot, mentioned_target, message_text_without
 from .core.page_api import SessionPageAPI
 from .core.event_catalog import FREE_PUSH_ACTIONS, push_arg_map
 from .core.command_catalog import apply_command_overrides, resolve_command, suggest_command
+from .core.rank_catalog import match_rank_name
 from .core.server_catalog import apply_alias_overrides, canonical_server
 from .core.plugin_settings import PluginSettings
 
@@ -254,20 +256,30 @@ class Jx3ApiPlugin(Star):
             "江湖排行": self.jx3cmd.laojianghuwushiqiang,
             "兵甲排行": self.jx3cmd.bingjiacangjiawushiqiang,
             "名师排行": self.jx3cmd.mingshiwushiqiang_mentor,
-            "阵营排行": self.jx3cmd.zhengyingyingxiongwushiqiang,
             "薪火排行": self.jx3cmd.xinhuoxiangchuanwushiqiang,
             "家园排行": self.jx3cmd.luyuanguangjiyibaiqiang,
+            "本周恶人战功榜": self.jx3cmd.benzhouerenwushiqiang,
+            "本周浩气战功榜": self.jx3cmd.benzhouhaoqiwushiqiang,
+            "上周恶人战功榜": self.jx3cmd.shangzhouerenwushiqiang,
+            "上周浩气战功榜": self.jx3cmd.shangzhouhaoqiwushiqiang,
+            "赛季恶人战功榜": self.jx3cmd.saijierenwushiqiang,
+            "赛季浩气战功榜": self.jx3cmd.saijihaoqiwushiqiang,
             "浩气神兵排行": self.jx3cmd.haoqishenbingbaojiawushiqiang,
             "恶人神兵排行": self.jx3cmd.erenshenbingbaojiawushiqiang,
             "浩气爱心排行": self.jx3cmd.haoqiaixinbanghuiwushiqiang,
             "恶人爱心排行": self.jx3cmd.erenaixinbanghuiwushiqiang,
-            "赛季恶人战功榜": self.jx3cmd.saijierenwushiqiang,
-            "赛季浩气战功榜": self.jx3cmd.saijihaoqiwushiqiang,
-            "上周恶人战功榜": self.jx3cmd.shangzhouerenwushiqiang,
-            "上周浩气战功榜": self.jx3cmd.shangzhouhaoqiwushiqiang,
-            "本周恶人战功榜": self.jx3cmd.benzhouerenwushiqiang,
-            "本周浩气战功榜": self.jx3cmd.benzhouhaoqiwushiqiang,
-            "试炼之地排行": self.jx3cmd.shilianpaixing,
+            "恶人后勤排行": self.jx3cmd.erenhoudingyibaiqiang,
+            "浩气后勤排行": self.jx3cmd.haoqihoudingyibaiqiang,
+            "恶人英雄排行": self.jx3cmd.erenyingxiongwushiqiang,
+            "浩气英雄排行": self.jx3cmd.haoqiyingxiongwushiqiang,
+            "个人排行": self.jx3cmd.个人排行,
+            "帮会排行": self.jx3cmd.帮会排行,
+            "绝境战场": self.jx3cmd.绝境战场,
+            "据点贡献": self.jx3cmd.据点贡献,
+            "江湖榜": self.jx3cmd.江湖榜,
+            "跨服名剑": self.jx3cmd.跨服名剑,
+            "武林争霸": self.jx3cmd.武林争霸,
+            "决斗挑战": self.jx3cmd.决斗挑战,
             "跨服名剑榜": self.jx3cmd.kuafumingjian,
             "武林争霸赛": self.jx3cmd.wulinzhengba,
             "捕快荣誉榜": self.jx3cmd.bukuai,
@@ -288,8 +300,6 @@ class Jx3ApiPlugin(Star):
             "全部名片": self.jx3cmd.shuoyoumingpian,
             "随机名片": self.jx3cmd.shuijimingpian,
             "查询": self.jx3cmd.juesheqiyu,
-            "奇遇珍卷": self.jx3cmd.zhenjuan,
-            "未出": self.jx3cmd.weizuoqiyu,
             "汇总": self.jx3cmd.qiyuhuizong,
             "近期": self.jx3cmd.jinqiqiyu,
             "统计": self.jx3cmd.qiyutongji,
@@ -308,8 +318,6 @@ class Jx3ApiPlugin(Star):
             "统战": self.jx3cmd.tongzhanyy,
             "小药": self.jx3cmd.xiaoyao,
             "花价": self.jx3cmd.huajia,
-            "装饰": self.jx3cmd.zhuangshi,
-            "器物谱": self.jx3cmd.qiwu,
             "拜师": self.jx3cmd.baishi,
             "收徒": self.jx3cmd.shoutu,
             "维护": self.jx3cmd.weihu,
@@ -955,11 +963,31 @@ class Jx3ApiPlugin(Star):
             )
             return event.plain_result(format_command_error(cmd_id, e, self.command_catalog))
 
-    async def _cmd_ranking(self, event: AstrMessageEvent, args: list[str]):
-        ids = self.jx3cmd.RANKING_IDS
-        async def runner(choice: int, reply_event: AstrMessageEvent):
-            await self._run_menu_choice(reply_event, choice, ids, [])
-        await self.jx3cmd.send_command_menu(event, "排行榜", ids, runner, timeout=20)
+    async def _cmd_ranking(self, event: AstrMessageEvent, args: list[str], bound: str = ""):
+        injected = inject_optional_server_args(
+            "排行榜",
+            args,
+            bound,
+            resolver=lambda name: canonical_server(self.server_catalog, name),
+        )
+        if injected == UNKNOWN_SERVER:
+            return event.plain_result(hint_unknown_server())
+        await self.jx3cmd.rank_root_menu(event, injected[0])
+
+    async def _cmd_rank_direct(self, event: AstrMessageEvent, label: str, kind: str, args: list[str], row: dict):
+        """直接发榜单名：可用「<榜单名> 服务器」指定区服。"""
+        bound = (row.get("server") or "").strip()
+        injected = inject_optional_server_args(
+            "排行榜",
+            args,
+            bound,
+            resolver=lambda name: canonical_server(self.server_catalog, name),
+        )
+        if injected == UNBOUND_SERVER:
+            return event.plain_result(hint_unbound(self.command_catalog))
+        if injected == UNKNOWN_SERVER:
+            return event.plain_result(hint_unknown_server())
+        return await self.jx3cmd._run_rank_entry(event, label, kind, injected[0])
 
     async def _cmd_zhangong(self, event: AstrMessageEvent, args: list[str]):
         camp = (args[0] if args else "").strip()
@@ -1051,6 +1079,11 @@ class Jx3ApiPlugin(Star):
         trigger, *args = parts
         cmd = resolve_command(self.command_catalog, trigger)
         if not cmd:
+            rank_kind = match_rank_name(trigger)
+            if rank_kind:
+                event.stop_event()
+                yield await self._cmd_rank_direct(event, trigger, rank_kind[1], args, row)
+                return
             if bot_at:
                 if self.sessions.is_llm_enabled(row):
                     event.is_wake = True
@@ -1070,7 +1103,7 @@ class Jx3ApiPlugin(Star):
         if cmd in {"排行榜", "战功榜"}:
             event.stop_event()
             if cmd == "排行榜":
-                yield await self._cmd_ranking(event, args)
+                yield await self._cmd_ranking(event, args, (row.get("server") or "").strip())
             else:
                 yield await self._cmd_zhangong(event, args)
             return

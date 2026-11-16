@@ -15,7 +15,6 @@ class PluginSettings:
         "拍卖": "阵营拍卖",
         "的卢": "的卢拍卖",
         "武林争霸": "武林争霸赛",
-        "试炼之地": "试炼之地排行",
     }
 
     async def init(self) -> None:

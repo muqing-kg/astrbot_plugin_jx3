@@ -25,6 +25,7 @@ from .credentials import (
     set_request_credentials,
 )
 from .session_policy import exception_notice
+from .rank_catalog import RANK_CATEGORY_ORDER, rank_entries
 from .render_meta import build_page_meta, limit_image_rows
 
 _SEND_RETRY_DELAY = 1.0
@@ -43,15 +44,10 @@ def _send_outcome_unknown(exc: BaseException) -> bool:
 
 class MessageBuilder:
     """回复消息构建"""
-    RANKING_IDS = (
-        "名剑排行", "名剑统计", "跨服名剑榜", "武林争霸赛", "捕快荣誉榜",
-        "江湖浪客榜", "决斗挑战榜", "资历排行", "名士排行", "江湖排行",
-        "兵甲排行", "名师排行", "阵营排行", "薪火排行", "家园排行",
-        "浩气神兵排行", "恶人神兵排行", "浩气爱心排行", "恶人爱心排行",
-    )
     ZHANGONG_ALL = (
-        "本周恶人战功榜", "上周恶人战功榜", "赛季恶人战功榜",
-        "本周浩气战功榜", "上周浩气战功榜", "赛季浩气战功榜",
+        "本周恶人战功榜", "本周浩气战功榜",
+        "上周恶人战功榜", "上周浩气战功榜",
+        "赛季恶人战功榜", "赛季浩气战功榜",
     )
     ZHANGONG_EWE = ("本周恶人战功榜", "上周恶人战功榜", "赛季恶人战功榜")
     ZHANGONG_HAO = ("本周浩气战功榜", "上周浩气战功榜", "赛季浩气战功榜")
@@ -659,9 +655,6 @@ class MessageBuilder:
         """ 名师五十强 服务器"""
         return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("名师五十强", server))
 
-    async def  zhengyingyingxiongwushiqiang(self, event: AstrMessageEvent, server: str):
-        """ 阵营英雄五十强 服务器"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("阵营英雄五十强", server))
 
     async def  xinhuoxiangchuanwushiqiang(self, event: AstrMessageEvent, server: str):
         """ 薪火相传五十强 服务器"""
@@ -671,37 +664,13 @@ class MessageBuilder:
         """ 庐园广记一百强 服务器"""
         return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("庐园广记一百强", server))
 
-    async def  haoqishenbingbaojiawushiqiang(self, event: AstrMessageEvent, server: str):
-        """ 浩气神兵宝甲五十强 服务器"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("浩气神兵宝甲五十强", server))
 
-    async def  erenshenbingbaojiawushiqiang(self, event: AstrMessageEvent, server: str ):
-        """ 恶人神兵宝甲五十强 服务器"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("恶人神兵宝甲五十强", server))
 
-    async def  haoqiaixinbanghuiwushiqiang(self, event: AstrMessageEvent, server: str ):
-        """ 浩气爱心帮会五十强 服务器"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("浩气爱心帮会五十强", server))
 
-    async def  erenaixinbanghuiwushiqiang(self, event: AstrMessageEvent, server: str ):
-        """ 恶人爱心帮会五十强 服务器"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("恶人爱心帮会五十强", server))
 
-    async def  saijierenwushiqiang(self, event: AstrMessageEvent, server: str):
-        """ 赛季恶人五十强 服务器"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("赛季恶人五十强", server))
 
-    async def  saijihaoqiwushiqiang(self, event: AstrMessageEvent, server: str ):
-        """ 赛季浩气五十强 服务器"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("赛季浩气五十强", server))
 
-    async def  shangzhouerenwushiqiang(self, event: AstrMessageEvent, server: str ):
-        """ 上周恶人五十强 服务器"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("上周恶人五十强", server))
 
-    async def  shangzhouhaoqiwushiqiang(self, event: AstrMessageEvent, server: str ):
-        """ 上周浩气五十强 服务器"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("上周浩气五十强", server))
 
     async def  benzhouerenwushiqiang(self, event: AstrMessageEvent, server: str ):
         """ 本周恶人五十强 服务器"""
@@ -711,9 +680,53 @@ class MessageBuilder:
         """ 本周浩气五十强 服务器"""
         return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("本周浩气五十强", server))
 
-    async def  shilianpaixing(self, event: AstrMessageEvent, server: str , name: str):
-        """ 试炼排行 服务器 心法 """
-        return await self.T2I_image_msg(event, lambda: self.jx3api.shilianpaixing(name, server))
+    async def  erenhoudingyibaiqiang(self, event: AstrMessageEvent, server: str):
+        """ 恶人后勤一百强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("恶人后勤一百强", server))
+
+    async def  haoqihoudingyibaiqiang(self, event: AstrMessageEvent, server: str):
+        """ 浩气后勤一百强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("浩气后勤一百强", server))
+
+    async def  erenyingxiongwushiqiang(self, event: AstrMessageEvent, server: str):
+        """ 恶人英雄五十强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("恶人英雄五十强", server))
+
+    async def  haoqiyingxiongwushiqiang(self, event: AstrMessageEvent, server: str):
+        """ 浩气英雄五十强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("浩气英雄五十强", server))
+
+    async def  haoqishenbingbaojiawushiqiang(self, event: AstrMessageEvent, server: str):
+        """ 浩气神兵宝甲五十强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("浩气神兵宝甲五十强", server))
+
+    async def  erenshenbingbaojiawushiqiang(self, event: AstrMessageEvent, server: str):
+        """ 恶人神兵宝甲五十强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("恶人神兵宝甲五十强", server))
+
+    async def  haoqiaixinbanghuiwushiqiang(self, event: AstrMessageEvent, server: str):
+        """ 浩气爱心帮会五十强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("浩气爱心帮会五十强", server))
+
+    async def  erenaixinbanghuiwushiqiang(self, event: AstrMessageEvent, server: str):
+        """ 恶人爱心帮会五十强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("恶人爱心帮会五十强", server))
+
+    async def  saijihaoqiwushiqiang(self, event: AstrMessageEvent, server: str):
+        """ 赛季浩气五十强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("赛季浩气五十强", server))
+
+    async def  saijierenwushiqiang(self, event: AstrMessageEvent, server: str):
+        """ 赛季恶人五十强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("赛季恶人五十强", server))
+
+    async def  shangzhouhaoqiwushiqiang(self, event: AstrMessageEvent, server: str):
+        """ 上周浩气五十强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("上周浩气五十强", server))
+
+    async def  shangzhouerenwushiqiang(self, event: AstrMessageEvent, server: str):
+        """ 上周恶人五十强 服务器"""
+        return await self.T2I_image_msg(event, lambda: self.jx3api.rank_statistical("上周恶人五十强", server))
 
     async def  kuafumingjian(self, event: AstrMessageEvent, server: str = "", mode: str = "33"):
         """ 跨服名剑 [服务器] [模式] """
@@ -734,6 +747,152 @@ class MessageBuilder:
     async def  juedou(self, event: AstrMessageEvent, server: str = "", mode: str = "公开"):
         """ 决斗 [服务器] [公开/私密] """
         return await self.T2I_image_msg(event, lambda: self.jx3api.juedou(server, mode))
+
+    async def _run_rank_entry(self, event: AstrMessageEvent, label: str, kind: str, server: str = ""):
+        """按榜单条目的取数方式出图。"""
+        runners = {
+            "name": lambda: self.jx3api.rank_statistical(label, server),
+            "langke": lambda: self.jx3api.langke(server),
+            "bukuai": lambda: self.jx3api.bukuai(server),
+            "ladder": lambda: self.jx3api.kuafumingjian(server, label),
+            "contest": lambda: self.jx3api.wulinzhengba(label),
+            "wanted": lambda: self.jx3api.juedou(server, label),
+        }
+        runner = runners.get(kind)
+        if not runner:
+            await event.send(event.plain_result(f"未知榜单类型：{label}"))
+            return None
+        return await self.T2I_image_msg(event, runner)
+
+    async def rank_category_menu(self, event: AstrMessageEvent, category: str, server: str = ""):
+        """分类下的榜单菜单，回序号直接出图。"""
+        entries = rank_entries(category)
+        if not entries:
+            return event.plain_result(f"没有这个榜单分类：{category}")
+        scope = "全服" if category in {"武林争霸"} else (server or "全服")
+        lines = "\n".join(f"{index}. {label}" for index, (label, _) in enumerate(entries, 1))
+
+        async def runner(choice: int, reply_event: AstrMessageEvent):
+            label, kind = entries[choice - 1]
+            await self._run_rank_entry(reply_event, label, kind, server)
+
+        await self._send_choice_and_wait(event, f"{category}（{scope}）\n{lines}", len(entries), runner, timeout=30)
+        return None
+
+    async def rank_root_menu(self, event: AstrMessageEvent, server: str = ""):
+        """排行榜总入口：先选分类，再选榜单，单个 waiter 承载两级。"""
+        order = list(RANK_CATEGORY_ORDER)
+        timeout = 30
+        lines = "\n".join(f"{index}. {name}（{len(rank_entries(name))} 项）" for index, name in enumerate(order, 1))
+        text = f"排行榜（{server or '全服'}）\n{lines}\n\n发送分类序号即可，{timeout} 秒后自动选 1"
+        if not await self._deliver(event, lambda: event.send(event.plain_result(text)), "菜单"):
+            return None
+        user_id = event.get_sender_id()
+        token = current_token()
+        ticket = current_ticket()
+        state = {"category": ""}
+        resolved = False
+
+        async def execute(choice: int, target_event: AstrMessageEvent):
+            label, kind = rank_entries(state["category"])[choice - 1]
+            await self._run_rank_entry(target_event, label, kind, server)
+
+        async def run_choice(choice: int, target_event: AstrMessageEvent) -> None:
+            creds = set_request_credentials(token or None, ticket or None)
+            try:
+                await execute(choice, target_event)
+            finally:
+                reset_request_credentials(creds)
+
+        async def report_failure(target_event: AstrMessageEvent, exc: BaseException, label: str) -> None:
+            logger.error(f"{label}: {exc}")
+            await self._notice(target_event, exception_notice(exc))
+
+        @session_waiter(timeout=timeout)
+        async def choice_waiter(controller: SessionController, new_event: AstrMessageEvent):
+            nonlocal resolved
+            if new_event.get_sender_id() != user_id:
+                return
+            msg = new_event.get_message_str().strip()
+            if msg.startswith("/"):
+                msg = msg[1:].strip()
+            if not msg.isdigit():
+                await self._deliver(new_event, lambda: new_event.send(MessageChain().message("输入异常，结束会话")), "会话提示")
+                controller.stop()
+                return
+            choice = int(msg)
+            if not state["category"]:
+                if choice < 1 or choice > len(order):
+                    await self._deliver(new_event, lambda: new_event.send(MessageChain().message("无效序号，结束会话")), "会话提示")
+                    controller.stop()
+                    return
+                state["category"] = order[choice - 1]
+                entries = rank_entries(state["category"])
+                sub_lines = "\n".join(f"{index}. {label}" for index, (label, _) in enumerate(entries, 1))
+                await self._deliver(
+                    new_event,
+                    lambda: new_event.send(new_event.plain_result(f"{state['category']}\n{sub_lines}\n\n发送序号即可")),
+                    "菜单",
+                )
+                return
+            entries = rank_entries(state["category"])
+            if choice < 1 or choice > len(entries):
+                await self._deliver(new_event, lambda: new_event.send(MessageChain().message("无效序号，结束会话")), "会话提示")
+                controller.stop()
+                return
+            resolved = True
+            try:
+                await run_choice(choice, new_event)
+            except Exception as e:
+                await report_failure(new_event, e, "执行命令错误")
+            controller.stop()
+
+        try:
+            await choice_waiter(event)
+        except TimeoutError:
+            if resolved:
+                return None
+            if not state["category"]:
+                state["category"] = order[0]
+            try:
+                await run_choice(1, event)
+            except Exception as e:
+                await report_failure(event, e, "默认选项执行错误")
+        except Exception:
+            logger.error("排行榜菜单异常", exc_info=True)
+        return None
+
+    async def 个人排行(self, event: AstrMessageEvent, server: str = ""):
+        """ 个人排行 [服务器] """
+        return await self.rank_category_menu(event, "个人排行", server)
+
+    async def 帮会排行(self, event: AstrMessageEvent, server: str = ""):
+        """ 帮会排行 [服务器] """
+        return await self.rank_category_menu(event, "帮会排行", server)
+
+    async def 绝境战场(self, event: AstrMessageEvent, server: str = ""):
+        """ 绝境战场 [服务器] """
+        return await self.rank_category_menu(event, "绝境战场", server)
+
+    async def 据点贡献(self, event: AstrMessageEvent, server: str = ""):
+        """ 据点贡献 [服务器] """
+        return await self.rank_category_menu(event, "据点贡献", server)
+
+    async def 江湖榜(self, event: AstrMessageEvent, server: str = ""):
+        """ 江湖榜 [服务器] """
+        return await self.rank_category_menu(event, "江湖榜", server)
+
+    async def 跨服名剑(self, event: AstrMessageEvent, server: str = ""):
+        """ 跨服名剑 [服务器] """
+        return await self.rank_category_menu(event, "跨服名剑", server)
+
+    async def 武林争霸(self, event: AstrMessageEvent, server: str = ""):
+        """ 武林争霸 [服务器] """
+        return await self.rank_category_menu(event, "武林争霸", server)
+
+    async def 决斗挑战(self, event: AstrMessageEvent, server: str = ""):
+        """ 决斗挑战 [服务器] """
+        return await self.rank_category_menu(event, "决斗挑战", server)
 
     async def  zilifenbu(self, event: AstrMessageEvent, server: str, name: str, class_id: str = "1", subclass: str = ""):
         """ 资历分布 服务器 角色 [分类] """
@@ -837,9 +996,6 @@ class MessageBuilder:
         """ 汇总 服务器 天数 """
         return await self.T2I_image_msg(event, lambda: self.jx3api.qiyuhuizong(server, num))
 
-    async def  weizuoqiyu(self, event: AstrMessageEvent,server: str, name: str, ):
-        """ 未出 服务器 角色 """
-        return await self.T2I_image_msg(event, lambda: self.jx3api.weizuoqiyu(server,name))
 
     async def  jinqiqiyu(self, event: AstrMessageEvent,server: str, limit: int = 20):
         """ 近期 服务器 数量"""
@@ -848,26 +1004,6 @@ class MessageBuilder:
     async def  juesheqiyu(self, event: AstrMessageEvent, server: str, name: str):
         """ 查询 服务器 角色 """
         return await self.T2I_image_msg(event, lambda: self.jx3api.juesheqiyu(server,name, 1))
-
-    async def  zhenjuan(self, event: AstrMessageEvent, server: str, name: str):
-        """ 奇遇珍卷 服务器 角色 """
-        async def action():
-            catalog = await self.jx3box.qiyuliebiao()
-            school = await self.jx3api.role_school(server, name)
-            icon = (self.icons.get("sect") or {}).get(school, "") if school else ""
-            return await self.jx3api.zhenjuan(
-                server,
-                name,
-                catalog,
-                school=school,
-                school_icon=icon,
-            )
-
-        return await self.raw_image_msg(
-            event,
-            action,
-            options={"device_scale_factor_level": "high"},
-        )
 
     async def  qiyutongji(self, event: AstrMessageEvent,adventureName: str, server: str = "",limit: int = 20):
         """ 统计 奇遇 服务器 数量"""
@@ -885,8 +1021,8 @@ class MessageBuilder:
         """ 百战"""
         return await self.T2I_image_msg(event, self.jx3api.baizhan)
     
-    async def  chengjiu(self, event: AstrMessageEvent, server:str, role:str, name:str):
-        """ 成就 服务器 角色 成就"""
+    async def  chengjiu(self, event: AstrMessageEvent, server:str, role:str, name:str = ""):
+        """ 成就 服务器 角色"""
         return await self.T2I_image_msg(event, lambda: self.jx3api.chengjiuchaxun(server,role,name))
 
     async def  jueshe(self, event: AstrMessageEvent,server: str, name: str):
@@ -943,13 +1079,7 @@ class MessageBuilder:
         """ 花价 服务器 名称 地图"""
         return await self.T2I_image_msg(event, lambda: self.jx3api.huajia(server,name,map))
 
-    async def  zhuangshi(self, event: AstrMessageEvent,  name: str):
-        """ 装饰 名称"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.zhuangshi(name))
 
-    async def  qiwu(self, event: AstrMessageEvent,  name: str):
-        """ 器物 地图名称"""
-        return await self.T2I_image_msg(event, lambda: self.jx3api.qiwu(name))
 
     async def  baishi(self, event: AstrMessageEvent, server: str, keyword: str = ""):
         """ 拜师 服务器 关键词 """

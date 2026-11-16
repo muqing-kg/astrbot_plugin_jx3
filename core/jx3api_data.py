@@ -23,7 +23,15 @@ from .credentials import (
     current_ticket,
 )
 from .session_policy import camp_code, exception_notice
-from .treasure_data import CDN_ROOT, IMG_ROOT, PERFECT_ITEMS, PERFECT_ORDER
+from .rank_catalog import RANK_NAME_INDEX
+
+# 榜单分类 → 上游端点
+_RANK_ENDPOINTS = {
+    "个人排行": "/rank/records",
+    "帮会排行": "/rank/guild",
+    "绝境战场": "/rank/battle",
+    "据点贡献": "/rank/castle",
+}
 
 
 
@@ -58,83 +66,6 @@ def _style_text(style: Optional[dict]) -> str:
         parts.append(f"{key}:{value}")
     return ";".join(parts)
 
-
-_INVALID_NAME_CHARS = re.compile(r'[\\/:*?"<>|]')
-
-
-def _asset_name(name: Any) -> str:
-    """把接口给的奇遇名变成安全文件名片段：去掉路径分隔符与保留字符。"""
-    return _INVALID_NAME_CHARS.sub("_", str(name or "").strip()).lstrip(".")
-
-
-def _is_inside(base: Path, target: Path) -> bool:
-    try:
-        base_resolved = base.resolve()
-        target_resolved = target.resolve()
-    except OSError:
-        return False
-    return base_resolved == target_resolved or base_resolved in target_resolved.parents
-
-
-@lru_cache(maxsize=1)
-def _zhenjuan_logo() -> str:
-    """珍卷右下角的剑网3标识（本地裁切素材），随模板一并下发。"""
-    path = Path(__file__).resolve().parent.parent / "templates" / "img" / "剑网3标识.png"
-    if not path.exists():
-        return ""
-    return "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
-
-
-@lru_cache(maxsize=1)
-def _zhenjuan_card_font() -> str:
-    """珍卷内嵌字体（Noto Sans SC 按珍卷用字子集，OFL 协议），缺文件返回空串。"""
-    path = Path(__file__).resolve().parent.parent / "templates" / "font" / "珍卷字体.woff2"
-    if not path.exists():
-        return ""
-    return "data:font/woff2;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
-
-
-@lru_cache(maxsize=256)
-def _zhenjuan_pet_icon(name: str) -> str:
-    """宠物奇遇图标：本地 2 倍图（templates/img/宠物奇遇/<奇遇名>），按奇遇名取用。"""
-    if not name:
-        return ""
-    name = _asset_name(name)
-    if not name:
-        return ""
-    base = (
-        Path(__file__).resolve().parent.parent
-        / "templates"
-        / "img"
-        / "奇遇珍卷"
-        / "宠物奇遇"
-    )
-    for file_name, mime in ((f"{name}.webp", "image/webp"), (f"{name}.png", "image/png")):
-        path = base / file_name
-        if path.exists() and _is_inside(base, path):
-            return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode("ascii")
-    return ""
-
-
-_TREASURE_DIR = Path(__file__).resolve().parent.parent / "templates" / "img"
-_ASSET_MIME = {
-    ".webp": "image/webp",
-    ".png": "image/png",
-    ".svg": "image/svg+xml",
-    ".jpg": "image/jpeg",
-}
-
-
-@lru_cache(maxsize=256)
-def _treasure_asset(rel_path: str) -> str:
-    """本地奇遇珍卷素材（templates/img，中文命名），返回 data URI；缺失返回空串。"""
-    if not rel_path or ".." in Path(rel_path).parts:
-        return ""
-    path = _TREASURE_DIR / rel_path
-    if not path.exists() or not _is_inside(_TREASURE_DIR, path):
-        return ""
-    mime = _ASSET_MIME.get(path.suffix.lower(), "application/octet-stream")
-    return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
 
 
@@ -934,41 +865,39 @@ class JX3APIService:
 
     async def rank_statistical(self, name: str, server: str) -> Dict[str, Any]:
         """排行榜单"""
-        ROLE_RANK_NAMES = {
-            "名士五十强",
-            "老江湖五十强",
-            "兵甲藏家五十强",
-            "名师五十强",
-            "阵营英雄五十强",
-            "薪火相传五十强",
-            "庐园广记一百强",
-        }
-        TONG_RANK_NAMES0 = {
-            "赛季恶人五十强",
-            "赛季浩气五十强",
+        GUILD_RANK_NAMES = {
             "本周恶人五十强",
             "本周浩气五十强",
-        }
-        TONG_RANK_NAMES1 = {
+            "赛季恶人五十强",
+            "赛季浩气五十强",
+            "上周恶人五十强",
+            "上周浩气五十强",
             "浩气神兵宝甲五十强",
             "恶人神兵宝甲五十强",
             "浩气爱心帮会五十强",
             "恶人爱心帮会五十强",
         }
-        TONG_RANK_NAMES2 = {
-            "上周恶人五十强",
-            "上周浩气五十强",
+        GUILD_LIMIT_NAMES = {
+            "浩气神兵宝甲五十强",
+            "恶人神兵宝甲五十强",
+            "浩气爱心帮会五十强",
+            "恶人爱心帮会五十强",
         }
-        if name in ROLE_RANK_NAMES:
-            template_name = "rank_role.html"
-        elif name in TONG_RANK_NAMES0:
-            template_name = "rank_tong0.html"
-        elif name in TONG_RANK_NAMES1:
+        GUILD_WEEKLY_NAMES = {
+            "本周恶人五十强",
+            "本周浩气五十强",
+            "赛季恶人五十强",
+            "赛季浩气五十强",
+        }
+        if name in GUILD_LIMIT_NAMES:
             template_name = "rank_tong1.html"
-        elif name in TONG_RANK_NAMES2:
+        elif name in GUILD_WEEKLY_NAMES:
+            template_name = "rank_tong0.html"
+        elif name in GUILD_RANK_NAMES:
             template_name = "rank_tong2.html"
         else:
             template_name = "rank_role.html"
+        category = (RANK_NAME_INDEX.get(name) or ("个人排行", "name"))[0]
 
         # 数据处理
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:
@@ -978,27 +907,24 @@ class JX3APIService:
                 items = []
             limit = 100 if "一百强" in name else 50
             items = items[:limit]
-            if name in TONG_RANK_NAMES0:
+            if name in GUILD_WEEKLY_NAMES:
                 for item in items:
                     if isinstance(item, dict):
                         item["member_count"], item["member_class"], item["member_limit"], item["member_limit_style"], item["member_count_style"] = self._member_cell(
                             item.get("memberCount"), item.get("maxMemberCount")
                         )
-            elif name in TONG_RANK_NAMES1:
+            elif name in GUILD_LIMIT_NAMES:
                 for item in items:
                     if isinstance(item, dict):
                         limit_value = item.get("maxLimit")
                         item["limit_display"] = str(limit_value) if limit_value not in (None, "") else "-"
                         item["limit_style"] = self._limit_color_style(limit_value)
             rank_name = name
-            if "赛季" in rank_name:
-                page_kicker = "GUILD SEASON"
-            elif "上周" in rank_name:
-                page_kicker = "GUILD LAST"
-            elif "本周" in rank_name:
-                page_kicker = "GUILD WEEKLY"
-            else:
-                page_kicker = ""
+            page_kicker = "GUILD SEASON" if "赛季" in rank_name else "GUILD LAST" if "上周" in rank_name else "GUILD WEEKLY" if "本周" in rank_name else ""
+            if category == "绝境战场":
+                page_kicker = "BATTLE RANK"
+            elif category == "据点贡献":
+                page_kicker = "CASTLE RANK"
             return_data["data"] = {
                 "items": items,
                 "server": server,
@@ -1008,41 +934,10 @@ class JX3APIService:
             }
 
         return await self._request_api(
-            path="/rank/statistics",
+            path=_RANK_ENDPOINTS.get(category, "/rank/records"),
             params={"server": server, "name": name, "token": self.token},
             processor=processor,
             template=template_name
-        )   
-
-
-    async def shilianpaixing(self, name: str, server: str) -> Dict[str, Any]:
-        """试炼排行"""
-        # 数据处理
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            raw_items = data.get("data", []) if isinstance(data, dict) else []
-            items = []
-            for item in raw_items:
-                if not isinstance(item, dict):
-                    continue
-                items.append({
-                    "role_name": self._pick(item, "roleName", "role_name", "name"),
-                    "equip_score": self._pick(item, "equipScore", "equip_score"),
-                    "max_level": self._pick(item, "maxLevel", "max_level"),
-                    "total_score": self._pick(item, "totalScore", "total_score"),
-                })
-
-            return_data["data"] = {
-                "items": items,
-                "name": name,
-                "server": server,
-                "update_time": format_time(data.get("time"))
-            }
-            
-        return await self._request_api(
-            path="/rank/trials",
-            params={"server": server,"name": name,"token": self.token,},
-            processor=processor,
-            template="shilianpaixing.html"
         )   
 
 
@@ -1499,41 +1394,6 @@ class JX3APIService:
         ) 
 
 
-    async def weizuoqiyu(self, server: str, name: str, ) -> Dict[str, Any]:
-        """未出奇遇"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            return_data["data"]["ptqy"] = []
-            return_data["data"]["jsqy"] = []
-            return_data["data"]["name"] = name
-            return_data["data"]["server"] = server
-            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            for item in data:
-                try:
-                    level = int(item.get("level", 0))
-                except (TypeError, ValueError):
-                    continue
-
-                event_item = {
-                    "event": item.get("name"),
-                    "time": "未触发"
-                }
-
-                if level == 1:
-                    return_data["data"]["ptqy"].append(event_item)
-                elif level == 2:
-                    return_data["data"]["jsqy"].append(event_item)
-
-            if not return_data["data"]["ptqy"] and not return_data["data"]["jsqy"]:
-                return_data["msg"] = "未查询到未做普通或绝世奇遇"
-                return return_data
-            
-        return await self._request_api(
-            path="/event/missing",
-            params={"server": server, "name": name, "token": self.token},
-            processor=processor,
-            template="weizuoqiyu.html"
-        ) 
 
 
     async def jinqiqiyu(self, server: str, limit: int) -> Dict[str, Any]:
@@ -1615,7 +1475,7 @@ class JX3APIService:
 
 
     async def role_school(self, server: str, name: str) -> str:
-        """角色当前门派（forceName），用于珍卷标题区门派图标；失败返回空串。"""
+        """角色当前门派（forceName），用于标题区的门派图标；失败返回空串。"""
         try:
             data = await self._base_request(
                 "/role/detail",
@@ -1629,175 +1489,6 @@ class JX3APIService:
             return ""
         return str(data.get("forceName") or "").strip()
 
-    async def zhenjuan(
-        self,
-        server: str,
-        name: str,
-        serendipities: Any,
-        school: str = "",
-        school_icon: str = "",
-    ) -> Dict[str, Any]:
-        """奇遇珍卷，复用全量奇遇记录并叠加 JX3BOX 奇遇图素材布局。"""
-        if not isinstance(serendipities, list) or not serendipities:
-            return_data = self._init_return_data()
-            return_data["msg"] = "奇遇名表暂时不可用，请稍后再试"
-            return return_data
-        by_name: Dict[str, dict] = {}
-        catalog_order: Dict[str, int] = {}
-        for index, row in enumerate(serendipities):
-            if isinstance(row, dict):
-                key = str(row.get("szName") or "").strip()
-                if key:
-                    by_name[key] = row
-                    catalog_order.setdefault(key, index)
-
-        def pet_url(event: str) -> str:
-            row = by_name.get(event) or {}
-            local_icon = _zhenjuan_pet_icon(event)
-            if local_icon:
-                return local_icon
-            path = str(row.get("szOpenRewardPath") or "").strip().lower().replace("\\", "/")
-            if not path:
-                return f"{CDN_ROOT}pt/default.png"
-            path = path.replace("ui/image/adventure/", "")
-            return IMG_ROOT + re.sub(r"\.tga$", ".png", path)
-
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:
-            buckets: Dict[int, list] = {1: [], 2: [], 3: []}
-
-            for item in data:
-                if not isinstance(item, dict):
-                    continue
-                if str(item.get("event") or "").strip() in IGNORED_SERENDIPITY_EVENTS:
-                    continue
-                try:
-                    level = int(item.get("level") or 0)
-                except (TypeError, ValueError):
-                    continue
-                if level not in buckets:
-                    continue
-                try:
-                    status = int(item.get("status"))
-                except (TypeError, ValueError):
-                    status = None
-                try:
-                    timestamp = int(item.get("time") or 0)
-                except (TypeError, ValueError):
-                    timestamp = 0
-                pending = status == 0 if status is not None else timestamp <= 0
-                event_name = str(item.get("event") or "").strip()
-                buckets[level].append({
-                    "name": event_name,
-                    "pending": pending,
-                    "info": by_name.get(event_name) or {},
-                })
-
-            def pt_row(item: dict) -> dict:
-                name = item["name"]
-                image = _treasure_asset(f"奇遇珍卷/普通奇遇/{_asset_name(name)}.webp")
-                if not image and item["info"].get("dwID"):
-                    image = f"{CDN_ROOT}pt/{item['info']['dwID']}.png"
-                if not image:
-                    image = (
-                        _treasure_asset("奇遇珍卷/普通奇遇缺省.png")
-                        or f"{CDN_ROOT}pt/default.png"
-                    )
-                return {"name": name, "image": image}
-
-            def js_row(item: dict, index: int) -> dict:
-                dw_id = item["info"].get("dwID")
-                try:
-                    dw_id = int(dw_id)
-                except (TypeError, ValueError):
-                    dw_id = 0
-                image_style, label_style = PERFECT_ITEMS.get(dw_id) or ({}, {})
-                style_prefix = _style_text(image_style)
-                name = _asset_name(item["name"])
-                act = not item["pending"]
-                # 只内联本次真正要画的那张（已出彩图或未出剪影），减半素材负载
-                image = _treasure_asset(
-                    f"奇遇珍卷/绝世奇遇/{name}{'_已出' if act else ''}.webp"
-                )
-                return {
-                    "name": item["name"],
-                    "act": act,
-                    "image": image
-                    or (
-                        f"{CDN_ROOT}world/{dw_id}{'_act' if act else ''}.png"
-                        if dw_id
-                        else ""
-                    ),
-                    "imageStyle": style_prefix,
-                    "labelStyle": _style_text(label_style),
-                    "_order": PERFECT_ORDER.get(dw_id, 10 ** 6 + index),
-                }
-
-            def cw_row(item: dict) -> dict:
-                return {"name": item["name"], "image": pet_url(item["name"])}
-
-            pt_done = [row for row in buckets[1] if not row["pending"]]
-            js_done = sum(1 for row in buckets[2] if not row["pending"])
-            cw_done = [row for row in buckets[3] if not row["pending"]]
-            for rows in (pt_done, cw_done):
-                rows.sort(
-                    key=lambda row: catalog_order.get(row["name"], 10 ** 6)
-                )
-            # 层叠关系与官方一致：按布局表绘制顺序叠加，点亮与否不改变层级
-            js_items = [js_row(row, index) for index, row in enumerate(buckets[2])]
-            js_items.sort(key=lambda row: row["_order"])
-            for z_index, row in enumerate(js_items):
-                row.pop("_order")
-                style_prefix = row.pop("imageStyle")
-                row["imageStyle"] = (
-                    f"{style_prefix};z-index:{z_index}" if style_prefix else f"z-index:{z_index}"
-                )
-            data_out = {
-                "server": server,
-                "roleName": name,
-                "recordTime": datetime.now(ZoneInfo("Asia/Shanghai")).strftime(
-                    "%Y/%m/%d %H:%M:%S"
-                ),
-                "logo": _zhenjuan_logo(),
-                "cardFont": _zhenjuan_card_font(),
-                "school": school,
-                "schoolIcon": school_icon,
-                "assets": {
-                    "bg": _treasure_asset("奇遇珍卷/卷轴底.png"),
-                    "contentBg": _treasure_asset("奇遇珍卷/卷轴纸.png"),
-                    "leftRod": _treasure_asset("奇遇珍卷/卷轴轴头左.png"),
-                    "rightRod": _treasure_asset("奇遇珍卷/卷轴轴头右.png"),
-                    "ptBadge": _treasure_asset("奇遇珍卷/普通奇遇计数条.png"),
-                    "petBadge": _treasure_asset("奇遇珍卷/宠物奇遇计数条.png"),
-                    "worldBadge": _treasure_asset("奇遇珍卷/绝世奇遇计数条.png"),
-                    "ptTextBg": _treasure_asset("奇遇珍卷/普通奇遇名条.png"),
-                    "petBorder": _treasure_asset("奇遇珍卷/宠物奇遇边框.png"),
-                    "worldBg": _treasure_asset("奇遇珍卷/绝世底图.svg"),
-                    "worldTextBg": _treasure_asset("奇遇珍卷/绝世名条.png"),
-                    "worldTextBgAct": _treasure_asset("奇遇珍卷/绝世名条已出.png"),
-                    "titleIcon": _treasure_asset("奇遇珍卷/奇遇珍卷标题.png"),
-                    "poetry": _treasure_asset("奇遇珍卷/题诗.png"),
-                },
-                "ptqy": _chunk([pt_row(row) for row in pt_done], 3),
-                "ptDone": len(pt_done),
-                "ptAll": len(buckets[1]),
-                "jsqy": js_items,
-                "jsDone": js_done,
-                "jsAll": len(buckets[2]),
-                "cwqy": _chunk([cw_row(row) for row in cw_done], 5),
-                "cwDone": len(cw_done),
-                "cwAll": len(buckets[3]),
-            }
-            total = data_out["ptAll"] + data_out["jsAll"] + data_out["cwAll"]
-            done = data_out["ptDone"] + js_done + data_out["cwDone"]
-            data_out["progress"] = f"{done / total * 100:.2f}" if total else "0.00"
-            return_data["data"] = data_out
-
-        return await self._request_api(
-            path="/event/records",
-            params={"server": server, "name": name, "full": 1, "token": self.token},
-            processor=processor,
-            template="standalone/zhenjuan.html",
-        )
 
     async def qiyutongji(self, name: str, server: str, limit: int) -> Dict[str, Any]:
         """奇遇统计"""
@@ -1909,8 +1600,9 @@ class JX3APIService:
         ) 
 
 
-    async def chengjiuchaxun(self, server:str, role:str, name:str) -> Dict[str, Any]:
+    async def chengjiuchaxun(self, server:str, role:str, name:str = "") -> Dict[str, Any]:
         """成就查询"""
+        # /role/achievement 只认 name=角色名，已不支持按成就名筛选；name 仅为兼容旧调用保留。
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
             return_data["data"] = data
             if isinstance(return_data["data"], dict):
@@ -1920,7 +1612,7 @@ class JX3APIService:
 
         return await self._request_api(
             path="/role/achievement",
-            params= {"server": server, "role": role, "name": name, "token": self.token},
+            params= {"server": server, "name": role, "token": self.token},
             processor=processor,
             template="chengjiu.html"
         ) 
@@ -1982,7 +1674,7 @@ class JX3APIService:
 
         return await self._request_api(
             path="/school/matrix",
-            params= {"name": name, "ticket": self.ticket, "token": self.token},
+            params= {"kungfu": name, "token": self.token},
             processor=processor,
             template=""
         ) 
@@ -2051,7 +1743,7 @@ class JX3APIService:
 
         return await self._request_api(
             path="/school/skills",
-            params= {"name": name,"update": update, "ticket": self.ticket, "token": self.token},
+            params= {"kungfu": name, "token": self.token},
             processor=processor,
             template="jineng.html"
         ) 
@@ -2121,7 +1813,7 @@ class JX3APIService:
 
         return await self._request_api(
             path="/school/talent",
-            params= {"name": name,"update": update, "ticket": self.ticket, "token": self.token},
+            params= {"kungfu": name, "token": self.token},
             processor=processor,
             template="qixue.html"
         ) 
@@ -2151,9 +1843,13 @@ class JX3APIService:
         """统战歪歪"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
             lines = ["【统战歪歪】"]
-            for group in data:
+            for group in (data if isinstance(data, list) else [data]):
+                if not isinstance(group, dict):
+                    continue
                 group_server = group.get("server", "")
                 channels = group.get("data", [])
+                if not isinstance(channels, list):
+                    channels = [channels]
 
                 if len(lines) > 1:
                     lines.append("")
@@ -2176,7 +1872,7 @@ class JX3APIService:
                     return_data["data"] = "\n".join(lines)
 
         return await self._request_api(
-            path="/duowan/statistics",
+            path="/voice/channels",
             params= {"server": server},
             processor=processor,
             template=""
@@ -2241,41 +1937,8 @@ class JX3APIService:
         ) 
 
 
-    async def zhuangshi(self,name: str) -> Dict[str, Any]:
-        """家园装饰"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            if isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict) and item.get("tip"):
-                        item["tip"] = self._clean_newlines(item.get("tip"))
-            return_data["data"]["data"] = data
-            return_data["data"]["item_name"] = name
-            return_data["data"]["update_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        return await self._request_api(
-            path="/home/furniture",
-            params= { "name": name},
-            processor=processor,
-            template="zhuangshi.html"
-        ) 
 
 
-    async def qiwu(self,name: str) -> Dict[str, Any]:
-        """器物图谱"""
-        async def processor(data: Any, return_data: Dict[str, Any]) -> None:   
-            if isinstance(data, list):
-                for item in data:
-                    if isinstance(item, dict) and item.get("tip"):
-                        item["tip"] = self._clean_newlines(item.get("tip"))
-            return_data["data"]["data"] = data
-            return_data["data"]["name"] = name
-
-        return await self._request_api(
-            path="/home/travel",
-            params= { "name": name},
-            processor=processor,
-            template="qiwu.html"
-        ) 
  
 
     async def shitu(self, label: int, server: str, keyword: str, limit:int) -> Dict[str, Any]:
@@ -2382,7 +2045,7 @@ class JX3APIService:
             )
 
         return await self._request_api(
-            path="/saohua/answer",
+            path="/choice/answer",
             params= {},
             processor=processor,
             template=""
@@ -2413,7 +2076,7 @@ class JX3APIService:
             return_data["data"] = "\n".join(lines)
 
         return await self._request_api(
-            path="/saohua/drink",
+            path="/choice/drink",
             params= {},
             processor=processor,
             template=""
@@ -2428,7 +2091,7 @@ class JX3APIService:
             return_data["data"] = "\n".join(lines)
 
         return await self._request_api(
-            path="/saohua/eat",
+            path="/choice/food",
             params= {},
             processor=processor,
             template=""
@@ -2595,7 +2258,7 @@ class JX3APIService:
         params = {"mode": mode_code, "token": self.token}
         if server:
             params["server"] = server
-        return await self._request_api("/rank/arena", params, processor, "data_list.html")
+        return await self._request_api("/rank/ladder", params, processor, "data_list.html")
 
     async def wulinzhengba(self, camp: str = "恶人") -> Dict[str, Any]:
         """武林争霸赛"""
@@ -2626,7 +2289,7 @@ class JX3APIService:
                 return_data["data"]["update_time"] = self._now_text()
 
         params = {"camp": camp_id, "token": self.token}
-        return await self._request_api("/rank/championship", params, processor, "data_list.html")
+        return await self._request_api("/rank/contest", params, processor, "data_list.html")
 
     async def bukuai(self, server: str = "") -> Dict[str, Any]:
         """捕快荣誉"""
@@ -2648,10 +2311,10 @@ class JX3APIService:
                 return_data["data"]["rank_name"] = "捕快荣誉榜"
                 return_data["data"]["update_time"] = self._now_text()
 
-        params = {"token": self.token}
+        params = {"name": "捕快荣誉榜", "token": self.token}
         if server:
             params["server"] = server
-        return await self._request_api("/rank/constable", params, processor, "data_list.html")
+        return await self._request_api("/rank/jianghu", params, processor, "data_list.html")
 
     async def langke(self, server: str = "") -> Dict[str, Any]:
         """江湖浪客"""
@@ -2673,10 +2336,10 @@ class JX3APIService:
                 return_data["data"]["rank_name"] = "江湖浪客榜"
                 return_data["data"]["update_time"] = self._now_text()
 
-        params = {"token": self.token}
+        params = {"name": "江湖浪客榜", "token": self.token}
         if server:
             params["server"] = server
-        return await self._request_api("/rank/outlaw", params, processor, "data_list.html")
+        return await self._request_api("/rank/jianghu", params, processor, "data_list.html")
 
     async def juedou(self, server: str = "", mode: str = "公开") -> Dict[str, Any]:
         """决斗挑战"""
@@ -2779,7 +2442,7 @@ class JX3APIService:
         params = {"server": server, "name": name, "class": class_id, "token": self.token, "ticket": self.ticket}
         if subclass:
             params["subclass"] = subclass
-        return await self._request_api("/tuilan/achievement", params, processor, "data_list.html")
+        return await self._request_api("/role/achievement", params, processor, "data_list.html")
 
     async def waiguansousuo(self, name: str) -> Dict[str, Any]:
         """外观搜索"""
@@ -2804,16 +2467,16 @@ class JX3APIService:
         return await self._request_api("/trade/item/search", {"name": name, "token": self.token}, processor, "data_list.html")
 
     async def token_stats(self, token: str, kind: str = "token") -> dict:
-        """查询令牌用量。POST /token/stats"""
+        """校验令牌可用性。GET /active/calendar"""
         result = self._init_return_data()
         token = (token or "").strip()
         if not token:
             result["msg"] = "未提供令牌"
             result["valid"] = False
             return result
-        data = await self._api.post(self.base_url + "/token/stats", data={"token": token}, out_key=None)
-        if not data:
-            result["msg"] = "令牌无效或状态查询失败"
+        data = await self._api.get(self.base_url + "/active/calendar", params={"token": token}, out_key=None)
+        if data is None:
+            result["msg"] = "令牌状态查询失败"
             result["valid"] = False
             result["_transport_error"] = True
             return result
@@ -2822,12 +2485,7 @@ class JX3APIService:
             result["valid"] = False
             result["_code"] = data.get("_code")
             return result
-        payload = data.get("data") if isinstance(data, dict) and "data" in data else data
-        if not isinstance(payload, dict):
-            result["msg"] = "令牌无效或状态查询失败"
-            result["valid"] = False
-            result["_invalid_payload"] = True
-            return result
+        payload = data.get("data") if isinstance(data, dict) and isinstance(data.get("data"), dict) else {}
         level = payload.get("level")
         used = payload.get("used")
         remaining = payload.get("remaining")
@@ -2839,9 +2497,7 @@ class JX3APIService:
 
             result["msg"] = f"JX3API {credential_label(kind)}已失效，请更换后再试。"
             return result
-        lines = ["JX3API 令牌状态"]
-        if valid is not None:
-            lines.append("状态：" + ("有效" if valid else "已失效"))
+        lines = ["JX3API 令牌状态", "状态：有效"]
         if level is not None:
             lines.append(f"等级：LV.{level}")
         if used is not None:
@@ -2915,8 +2571,8 @@ class JX3APIService:
         if not token:
             return False, "校验推栏标识需要可用的 JX3API Token。", False
         data = await self._base_request(
-            "/school/skills",
-            {"name": "毒经", "token": token, "ticket": ticket},
+            "/school/seniority",
+            {"ticket": ticket, "token": token},
         )
         if data is None:
             return False, "推栏标识校验请求失败，请稍后重试。", True

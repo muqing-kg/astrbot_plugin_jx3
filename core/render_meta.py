@@ -15,7 +15,6 @@ _PAGE_ROW_SELECTORS = {
     "rank_tong0": ("items",),
     "rank_tong1": ("items",),
     "rank_tong2": ("items",),
-    "shilianpaixing": ("items",),
     "shitu": ("items",),
     "tuanduizhaomu": ("list",),
     "yanhuan": ("list",),
@@ -87,7 +86,7 @@ def build_page_meta(template: str, payload: dict) -> str:
         )
 
     if filename in {
-        "card_gallery.html", "juesheqiyu.html", "weizuoqiyu.html",
+        "card_gallery.html", "juesheqiyu.html",
         "yanhuan.html", "jingnai.html", "chengjiu.html", "zili.html",
         "zhanji.html", "juesheliaotian.html",
     }:
@@ -168,10 +167,7 @@ def build_page_meta(template: str, payload: dict) -> str:
     if filename == "xingxiashijian.html":
         return _meta_join(_meta_pick(payload, "name"), update_time)
 
-    if filename == "shilianpaixing.html":
-        return _meta_join(server, _meta_pick(payload, "name"), update_time)
-
-    if filename in {"zhuangshi.html", "qiwu.html", "wujia.html", "chengbeng.html"}:
+    if filename in {"wujia.html", "chengbeng.html"}:
         return _meta_join(
             _meta_pick(payload, "name", "item_name"),
             server,

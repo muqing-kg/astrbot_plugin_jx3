@@ -1,5 +1,25 @@
 ## 更新记录
 
+### version: 3.6.0：
+
+适配 JX3API Go 新版接口（公告 version 2026111401，11-14 上线）。上游响应信封由 `{code, msg, data}` 改为 `{status, detail}`，且 HTTP 状态恒为 200，业务状态只在正文 `status` 字段；原先按 `code` 校验的解析路径对每个响应都取不到 `data`，全部命令统一退回「网络请求失败，请稍后再试」。修正落在 `core/request.py` 的 `_validate_api_payload`：识别到 `status` + `detail` 且无 `code` 的信封时归一化为内部的 `{code, msg, data}`，业务失败转成 `{"_error": detail, "_code": status}`，成功的 `detail` 直接作为 `data`。下游 66 处调用点与 `out_key="data"` 的取值方式不变。
+
+接口路径与参数按上游 v3.6.0 文档重排（`core/jx3api_data.py`）：原 `/rank/statistics` 一个端点拆成 `/rank/records`（个人排行）与 `/rank/guild`（帮会排行与战功榜）；`/rank/arena`→`/rank/ladder`、`/rank/championship`→`/rank/contest`、`/rank/outlaw` 与 `/rank/constable`→`/rank/jianghu`（按 `name` 区分江湖浪客榜、捕快荣誉榜）、`/tuilan/achievement`→`/role/achievement`、`/duowan/statistics`→`/voice/channels`、`/saohua/answer|drink|eat`→`/choice/answer|drink|food`；`/rank/trials`、`/school/matrix|skills|talent` 的参数由 `name` 改为 `kungfu`，`/school/*` 不再接受 `ticket` 与 `update`。
+
+榜单按上游拆分后的两份名单重排。个人榜走 `/rank/records`，共 12 项：名士五十强、老江湖五十强、兵甲藏家五十强、薪火相传五十强、名师五十强、庐园广记一百强、恶人后勤一百强、浩气后勤一百强、恶人英雄五十强、浩气英雄五十强、本周恶人一百强、本周浩气一百强。帮会与战功榜走 `/rank/guild`，共 10 项：本周恶人五十强、本周浩气五十强、赛季恶人五十强、赛季浩气五十强、上周恶人五十强、上周浩气五十强、浩气神兵宝甲五十强、恶人神兵宝甲五十强、浩气爱心帮会五十强、恶人爱心帮会五十强。`rank_statistical` 按 `name` 归属自动选端点，帮会类沿用 `rank_tong0.html`（本周、赛季，渲染成员数）与 `rank_tong1.html`（神兵、爱心，渲染人数上限）、`rank_tong2.html`（上周），个人榜沿用 `rank_role.html`。命令层新增「恶人后勤排行」「浩气后勤排行」「恶人英雄排行」「浩气英雄排行」；移除「阵营排行」——上游把「阵营英雄五十强」拆成恶人英雄与浩气英雄两个榜，已由上述两条新命令承接。其余历史命令全部保留，只改指向的端点。
+
+移除上游已下线的三个命令：「未出」（查询角色尚未触发的奇遇清单，`/event/missing`）、「器物谱」（`/home/travel`）、「装饰」（`/home/furniture`）。同时删除对应模板 `weizuoqiyu.html`、`qiwu.html`、`zhuangshi.html`，并清理命令目录、区服注入表、帮助文案与页面 kicker 中的引用。角色奇遇查询（`查询`）里每个奇遇的「已出／未出」状态取自 `/event/records`，与上述命令无关，不受影响。
+
+`token_stats` 原先请求 `/token/stats`，该端点已不存在；现改为带令牌请求 `/active/calendar`，按返回 `200` / `401 token 无效` 判定令牌可用性。上游不再提供等级、已用与剩余次数，卡片只显示有效状态，字段存在时仍照旧追加。推栏标识校验原先借 `/school/skills` 传 `ticket`，现改用声明了该参数的 `/school/seniority`。
+
+线上核对：改动后涉及 `/rank/records` 的 12 个 `name`、`/rank/guild` 的 10 个 `name`，以及 `/rank/jianghu`、`/rank/contest`、`/rank/ladder`、`/rank/trials`、`/rank/wanted`、`/role/achievement`、`/school/matrix|skills|talent`、`/school/seniority` 等共 32 个请求，在无令牌时统一返回 `401 禁止访问，请提供 token`（路径与参数被接受）；旧路径 `/rank/statistics` 仍为 `404`；`/voice/channels`、`/choice/*`、`/active/calendar` 免令牌返回 `200`。`pytest` 190 passed。
+
+移除「奇遇珍卷」命令：`奇遇珍卷 服务器 角色` 的下游实现、模板与全部素材一并删除，涉及 `core/jx3api_data.py` 的 `zhenjuan()` 及其专用辅助函数、`core/treasure_data.py`、`templates/standalone/zhenjuan.html`、`templates/img/奇遇珍卷/`（176 个文件，约 2.6MB）、`templates/img/剑网3标识.png`、`templates/font/珍卷字体.woff2` 与 `NotoSansSC-OFL.txt`、`tools/` 下四个珍卷维护脚本，以及 `tests/test_zhenjuan.py`、`tests/test_treasure_assets.py`；命令表、命令目录、会话注入表与页面 kicker 中的引用同步清理。
+
+排行榜改为两级菜单。新增 `core/rank_catalog.py` 保存上游枚举：个人排行 12 项、帮会排行 10 项、绝境战场 7 项、据点贡献 26 项、江湖榜 2 项、跨服名剑 3 项、武林争霸 2 项、决斗挑战 2 项，共 64 个可查榜单。`排行榜` 命令先列出 8 个分类，回序号后列出该分类的实际榜单名与序号，再回序号出图；整个流程用一个 `session_waiter` 承载，第一级只切换状态、第二级才结束对话，超时按当前层级的第一项执行。「个人排行」「帮会排行」「绝境战场」「据点贡献」「江湖榜」「跨服名剑」「武林争霸」「决斗挑战」8 条命令可直接进入对应分类，也可直接发送榜单名（如 `老江湖五十强 飞龙在天`）。服务器参数与其他榜单命令一致：显式填写优先，缺省用绑定区服，写 `全服` 查全服；`排行榜 飞龙在天` 与 `排行榜 全服` 都按此解析。「武林争霸」是全服榜，不吃服务器参数，菜单标题固定显示「全服」。榜单条数按名称截断：含「一百强」取 100 条，其余 50 条。`/rank/battle` 与 `/rank/castle` 由 `rank_statistical` 按分类选择端点，页面 kicker 相应显示 `BATTLE RANK` / `CASTLE RANK`。
+
+移除「试炼之地排行」：该榜以心法名称为必填参数，与两级菜单的「选榜单」模型不符，按要求整条删除，涉及 `shilianpaixing` 处理器、命令表与目录条目、区服注入表、页面 kicker、渲染元数据与 README 说明。
+
 ### version: 3.5.4：
 
 修复事件推送通道断线后不再重连：`core/ws_client.py` 的 `configure()` 原先只在「由关转开」或令牌、地址变化时启动连接任务，任务一旦意外结束，`_wanted` 仍为真，后续每次刷新都命中不了重启条件而空转，通道就此永久停摆。现条件补上「连接任务不存在或已结束」也重新启动。
