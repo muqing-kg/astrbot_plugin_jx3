@@ -155,28 +155,10 @@ class JX3BOXService:
             return_data["msg"] = "未找到该奇遇"
             return return_data
 
-        data1 = await self._base_request(
-            "node",
-            f"/serendipity/{dwID}/achievement",
-            out=None,
-        )
-        achievement_id = data1.get("achievement_id") if isinstance(data1, dict) else None
-        if not achievement_id:
-            return_data["msg"] = "未找到该奇遇的魔盒攻略"
-            return return_data
-
-        data2 = await self._base_request(
-            "cms",
-            f"/api/cms/wiki/post/type/achievement/source/{achievement_id}",
-        )
-        post = data2.get("post") if isinstance(data2, dict) else None
-        if not isinstance(post, dict) or not post.get("id"):
-            return_data["msg"] = "未找到该奇遇的魔盒攻略"
-            return return_data
-
         try:
-            title = str(post.get("title") or name).strip()
-            url = f"https://www.jx3box.com/wiki/{post['id']}"
+            title = str(first.get("szName") or name).strip()
+            # 魔盒奇遇页的路径参数是 dwID；/wiki/{post.id} 与 /achievement/{id} 都不是奇遇页。
+            url = f"https://www.jx3box.com/adventure/{dwID}"
             return_data["data"] = f"{title} · 魔盒攻略\n{url}"
         except Exception:
             logger.exception("处理返回数据失败")
