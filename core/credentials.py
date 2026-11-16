@@ -113,6 +113,9 @@ def credential_message(kind: str, raw: Any) -> str:
 
 async def validate_pool_token(jx3api, value: str, kind: str = "token") -> tuple[bool, str, int | None]:
     """Validate one interface token for the group-owned pool."""
+    if kind == "push_token":
+        # 没有可用的探测端点：放行添加，失效交由推送连接失败判定
+        return True, "", None
     result = await jx3api.token_stats(value, kind)
     if result.get("code") != 200 or result.get("valid") is False:
         detail = str(result.get("msg") or f"{credential_label(kind)}不可用")

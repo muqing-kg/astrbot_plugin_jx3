@@ -957,6 +957,27 @@ class Jx3ApiPlugin(Star):
             )
             return event.plain_result(format_command_error(cmd_id, e, self.command_catalog))
 
+    async def _run_with_credentials(self, event: AstrMessageEvent, action):
+        """菜单类命令：先把令牌注入本次上下文，菜单里选中的项才带得上令牌。"""
+        async def runner(token: str, ticket: str):
+            creds = set_request_credentials(token or None, ticket or None)
+            try:
+                return await action()
+            finally:
+                reset_request_credentials(creds)
+
+        return await execute_query_with_credentials(
+            runner,
+            jx3api=self.jx3api,
+            sessions=self.sessions,
+            umo=self._event_umo(event),
+            cursors=self._credential_cursors,
+            token_required=False,
+            ticket_required=False,
+            token_missing=hint_need_token(self.command_catalog),
+            ticket_missing=hint_need_ticket(self.command_catalog),
+        )
+
     async def _cmd_ranking(self, event: AstrMessageEvent, args: list[str], bound: str = ""):
         injected = inject_optional_server_args(
             "排行榜",
@@ -966,7 +987,9 @@ class Jx3ApiPlugin(Star):
         )
         if injected == UNKNOWN_SERVER:
             return event.plain_result(hint_unknown_server())
-        await self.jx3cmd.rank_root_menu(event, injected[0])
+        return await self._run_with_credentials(
+            event, lambda: self.jx3cmd.rank_root_menu(event, injected[0])
+        )
 
     async def _cmd_rank_direct(self, event: AstrMessageEvent, label: str, kind: str, args: list[str], row: dict):
         """直接发榜单名：可用「<榜单名> 服务器」指定区服。"""
@@ -981,7 +1004,9 @@ class Jx3ApiPlugin(Star):
             return event.plain_result(hint_unbound(self.command_catalog))
         if injected == UNKNOWN_SERVER:
             return event.plain_result(hint_unknown_server())
-        return await self.jx3cmd._run_rank_entry(event, label, kind, injected[0])
+        return await self._run_with_credentials(
+            event, lambda: self.jx3cmd._run_rank_entry(event, label, kind, injected[0])
+        )
 
     async def _cmd_zhangong(self, event: AstrMessageEvent, args: list[str]):
         camp = (args[0] if args else "").strip()

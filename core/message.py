@@ -255,7 +255,7 @@ class MessageBuilder:
         runner,
         *,
         allow_zero: bool = False,
-        timeout: int = 10,
+        timeout: int = 30,
     ):
         text = str(menu_text).rstrip()
         resolved = False
@@ -326,7 +326,7 @@ class MessageBuilder:
         title: str,
         ids: tuple[str, ...],
         runner,
-        timeout: int = 10,
+        timeout: int = 30,
     ):
         lines = "\n".join(f"{index}. {self._cmd_display_name(item)}" for index, item in enumerate(ids, 1))
         await self._send_choice_and_wait(event, f"{title}\n{lines}", len(ids), runner, timeout=timeout)
@@ -337,7 +337,7 @@ class MessageBuilder:
         title: str,
         ids: tuple[str, ...],
         runner,
-        timeout: int = 10,
+        timeout: int = 30,
     ):
         await self._send_command_menu(event, title, ids, runner, timeout=timeout)
 
@@ -688,11 +688,14 @@ class MessageBuilder:
                     controller.stop()
                     return
                 state["category"] = order[choice - 1]
-                entries = rank_entries(state["category"])
+                category = state["category"]
+                scope = "全服" if category in {"武林争霸"} else (server or "全服")
+                entries = rank_entries(category)
                 sub_lines = "\n".join(f"{index}. {label}" for index, (label, _) in enumerate(entries, 1))
+                menu_text = f"{category}（{scope}）\n{sub_lines}\n\n发送序号即可，{timeout} 秒后自动选 1"
                 await self._deliver(
                     new_event,
-                    lambda: new_event.send(new_event.plain_result(f"{state['category']}\n{sub_lines}\n\n发送序号即可")),
+                    lambda: new_event.send(new_event.plain_result(menu_text)),
                     "菜单",
                 )
                 return

@@ -2721,6 +2721,11 @@ class JX3APIService:
             result["msg"] = "未提供令牌"
             result["valid"] = False
             return result
+        if kind == "push_token":
+            # 推送令牌只能由推送连接结果判定，业务接口探测会把它误判成失效
+            result["msg"] = "推送令牌无法通过业务接口校验，以推送连接结果为准。"
+            result["_transport_error"] = True
+            return result
         data = await self._api.get(self.base_url + "/active/calendar", params={"token": token}, out_key=None)
         if data is None:
             result["msg"] = "令牌状态查询失败"
