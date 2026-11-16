@@ -39,14 +39,13 @@ EVENT_DESCRIPTIONS = {
     2002: "官方新闻更新通知",
     2003: "游戏版本更新通知",
     2004: "八卦主题更新通知",
-    2006: "地图事件触发通知",
 }
 
 # 全服事件不按绑定区服过滤。
-GLOBAL_KINDS = frozenset({"新闻", "更新", "八卦", "云从", "微博"})
+GLOBAL_KINDS = frozenset({"新闻", "更新", "八卦", "微博"})
 
 # JX3API 事件版免费档；其余事件需要付费推送令牌。
-FREE_PUSH_ACTIONS = frozenset({"2001", "2002", "2003", "2004", "2006"})
+FREE_PUSH_ACTIONS = frozenset({"2001", "2002", "2003", "2004"})
 
 # 官方 action -> 开关名。
 ACTION_KIND = {
@@ -54,7 +53,6 @@ ACTION_KIND = {
     2002: "新闻",
     2003: "更新",
     2004: "八卦",
-    2006: "云从",
     1001: "奇遇",
     1002: "刷马",
     1003: "刷马",
@@ -92,7 +90,6 @@ EVENT_GROUPS = [
             {"action": 2002, "name": "官方新闻", "kind": "新闻"},
             {"action": 2003, "name": "版本更新", "kind": "更新"},
             {"action": 2004, "name": "八卦速报", "kind": "八卦"},
-            {"action": 2006, "name": "云从预告", "kind": "云从"},
         ],
     },
     {
@@ -158,7 +155,6 @@ LEGACY_PUSH_FIELDS = {
     "新闻": "push_xinwen",
     "更新": "push_gengxin",
     "八卦": "push_bagua",
-    "云从": "push_yuncong",
     "奇遇": "push_qiyu",
     "刷马": "push_shuma",
     "扶摇": "push_fuyao",
@@ -325,18 +321,6 @@ def format_event_text(action: int, payload: dict[str, Any]) -> str:
             field("日期", value("date")),
             field("链接", value("url")),
         )
-    if action == 2006:
-        lines = []
-        if value("name") not in (None, ""):
-            lines.append(str(value("name")))
-        if value("site") not in (None, ""):
-            lines.append(f"地点：{value('site')}")
-        if value("desc") not in (None, ""):
-            lines.append(str(value("desc")))
-        when = _fmt_time(data.get("time"))
-        if when:
-            lines.append(f"时间：{when}")
-        return line(*lines)
     if action == 1001:
         name = value("name")
         event = value("event")
