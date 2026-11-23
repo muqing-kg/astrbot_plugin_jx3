@@ -61,6 +61,7 @@ class UnuaService:
         body_hash = self._sha256hex(body)
         proof_str = f"{method.upper()}:{path}:{ts}:{nonce}:{token}:{body_hash}{daily_part}"
         headers = {
+            "Content-Type": "application/json",
             aliases.get("token", "x-client-proof-token"): token,
             aliases.get("timestamp", "x-client-proof-ts"): ts,
             aliases.get("nonce", "x-client-proof-nonce"): nonce,
