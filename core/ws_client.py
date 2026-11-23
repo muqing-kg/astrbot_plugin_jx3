@@ -181,6 +181,14 @@ class JX3WSClient:
                 except Exception as close_exc:
                     logger.warning(f"JX3API 事件通道关闭失败: {type(close_exc).__name__}")
 
+    def _backoff_delay(self) -> float:
+        # 指数必须钳制：长期连不上时 attempts 会一直累积，2 ** attempts 转 float 会溢出。
+        exponent = min(self.reconnect_attempts, 16)
+        return min(
+            self.reconnect_base_seconds * (2 ** exponent),
+            self.reconnect_max_seconds,
+        )
+
     async def _run(self) -> None:
         timeout = CLIENT_TIMEOUT
         while self._wanted and not self._stop.is_set():
@@ -252,10 +260,7 @@ class JX3WSClient:
                         pass
                     self._heartbeat_task = None
             if self._wanted and not self._stop.is_set():
-                delay = min(
-                    self.reconnect_base_seconds * (2 ** self.reconnect_attempts),
-                    self.reconnect_max_seconds,
-                )
+                delay = self._backoff_delay()
                 self.reconnect_attempts += 1
                 logger.info(
                     f"JX3API 事件通道将在 {delay:g} 秒后重连: "
