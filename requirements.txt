@@ -3,4 +3,3 @@ aiosqlite
 aiohttp
 apscheduler
 jinja2
-requests

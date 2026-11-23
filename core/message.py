@@ -9,7 +9,6 @@ from astrbot.core.utils.session_waiter import (
 
 from .jx3api_data import JX3APIService
 from .jx3box_data import JX3BOXService
-from .unua_data import UnuaService
 from .async_task import AsyncTask
 from .plugin_log import logger
 from .decorations import build_decorated_payload, estimate_body_length, fetch_poem_line
@@ -75,15 +74,13 @@ class MessageBuilder:
     def __init__(self, 
                  server: str, 
                  jx3api: JX3APIService, 
-                 jx3box: JX3BOXService,  
-                 unua: UnuaService,
+                 jx3box: JX3BOXService,
                  jx3at: AsyncTask, 
                  icons: dict[str, dict[str, str]],
             ):
         self.server = server
         self.jx3api = jx3api
         self.jx3box = jx3box
-        self.unua = unua
         self.jx3at = jx3at
         self.icons = icons
 
@@ -893,18 +890,9 @@ class MessageBuilder:
         """ 角色 服务器 名称 """
         return await self.plain_msg(event, lambda: self.jx3api.jueshe(server, name, 1))
 
-    async def  unua_online(self, event: AstrMessageEvent, server: str, name: str):
+    async def  role_online(self, event: AstrMessageEvent, server: str, name: str):
         """ 在线 服务器 角色名 """
-        tong_name = ""
-        try:
-            detail = await self.jx3api._base_request(
-                "/role/detail", {"server": server, "name": name, "history": 0, "token": self.jx3api.token}
-            )
-            if isinstance(detail, dict):
-                tong_name = str(detail.get("tongName") or "").strip()
-        except Exception:
-            pass
-        return await self.plain_msg(event, lambda: self.unua.role_online(server, name, tong_name))
+        return await self.plain_msg(event, lambda: self.jx3api.role_online_status(server, name))
 
     async def  shuxing(self, event: AstrMessageEvent, server: str, name: str):
         """ 属性 服务器 角色名 """

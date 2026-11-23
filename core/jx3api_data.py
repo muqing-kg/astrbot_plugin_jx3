@@ -1779,6 +1779,57 @@ class JX3APIService:
         ) 
 
 
+    async def role_online_status(self, server: str, name: str) -> Dict[str, Any]:
+        """角色在线状态，需接口令牌与推栏标识"""
+        return_data = self._init_return_data()
+        self._last_transport_error = ""
+        if not self._api:
+            return_data["msg"] = "网络请求失败，请稍后再试"
+            return return_data
+        data = await self._api.post(
+            f"{self.base_url}/role/online/status",
+            data={"ticket": self.ticket, "query": [{"server": server, "name": name}]},
+            headers={"token": self.token},
+        )
+        if isinstance(data, dict) and data.get("_error"):
+            failure = credential_failure(data.get("_error"), data.get("_code"))
+            if failure:
+                kind, reason = failure
+                raise CredentialRuntimeError(kind, credential_message(kind, reason))
+            if data.get("_code") == 404:
+                return_data["msg"] = "未查询到该角色，请确认区服与角色名（可直接使用角色 ID）"
+                return return_data
+            return_data["msg"] = f"接口返回：{data.get('_error')}"
+            return return_data
+        if data is None:
+            self._last_transport_error = str(
+                getattr(self._api, "last_error", "") or "网络请求失败，请稍后再试"
+            )
+            return_data["msg"] = self._last_transport_error
+            return return_data
+        items = data.get("data") if isinstance(data, dict) else None
+        if not isinstance(items, list) or not items:
+            return_data["msg"] = "未查询到该角色，请确认区服与角色名（可直接使用角色 ID）"
+            return return_data
+        item = items[0] if isinstance(items[0], dict) else {}
+        if bool(item.get("gameLogin")):
+            status = "游戏在线"
+        elif bool(item.get("appLogin")):
+            status = "App在线"
+        else:
+            status = "离线"
+        lines = [
+            f"{item.get('zoneName') or ''} · {item.get('serverName') or ''} · {item.get('roleName') or name}",
+            f"门派体型：{item.get('forceName') or ''} · {item.get('bodyName') or ''}",
+            f"所属阵营：{item.get('campName') or ''}",
+            f"所在帮会：{item.get('tongName') or ''}",
+            f"登录状态：{status}",
+            f"角色标识：{item.get('roleId') or ''}",
+        ]
+        return_data["data"] = "\n".join(lines)
+        return_data["code"] = 200
+        return return_data
+
     async def zhenyan(self, name: str) -> Dict[str, Any]:
         """阵眼"""
         async def processor(data: Any, return_data: Dict[str, Any]) -> None:   

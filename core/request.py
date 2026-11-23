@@ -79,7 +79,7 @@ class APIClient:
                 hidden[key] = "***"
         return hidden
 
-    async def _request(self, method: str, url: str, params: Optional[Dict] = None, json_data: Optional[Dict] = None) -> Any:
+    async def _request(self, method: str, url: str, params: Optional[Dict] = None, json_data: Optional[Dict] = None, headers: Optional[Dict] = None) -> Any:
         """
         统一的内部请求处理方法
         """
@@ -99,6 +99,7 @@ class APIClient:
                 url=url,
                 params=params,
                 json=json_data,
+                headers=headers,
                 ssl=self.ssl_verify,
                 proxy=self.proxy or None
             ) as response:
@@ -191,9 +192,9 @@ class APIClient:
         data = await self._request('GET', url, params=params)
         return self._extract_data(data, out_key)
 
-    async def post(self, url: str, data: Optional[Dict] = None, out_key: Optional[str] = None) -> Any:
+    async def post(self, url: str, data: Optional[Dict] = None, out_key: Optional[str] = None, headers: Optional[Dict] = None) -> Any:
         """POST 请求封装 (默认发送 JSON)"""
-        data = await self._request('POST', url, json_data=data)
+        data = await self._request('POST', url, json_data=data, headers=headers)
         return self._extract_data(data, out_key)
 
     async def get_bytes(self, url: str) -> Optional[bytes]:

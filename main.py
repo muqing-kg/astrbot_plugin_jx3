@@ -12,7 +12,6 @@ from .core.sqlite import AsyncSQLiteDB
 from .core.group_info import ensure_group_display_name
 from .core.jx3api_data import JX3APIService
 from .core.jx3box_data import JX3BOXService
-from .core.unua_data import UnuaService
 from .core.async_task import AsyncTask
 from .core.message import MessageBuilder
 from .core.decorations import set_bot_name, set_proxy
@@ -156,7 +155,6 @@ class Jx3ApiPlugin(Star):
             self.jx3at.destroy if self.jx3at else None,
             self.jx3api.close if self.jx3api else None,
             self.jx3box.close if self.jx3box else None,
-            self.unua.close if self.unua else None,
             self.local_sql_db.close if self.local_sql_db else None,
             self.plugin_sql_db.close if self.plugin_sql_db else None,
         ):
@@ -197,7 +195,6 @@ class Jx3ApiPlugin(Star):
         self.jx3box = JX3BOXService(self.conf, self.plugin_sql_db, self.local_sql_db)
         proxy_url = str(self.conf.get("proxy", "") or "").strip()
         set_proxy(proxy_url)
-        self.unua = UnuaService(proxy=proxy_url)
         self.jx3at = AsyncTask(
             cast(Context, self.context),
             self.conf,
@@ -209,7 +206,6 @@ class Jx3ApiPlugin(Star):
             "",
             self.jx3api,
             self.jx3box,
-            self.unua,
             self.jx3at,
             self.icons,
         )
@@ -301,7 +297,7 @@ class Jx3ApiPlugin(Star):
             "百战": self.jx3cmd.baizhan,
             "成就": self.jx3cmd.chengjiu,
             "角色": self.jx3cmd.jueshe,
-            "在线": self.jx3cmd.unua_online,
+            "在线": self.jx3cmd.role_online,
             "属性": self.jx3cmd.shuxing,
             "阵眼": self.jx3cmd.zhenyan,
             "配装": self.jx3cmd.peizhuang,
