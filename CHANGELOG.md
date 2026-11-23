@@ -1,5 +1,15 @@
 ## 更新记录
 
+### version: 3.7.0：
+
+「在线」改为官方接口 `/role/online/status` 直查，不再依赖 `jx3.unua.top`。请求带 `token` 头与 `ticket` 字段，一次取回 `gameLogin`／`appLogin`，输出区服、门派体型、阵营、帮会、登录状态与角色标识。`server` 取服务器全名，`name` 可填角色名或角色 ID；该端点按「服务器 + 角色名」精确匹配，转服角色需带上 `@隐客` 一类的后缀，裸名会返回 `404 未找到有效角色数据`，提示里引导改用角色 ID。该端点收费等级为 1，按次计费。
+
+「在线」的需求从「免令牌」变为「接口令牌 + 推栏标识」，缺任一项由会话策略在入口拦截并给出对应提示，命令目录的费用标注随之变为 `令牌 + 推栏`。只用令牌、未配置推栏的部署需要补配置才能继续使用该命令。
+
+`core/request.py` 的请求层支持传入自定义请求头并透传给 aiohttp，供需要 `token` 头的端点使用。删除 `core/unua_data.py` 与 `UnuaService` 的初始化、关闭逻辑，`MessageBuilder` 去掉 `unua` 参数；`requirements.txt` 移除不再被引用的 `requests`，README 的依赖表与第三方地址说明同步删除 UNUA 相关表述。
+
+本地验证：真实凭据查「梦江南 · 叶秋林@隐客」返回游戏在线、帮会倾年、角色 ID 35176862；未知角色返回 404 提示；无效令牌抛 `CredentialRuntimeError` 并按既有逻辑处理；接口报错时直接显示接口原文，传输失败显示本次请求的错误而不是上一条命令的残留文案。
+
 ### version: 3.6.1：
 
 修复「在线」命令始终返回「未查询到该角色，请确认区服与角色名」：`jx3.unua.top` 现要求请求携带 `Content-Type: application/json`，`core/unua_data.py` 的 `_make_headers` 未设置该头，`/api/player/home-page` 与 `/api/player/role-online` 都返回 `415 Unsupported Media Type`，`_post` 捕获异常后返回 `None`，`_resolve_role` 再按「角色不存在」处理，最终统一落到该提示。请求头补上 `Content-Type: application/json` 后两个接口一并恢复；实测「梦江南 · 叶秋林」返回 `200`，登录状态为游戏在线。
