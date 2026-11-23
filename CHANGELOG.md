@@ -1,5 +1,9 @@
 ## 更新记录
 
+### version: 3.6.1：
+
+修复「在线」命令始终返回「未查询到该角色，请确认区服与角色名」：`jx3.unua.top` 现要求请求携带 `Content-Type: application/json`，`core/unua_data.py` 的 `_make_headers` 未设置该头，`/api/player/home-page` 与 `/api/player/role-online` 都返回 `415 Unsupported Media Type`，`_post` 捕获异常后返回 `None`，`_resolve_role` 再按「角色不存在」处理，最终统一落到该提示。请求头补上 `Content-Type: application/json` 后两个接口一并恢复；实测「梦江南 · 叶秋林」返回 `200`，登录状态为游戏在线。
+
 ### version: 3.6.0：
 
 适配 JX3API Go 新版接口（公告 version 2026111401，11-14 上线）。上游响应信封由 `{code, msg, data}` 改为 `{status, detail}`，且 HTTP 状态恒为 200，业务状态只在正文 `status` 字段；原先按 `code` 校验的解析路径对每个响应都取不到 `data`，全部命令统一退回「网络请求失败，请稍后再试」。修正落在 `core/request.py` 的 `_validate_api_payload`：识别到 `status` + `detail` 且无 `code` 的信封时归一化为内部的 `{code, msg, data}`，业务失败转成 `{"_error": detail, "_code": status}`，成功的 `detail` 直接作为 `data`。下游 66 处调用点与 `out_key="data"` 的取值方式不变。
