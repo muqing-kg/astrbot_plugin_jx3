@@ -25,9 +25,9 @@
             {% if deco_caption %}
             <div class="jx3-bot-panel">{{ deco_caption | default('') }}</div>
             {% endif %}
-            {% if action_icon %}
+            {% if action_icon_src %}
             <div class="jx3-top-wrap">
-                <img class="jx3-top-action" alt="" src="{{ ((icons or {}).get('img') or {}).get(action_icon, '') }}">
+                <img class="jx3-top-action" alt="" src="{{ action_icon_src }}">
                 {{ deco_action | default('') }}
             </div>
             {% endif %}

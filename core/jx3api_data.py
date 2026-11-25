@@ -456,15 +456,15 @@ class JX3APIService:
     def _sand_assets() -> dict[str, str]:
         root = Path(__file__).resolve().parent.parent / "templates" / "img" / "sand"
         return {
-            path.name: "data:image/png;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
-            for path in sorted(root.glob("*.png"))
+            path.stem + ".png": "data:image/webp;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+            for path in sorted(root.glob("*.webp"))
         }
 
     @staticmethod
     @lru_cache(maxsize=1)
     def _sand_font() -> str:
-        path = Path(__file__).resolve().parent.parent / "templates" / "font" / "STXINGKA.TTF"
-        return "data:font/ttf;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+        path = Path(__file__).resolve().parent.parent / "templates" / "font" / "STXINGKA.woff2"
+        return "data:font/woff2;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
     async def shapan(self, server: str) -> Dict[str, Any]:
         """沙盘数据，使用官方 JX3API 并渲染独立战场模板。"""

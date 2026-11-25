@@ -182,10 +182,25 @@ def _estimate_payload_weight(payload: dict) -> int:
     return total
 
 
+def _payload_icons(icons: dict, template: str = "") -> tuple[dict, str]:
+    """返回下发用的精简图标与被选中的动作图 data URI。
+
+    动作图只随机给一张，奇遇图标只在模板用到时附带；其余图标原样保留。
+    """
+    img_icons = icons.get("img") or {}
+    actions = [name for name in img_icons if name.startswith("动作")]
+    picked = random.choice(actions) if actions else ""
+    slim = dict(icons)
+    slim["img"] = {name: value for name, value in img_icons.items() if not name.startswith("动作")}
+    if "serendipity" not in template:
+        slim.pop("serendipity", None)
+    return slim, img_icons.get(picked, "") if picked else ""
+
+
 def estimate_body_length(template: str, payload: dict, icons: dict | None = None) -> int:
     """本地渲染一次并用 main 卡片长度估算正文图片长度，失败回退数据权重。"""
     render_payload = dict(payload)
-    render_payload.setdefault("icons", icons or {})
+    render_payload.setdefault("icons", _payload_icons(icons or {}, template)[0])
     try:
         html = _JINJA.from_string(template or "").render(**render_payload)
     except Exception:
@@ -207,19 +222,19 @@ def _body_decor_range(body_length: int) -> tuple[int, int]:
     return (1, 1)
 
 
-def build_decorated_payload(icons: dict, body_length: int = 0, poem_line: str = "") -> dict:
+def build_decorated_payload(icons: dict, body_length: int = 0, poem_line: str = "", template: str = "") -> dict:
     """为模板补充随机顶卡动作图和卡片淡色矢量装饰。"""
-    actions = [name for name in (icons.get("img") or {}) if name.startswith("动作")]
+    slim_icons, action_src = _payload_icons(icons, template)
     brand = f'<span class="jx3-bot-name">{html.escape(_bot_name)} · 江湖小助手</span>'
     if poem_line.strip():
         deco_caption = brand + f'<span class="jx3-bot-poem">{html.escape(poem_line.strip())}</span>'
     else:
         deco_caption = brand
     return {
-        "icons": icons,
-        "action_icon": random.choice(actions) if actions else "",
+        "icons": slim_icons,
+        "action_icon_src": action_src,
         "deco_caption": deco_caption,
-        "deco_action": _build_action_markup() if actions else "",
+        "deco_action": _build_action_markup() if action_src else "",
         "deco_header": _build_decor_markup("header", 8, 3),
         "deco_body": _build_decor_markup(
             "body",

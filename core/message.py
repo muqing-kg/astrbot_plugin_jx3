@@ -172,7 +172,7 @@ class MessageBuilder:
         try:
             body_length = estimate_body_length(data.get("temp") or "", data["data"], self.icons)
             poem_line = await fetch_poem_line()
-            data["data"].update(build_decorated_payload(self.icons, body_length, poem_line))
+            data["data"].update(build_decorated_payload(self.icons, body_length, poem_line, data.get("temp") or ""))
             if not data["data"].get("page_quote"):
                 quote = await self.jx3api.shaohua()
                 if quote.get("code") == 200 and quote.get("data"):
@@ -401,7 +401,7 @@ class MessageBuilder:
             try:
                 body_length = estimate_body_length(data.get("temp") or "", data["data"], self.icons)
                 poem_line = await fetch_poem_line()
-                data["data"].update(build_decorated_payload(self.icons, body_length, poem_line))
+                data["data"].update(build_decorated_payload(self.icons, body_length, poem_line, data.get("temp") or ""))
                 data["data"]["page_meta"] = " · ".join(part for part in (
                     str(data["data"].get("server") or "").strip(),
                     str(data["data"].get("role_name") or "").strip(),
