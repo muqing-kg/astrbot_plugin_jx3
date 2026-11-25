@@ -9,7 +9,7 @@ from .plugin_log import LOG_BUFFER_SIZE, memory_handler
 
 from .group_info import refresh_missing_group_display_names
 from .page_payload import read_json_payload
-from .session_policy import is_group_umo, mask_for_user
+from .session_policy import is_group_umo
 
 PLUGIN_NAME = "astrbot_plugin_jx3"
 
@@ -322,7 +322,7 @@ class SessionPageAPI:
         from .credentials import validate_pool_token
         ok, message, remaining = await validate_pool_token(self.plugin.jx3api, token, "token")
         if not ok:
-            return self.error_response(f"接口令牌 {mask_for_user(token)} 校验失败：{message}", status_code=400)
+            return self.error_response(f"接口令牌 {token} 校验失败：{message}", status_code=400)
         existing = await self.plugin.sessions.get_credential(umo, "token", token)
         if existing and existing.get("status") == "active":
             return self.error_response("该接口令牌已在可用池中。", status_code=400)
@@ -348,7 +348,7 @@ class SessionPageAPI:
 
         ok, message, _remaining = await validate_pool_token(self.plugin.jx3api, token, "push_token")
         if not ok:
-            return self.error_response(f"推送令牌 {mask_for_user(token)} 校验失败：{message}", status_code=400)
+            return self.error_response(f"推送令牌 {token} 校验失败：{message}", status_code=400)
         added = await self.plugin.sessions.add_active_credential(umo, "push_token", token)
         if not added:
             return self.error_response("该推送令牌已在可用池中。", status_code=400)
@@ -370,7 +370,7 @@ class SessionPageAPI:
         from .credentials import validate_pool_ticket
         ok, message, _ = await validate_pool_ticket(self.plugin.jx3api, ticket, probe_token)
         if not ok:
-            return self.error_response(f"推栏标识 {mask_for_user(ticket)} 校验失败：{message}", status_code=400)
+            return self.error_response(f"推栏标识 {ticket} 校验失败：{message}", status_code=400)
         existing = await self.plugin.sessions.get_credential(umo, "ticket", ticket)
         if existing and existing.get("status") == "active":
             return self.error_response("该推栏标识已在可用池中。", status_code=400)

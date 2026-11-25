@@ -2,8 +2,6 @@ from contextvars import ContextVar
 import re
 from typing import Any
 
-from .session_policy import mask_for_user
-
 _request_token: ContextVar[str | None] = ContextVar("jx3_request_token", default=None)
 _request_ticket: ContextVar[str | None] = ContextVar("jx3_request_ticket", default=None)
 
@@ -51,6 +49,7 @@ TOKEN_ERROR_PATTERN = re.compile(
     r"|(?:无效|失效|过期|不存在|不可用)[^\n]*令牌"
     r"|剩余(?:次数|额度|余额)(?:不足|为\s*0|已用尽)"
     r"|(?:次数|额度|余额)(?:已用尽|不足)"
+    r"|\btoken\b[^\n]*(?:无效|失效|过期|不存在|不可用|次数不足|额度不足|额度用尽|余额不足)"
     r")",
     re.IGNORECASE,
 )
@@ -61,23 +60,29 @@ TICKET_ERROR_PATTERN = re.compile(
     r"|(?:invalid|expired|not found|does not exist|unavailable)[^\n]*\bticket\b"
     r"|推栏(?:标识)?[^\n]*(?:无效|失效|过期|不存在|不可用|次数不足|额度不足|额度用尽|余额不足)"
     r"|(?:无效|失效|过期|不存在|不可用)[^\n]*推栏(?:标识)?"
+    r"|\bticket\b[^\n]*(?:无效|失效|过期|不存在|不可用|次数不足|额度不足|额度用尽|余额不足)"
     r")",
     re.IGNORECASE,
 )
 
 
 def credential_failure(raw: Any, code: Any = None) -> tuple[str, str] | None:
-    """Classify explicit JX3API credential failures only."""
+    """Classify explicit JX3API credential failures only.
+
+    Only 401 means unauthenticated. JX3API answers 403 for upstream failures of
+    its own ("上游请求失败：Forbidden"); treating that as a credential failure
+    retires valid tokens whenever the provider's data source is unavailable.
+    """
     text = str(raw or "").strip()
     if not text:
-        if code in (401, 403):
-            return "token", f"HTTP {code}"
+        if code == 401:
+            return "token", "HTTP 401"
         return None
     if TICKET_ERROR_PATTERN.search(text):
         return "ticket", text
     if TOKEN_ERROR_PATTERN.search(text):
         return "token", text
-    if code in (401, 403):
+    if code == 401:
         return "token", text
     return None
 
@@ -196,7 +201,3 @@ async def confirm_ticket_failure(jx3api, value: str, probe_token: str = "") -> t
             return True, "推栏标识已失效。"
         return True, credential_message("ticket", " / ".join(reasons))
     return False, "推栏标识状态未能确认失效：" + " / ".join(reasons)
-
-
-def masked_credential(value: str) -> str:
-    return mask_for_user(value)

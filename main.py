@@ -26,7 +26,6 @@ from .core.session_policy import (
     UNKNOWN_SERVER,
     inject_optional_server_args,
     is_group_umo,
-    mask_for_user,
     CLAIM_PHRASE,
     resolve_display_name,
     valid_display_name,
@@ -581,7 +580,6 @@ class Jx3ApiPlugin(Star):
             label = "群属失效池" if source.startswith("group") else "全局失效池"
             blocks.append(
                 f"【{label} {index}】\n"
-                f"凭据：{mask_for_user(value)}\n"
                 f"当前查询：{body}\n"
                 f"原因：{row_data.get('failure_reason') or '已失效'}\n"
                 f"时间：{row_data.get('removed_at') or '未知'}"
@@ -822,7 +820,7 @@ class Jx3ApiPlugin(Star):
 
                 ok, message, _remaining = await validate_pool_token(self.jx3api, value, "token")
                 if not ok:
-                    return event.plain_result(f"接口令牌 {mask_for_user(value)} 校验失败：{message}")
+                    return event.plain_result(f"接口令牌校验失败：{message}")
                 await self.sessions.add_active_credential(target, "token", value)
                 return event.plain_result(
                     hint_secret_saved("token", target)
@@ -835,7 +833,7 @@ class Jx3ApiPlugin(Star):
                 return event.plain_result("校验推栏标识需要可用的 JX3API 接口令牌。")
             ok, message, _retryable = await validate_pool_ticket(self.jx3api, value, probe_token)
             if not ok:
-                return event.plain_result(f"推栏标识 {mask_for_user(value)} 校验失败：{message}")
+                return event.plain_result(f"推栏标识校验失败：{message}")
             await self.sessions.add_active_credential(target, "ticket", value)
             return event.plain_result(
                 hint_secret_saved("ticket", target)
@@ -860,7 +858,7 @@ class Jx3ApiPlugin(Star):
 
             ok, message, _remaining = await validate_pool_token(self.jx3api, value, "push_token")
             if not ok:
-                return event.plain_result(f"推送令牌 {mask_for_user(value)} 校验失败：{message}")
+                return event.plain_result(f"推送令牌校验失败：{message}")
             await self.sessions.add_active_credential(target, "push_token", value)
             await self.jx3at.refresh_jobs()
             return event.plain_result(

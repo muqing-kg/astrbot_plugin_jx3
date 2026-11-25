@@ -15,7 +15,6 @@ from .session_policy import (
     NEED_TOKEN,
     UNBOUND_SERVER,
     is_group_umo,
-    mask_secret,
     resolve_query_server,
 )
 from .sqlite import AsyncSQLiteDB
@@ -26,7 +25,6 @@ __all__ = [
     "NEED_TOKEN",
     "UNBOUND_SERVER",
     "SessionStore",
-    "mask_secret",
     "resolve_query_server",
 ]
 

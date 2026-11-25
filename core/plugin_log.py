@@ -19,25 +19,23 @@ _logger.setLevel(logging.DEBUG)
 _logger.propagate = False
 
 def configure_plugin_logger():
-    """Idempotently install plugin handlers and remove stale duplicates."""
+    """Install exactly one of each plugin handler, replacing stale ones from earlier module loads.
+
+    Handlers are matched by class name: a module reload redefines the classes,
+    so isinstance() no longer recognizes handlers installed by the previous load
+    and they would accumulate one pair per reload, duplicating every log line.
+    """
     global _memory_handler, _forward_handler
+    existing = list(_logger.handlers)
     _memory_handler = next(
-        (handler for handler in _logger.handlers if isinstance(handler, MemoryLogHandler)),
+        (handler for handler in existing if type(handler).__name__ == "MemoryLogHandler"),
         MemoryLogHandler(),
     )
     _forward_handler = next(
-        (handler for handler in _logger.handlers if isinstance(handler, AstrBotForwardHandler)),
+        (handler for handler in existing if type(handler).__name__ == "AstrBotForwardHandler"),
         AstrBotForwardHandler(astrbot_logger),
     )
-    deduped = []
-    for handler in _logger.handlers:
-        if not isinstance(handler, (MemoryLogHandler, AstrBotForwardHandler)):
-            deduped.append(handler)
-    if not any(isinstance(handler, MemoryLogHandler) for handler in deduped):
-        deduped.append(_memory_handler)
-    if not any(isinstance(handler, AstrBotForwardHandler) for handler in deduped):
-        deduped.append(_forward_handler)
-    _logger.handlers = deduped
+    _logger.handlers = [_memory_handler, _forward_handler]
 
 
 def _source_for_record(record: logging.LogRecord) -> str:

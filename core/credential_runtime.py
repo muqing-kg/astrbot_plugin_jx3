@@ -6,10 +6,18 @@ from typing import Any
 from .credentials import (
     CredentialRuntimeError,
     confirm_ticket_failure,
+    credential_label,
     inspect_token_status,
-    masked_credential,
 )
 from .plugin_log import logger
+
+
+def _scrub_reason(reason: Any, value: str, kind: str) -> str:
+    """Drop the credential itself from upstream error text before it reaches chat."""
+    text = str(reason or "")
+    if value and value in text:
+        text = text.replace(value, "").strip()
+    return text or f"{credential_label(kind)}不可用。"
 
 
 def _rotated(values: list[str], start: int) -> list[str]:
@@ -75,7 +83,7 @@ async def execute_query_with_credentials(
             except CredentialRuntimeError as exc:
                 kind = exc.kind
                 value = token_value if kind == "token" else ticket_value
-                reason = exc.reason
+                reason = _scrub_reason(exc.reason, value, kind)
                 if kind == "token":
                     if token_source == "group":
                         await sessions.remove_pool_credential(umo, "token", value, reason)
@@ -86,15 +94,16 @@ async def execute_query_with_credentials(
                     else:
                         action = "接口令牌不可用"
                     if notify:
-                        await notify(f"{action} {masked_credential(value)}：{reason}")
+                        await notify(f"{action}：{reason}")
                     logger.warning(
                         f"{action}，原因：{reason}",
                         extra={"log_source": "query", "log_umo": umo, "log_action": "credential_rotation"},
                     )
-                    token_failures.append(f"{masked_credential(value)}：{reason}")
+                    token_failures.append(reason)
                     break
                 if kind == "ticket":
                     confirmed, reason = await confirm_ticket_failure(jx3api, value, token_value)
+                    reason = _scrub_reason(reason, value, kind)
                     if confirmed:
                         if ticket_source == "group":
                             await sessions.delete_pool_credential(umo, "ticket", value)
@@ -105,22 +114,22 @@ async def execute_query_with_credentials(
                         else:
                             action = "推栏标识不可用"
                         if notify:
-                            await notify(f"{action} {masked_credential(value)}：{reason}")
+                            await notify(f"{action}：{reason}")
                         logger.warning(
                             f"{action}，原因：{reason}",
                             extra={"log_source": "query", "log_umo": umo, "log_action": "credential_rotation"},
                         )
                     else:
                         reason = f"未能确认失效：{reason}"
-                    ticket_failures.append(f"{masked_credential(value)}：{reason}")
+                    ticket_failures.append(reason)
                     continue
                 raise
 
     failures = token_failures + ticket_failures
-    detail = "；".join(failures)
+    detail = "；".join(dict.fromkeys(failures))
     if token_failures:
-        return f"接口令牌 {detail}"
-    return f"推栏标识 {detail}"
+        return detail if detail.startswith("接口令牌") else f"接口令牌 {detail}"
+    return detail if detail.startswith("推栏标识") else f"推栏标识 {detail}"
 
 
 async def restore_recoverable_tokens(jx3api: Any, sessions: Any) -> list[str]:

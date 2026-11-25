@@ -89,25 +89,6 @@ SERVER_SECOND_COMMANDS = frozenset({
 })
 
 
-def mask_secret(value: str) -> str:
-    text = (value or "").strip()
-    if not text:
-        return "未配置"
-    if len(text) <= 4:
-        return "已配置"
-    return "****" + text[-4:]
-
-
-def mask_for_user(value: str) -> str:
-    text = (value or "").strip()
-    if not text:
-        return "未配置"
-    suffix = "".join(item for item in text if item.isalnum())
-    if len(suffix) < 4:
-        return "****"
-    return "****" + suffix[-4:]
-
-
 def valid_display_name(value: object) -> bool:
     text = str(value or "").strip()
     return bool(text and text.upper() not in {"N/A", "NULL", "NONE"})

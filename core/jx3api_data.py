@@ -261,7 +261,7 @@ class JX3APIService:
                 data.get("_error"), data.get("_code")
             )
             credential_kind, credential_raw = credential_result or ("", "")
-            if not credential_kind and data.get("_code") in (401, 403):
+            if not credential_kind and data.get("_code") == 401:
                 credential_kind = "token"
                 credential_raw = data.get("_error")
             if credential_kind:
@@ -1808,7 +1808,7 @@ class JX3APIService:
                 kind, reason = failure
                 raise CredentialRuntimeError(kind, credential_message(kind, reason))
             if data.get("_code") == 404:
-                return_data["msg"] = "未查询到该角色，请确认区服与角色名（可直接使用角色 ID）"
+                return_data["msg"] = "未查询到该角色，请确认区服与角色名"
                 return return_data
             return_data["msg"] = f"接口返回：{data.get('_error')}"
             return return_data
@@ -1820,7 +1820,7 @@ class JX3APIService:
             return return_data
         items = data.get("data") if isinstance(data, dict) else None
         if not isinstance(items, list) or not items:
-            return_data["msg"] = "未查询到该角色，请确认区服与角色名（可直接使用角色 ID）"
+            return_data["msg"] = "未查询到该角色，请确认区服与角色名"
             return return_data
         item = items[0] if isinstance(items[0], dict) else {}
         if bool(item.get("gameLogin")):

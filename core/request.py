@@ -124,7 +124,7 @@ class APIClient:
                 except Exception:
                     detail = ""
                 return {
-                    "_error": detail or f"HTTP {response.status}",
+                    "_error": detail[:300] or f"HTTP {response.status}",
                     "_code": response.status,
                 }
             response.raise_for_status()
