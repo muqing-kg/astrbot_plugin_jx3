@@ -52,3 +52,7 @@ docs/文字类返回汇总.md
 .playwright-mcp/
 PROGRESS.md
 .memory/
+
+# SQLite 运行时附属文件，不随项目分发
+*.db-wal
+*.db-shm
