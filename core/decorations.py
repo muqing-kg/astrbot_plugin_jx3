@@ -1,23 +1,15 @@
 import random
 import html
+from pathlib import Path
 
-import aiohttp
 from jinja2 import Environment
 
 
 _JINJA = Environment(autoescape=False)
 
-_proxy: str = ""
-
 DEFAULT_BOT_NAME = "唐小珂"
 
 _bot_name: str = DEFAULT_BOT_NAME
-
-
-def set_proxy(value: str) -> None:
-    """配置出站代理；空串表示直连。"""
-    global _proxy
-    _proxy = str(value or "").strip()
 
 
 def set_bot_name(value: str) -> None:
@@ -88,10 +80,8 @@ _DECOR_SPOTS = {
     ],
 }
 
-_POEM_SOURCES = (
-    ("https://v1.jinrishici.com/all.json", ("content",)),
-    ("https://v1.hitokoto.cn/?c=i&encode=json&charset=utf-8", ("hitokoto",)),
-)
+_POEMS_PATH = Path(__file__).resolve().parent.parent / "data" / "poems.txt"
+_poems: list[str] = []
 _ACTION_SPOTS = (
     ("left: -24px; top: 6px;", 16),
     ("right: -20px; top: -8px;", 12),
@@ -138,22 +128,24 @@ def _build_action_markup() -> str:
     return "".join(parts)
 
 
-async def fetch_poem_line() -> str:
-    """拉取一句随机诗词，本地无网络时返回空串。"""
-    for url, keys in _POEM_SOURCES:
+def _load_poems() -> list[str]:
+    global _poems
+    if not _poems:
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=4), proxy=_proxy or None) as resp:
-                    if resp.status != 200:
-                        continue
-                    payload = await resp.json(content_type=None)
-            for key in keys:
-                value = payload.get(key)
-                if isinstance(value, str) and value.strip():
-                    return value.strip()
-        except Exception:
-            continue
-    return ""
+            _poems = [
+                line.strip()
+                for line in _POEMS_PATH.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+        except OSError:
+            _poems = []
+    return _poems
+
+
+async def fetch_poem_line() -> str:
+    """从本地诗句库随机取一句；库缺失时返回空串。"""
+    poems = _load_poems()
+    return random.choice(poems) if poems else ""
 
 
 _BODY_DECOR_RANGES = (

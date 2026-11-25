@@ -14,7 +14,7 @@ from .core.jx3api_data import JX3APIService
 from .core.jx3box_data import JX3BOXService
 from .core.async_task import AsyncTask
 from .core.message import MessageBuilder
-from .core.decorations import set_bot_name, set_proxy
+from .core.decorations import set_bot_name
 from .core.fun_basic import load_as_base64
 from .core.session_store import SessionStore
 from .core.session_policy import (
@@ -192,8 +192,6 @@ class Jx3ApiPlugin(Star):
         self.sessions = SessionStore(self.local_sql_db)
         self.jx3api = JX3APIService(self.conf, self.plugin_sql_db, self.local_sql_db)
         self.jx3box = JX3BOXService(self.conf, self.plugin_sql_db, self.local_sql_db)
-        proxy_url = str(self.conf.get("proxy", "") or "").strip()
-        set_proxy(proxy_url)
         self.jx3at = AsyncTask(
             cast(Context, self.context),
             self.conf,
