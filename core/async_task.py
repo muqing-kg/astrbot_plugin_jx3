@@ -250,6 +250,7 @@ class AsyncTask:
                 IntervalTrigger(hours=24),
                 id="credential_pool_recheck",
                 max_instances=1,
+                next_run_time=datetime.now(timezone.utc),
             )
 
     async def refresh_jobs(self):
