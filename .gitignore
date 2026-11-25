@@ -41,12 +41,14 @@ output/
 图片参考/
 
 # 本地记忆与内部记录，不随项目分发
-.recallloom/
 .serena/
 
 # 本地测试、过程渲染与内部记录，不随项目分发
 tests/
+pytest.ini
+tools/
 渲染验收/
 docs/文字类返回汇总.md
 .playwright-mcp/
 PROGRESS.md
+.memory/
