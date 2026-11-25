@@ -898,6 +898,10 @@ class MessageBuilder:
         """ 属性 服务器 角色名 """
         return await self.raw_image_msg(event, lambda: self.jx3api.calcd_attribute(server, name))
 
+    async def  zhuangbei(self, event: AstrMessageEvent, server: str, name: str, kungfu: str, equip_type: str):
+        """ 装备 服务器 角色名 心法 类型 """
+        return await self.raw_image_msg(event, lambda: self.jx3api.calcd_equip(server, name, kungfu, equip_type))
+
     async def  zhenyan(self, event: AstrMessageEvent, name: str):
         """ 阵眼 心法"""
         return await self.plain_msg(event, lambda: self.jx3api.zhenyan(name))

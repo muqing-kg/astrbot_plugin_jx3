@@ -299,6 +299,7 @@ class Jx3ApiPlugin(Star):
             "角色": self.jx3cmd.jueshe,
             "在线": self.jx3cmd.role_online,
             "属性": self.jx3cmd.shuxing,
+            "装备": self.jx3cmd.zhuangbei,
             "阵眼": self.jx3cmd.zhenyan,
             "配装": self.jx3cmd.peizhuang,
             "资历排行": self.jx3cmd.zilipaixing,

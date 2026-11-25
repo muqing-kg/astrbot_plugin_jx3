@@ -83,6 +83,17 @@ IGNORED_SERENDIPITY_EVENTS = frozenset({
     "茶馆悬赏", "英雄客",
 })
 
+# 装备详情的配装类型：PVP/PVE/PVX 是玩家习惯写法，服务端只认中文四值
+_EQUIP_TYPE_ALIASES = {
+    "pvp": "竞技对抗",
+    "竞技对抗": "竞技对抗",
+    "pve": "秘境挑战",
+    "秘境挑战": "秘境挑战",
+    "pvx": "休闲",
+    "休闲": "休闲",
+    "通用": "通用",
+}
+
 
 def _chunk(items: list, size: int) -> list:
     return [items[i:i + size] for i in range(0, len(items), size)]
@@ -2465,6 +2476,44 @@ class JX3APIService:
 
     async def calcd_attribute(self, server: str, name: str) -> Dict[str, Any]:
         """角色属性（已收录的装备与属性面板）"""
+        return await self._calcd_render("/calcd/attribute", {"server": server, "name": name})
+
+    async def calcd_equip(self, server: str, name: str, kungfu: str, equip_type: str) -> Dict[str, Any]:
+        """装备（指定心法与配装类型的那一套）"""
+        kungfu_name = await self._resolve_kungfu(kungfu)
+        if not kungfu_name:
+            return_data = self._init_return_data()
+            return_data["msg"] = f"未找到该心法：{kungfu}。心法可用简称，如鲸鱼、田螺、气纯。"
+            return return_data
+        type_name = _EQUIP_TYPE_ALIASES.get(str(equip_type or "").strip().casefold())
+        if not type_name:
+            return_data = self._init_return_data()
+            return_data["msg"] = "配装类型填 PVP、PVE、PVX，或竞技对抗、秘境挑战、通用、休闲。"
+            return return_data
+        result = await self._calcd_render(
+            "/calcd/detail",
+            {"server": server, "name": name, "kungfu": kungfu_name, "type": type_name},
+        )
+        if result.get("code") != 200:
+            result["msg"] = f"未取到「{kungfu_name} · {type_name}」这套配装：{result.get('msg') or '接口无数据'}"
+        return result
+
+    async def _resolve_kungfu(self, name: str) -> str:
+        """心法简称转标准全名，复用本地 kungfu 表"""
+        text = str(name or "").strip()
+        if not text:
+            return ""
+        row = await self._sql_db.select_one(
+            "kungfu",
+            "name=? OR name1=? OR name2=? OR name3=? OR name4=? OR name5=?",
+            (text, text, text, text, text, text),
+        )
+        return str((row or {}).get("name") or "").strip()
+
+    async def _calcd_render(self, path: str, params: Dict[str, Any]) -> Dict[str, Any]:
+        """装备面板渲染，attribute 与 detail 共用"""
+        server = str(params.get("server") or "")
+        name = str(params.get("name") or "")
         quality_colors = {0: "#9ca3af", 1: "#9ca3af", 2: "#22c55e", 3: "#60a5fa", 4: "#c084fc", 5: "#fb923c"}
 
         def as_int(value: Any) -> int:
@@ -2669,9 +2718,10 @@ class JX3APIService:
                 "cacheTime": data.get("cacheTime"),
             }
 
+        params["token"] = self.token
         return await self._request_api(
-            "/calcd/attribute",
-            {"server": server, "name": name, "token": self.token},
+            path,
+            params,
             processor,
             "standalone/shuxing.html",
         )
