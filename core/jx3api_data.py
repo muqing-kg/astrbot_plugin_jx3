@@ -370,6 +370,8 @@ class JX3APIService:
         query_id = "查询推送令牌" if kind == "push_token" else "查询接口令牌"
         hint = f"可发送 {current_command_name(self.command_catalog, query_id)} 查看状态。"
         text = str(raw or "").strip()
+        if text.startswith("JX3API "):
+            return text
         lowered = text.lower()
         if any(key in lowered for key in ("expire", "expired")) or "过期" in text:
             return f"JX3API {label}已过期，请更换或续费后再试。{hint}"
@@ -2900,7 +2902,11 @@ class JX3APIService:
         return await self._request_api("/trade/item/search", {"name": name, "token": self.token}, processor, "data_list.html")
 
     async def token_stats(self, token: str, kind: str = "token") -> dict:
-        """校验令牌可用性。GET /active/calendar"""
+        """校验令牌可用性。GET /token/stats
+
+        /active/calendar 是公开接口，不带令牌也返回 200 且没有令牌字段，
+        用它探测会把任何字符串都判成有效，失效池巡检因此会把坏令牌全部恢复。
+        """
         result = self._init_return_data()
         token = (token or "").strip()
         if not token:
@@ -2912,7 +2918,7 @@ class JX3APIService:
             result["msg"] = "推送令牌无法通过业务接口校验，以推送连接结果为准。"
             result["_transport_error"] = True
             return result
-        data = await self._api.get(self.base_url + "/active/calendar", params={"token": token}, out_key=None)
+        data = await self._api.get(self.base_url + "/token/stats", params={"token": token}, out_key=None)
         if data is None:
             result["msg"] = "令牌状态查询失败"
             result["valid"] = False
@@ -2924,6 +2930,12 @@ class JX3APIService:
             result["_code"] = data.get("_code")
             return result
         payload = data.get("data") if isinstance(data, dict) and isinstance(data.get("data"), dict) else {}
+        if not payload:
+            # 端点正常应答但读不到任何令牌字段：按查询失败处理，绝不默认有效
+            result["msg"] = "令牌状态查询失败：接口未返回令牌信息"
+            result["valid"] = False
+            result["_transport_error"] = True
+            return result
         level = payload.get("level")
         used = payload.get("used")
         remaining = payload.get("remaining")
