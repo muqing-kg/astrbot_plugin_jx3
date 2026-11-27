@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -61,6 +62,7 @@ class SessionStore:
                 claim_at TEXT DEFAULT '',
                 bot_enabled INTEGER DEFAULT 1,
                 llm_enabled INTEGER DEFAULT 1,
+                llm_mute_until INTEGER DEFAULT 0,
                 push_fail_count INTEGER DEFAULT 0,
                 push_last_error TEXT DEFAULT '',
                 updated_at TEXT DEFAULT ''
@@ -74,6 +76,7 @@ class SessionStore:
             "use_global_ticket INTEGER DEFAULT 1",
             "bot_enabled INTEGER DEFAULT 1",
             "llm_enabled INTEGER DEFAULT 1",
+            "llm_mute_until INTEGER DEFAULT 0",
             "push_fail_count INTEGER DEFAULT 0",
             "push_last_error TEXT DEFAULT ''",
             "is_private INTEGER DEFAULT 0",
@@ -738,21 +741,32 @@ class SessionStore:
             return True
         return bool(row.get("bot_enabled"))
 
-    async def set_llm_enabled(self, umo: str, enabled: bool) -> None:
+    async def set_llm_mute(self, umo: str, until_ts: int) -> None:
         await self.ensure(umo)
         await self.sql.update(
             "session_config",
-            {"llm_enabled": 1 if enabled else 0, "updated_at": _now()},
+            {"llm_mute_until": int(until_ts), "updated_at": _now()},
             "umo=?",
             (umo,),
         )
 
-    def is_llm_enabled(self, row: dict[str, Any] | None) -> bool:
+    async def clear_llm_mute(self, umo: str) -> None:
+        await self.ensure(umo)
+        await self.sql.update(
+            "session_config",
+            {"llm_mute_until": 0, "updated_at": _now()},
+            "umo=?",
+            (umo,),
+        )
+
+    def llm_muted(self, row: dict[str, Any] | None) -> bool:
         if not row:
-            return True
-        if "llm_enabled" not in row or row.get("llm_enabled") is None:
-            return True
-        return bool(row.get("llm_enabled"))
+            return False
+        try:
+            until = int(row.get("llm_mute_until") or 0)
+        except (TypeError, ValueError):
+            return False
+        return until > int(time.time())
 
     async def delete_session(self, umo: str) -> bool:
         if not is_group_umo(umo):

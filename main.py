@@ -1,4 +1,5 @@
 import inspect
+import time
 from pathlib import Path
 from typing import cast
 
@@ -676,6 +677,9 @@ class Jx3ApiPlugin(Star):
             return event.plain_result(hint_authorize_usage(self.command_catalog))
         if parsed.error == "missing_manager_index":
             return event.plain_result(hint_deauthorize_usage(self.command_catalog))
+        if parsed.error == "bad_mute_hours":
+            mute_cmd = current_command_name(self.command_catalog, "闭嘴")
+            return event.plain_result(f"用法：{mute_cmd} 或 {mute_cmd} 小时数（1-168）。")
         if parsed.error:
             return None
 
@@ -687,14 +691,19 @@ class Jx3ApiPlugin(Star):
                 return event.plain_result(hint_claim_phrase(self.command_catalog))
             return event.plain_result(hint_claim_ok(name))
 
-        if parsed.action == "llm_enabled":
-            if not await self._is_plugin_admin(event, umo=self._event_umo(event)):
-                return event.plain_result(hint_need_claim(self.command_catalog))
-            enabled = parsed.value == "1"
-            await self.sessions.set_llm_enabled(self._event_umo(event), enabled)
-            label = "张嘴" if enabled else "闭嘴"
-            state = "允许" if enabled else "禁止"
-            return event.plain_result(f"已{label}：被 @ 后{state}触发 LLM 回话。")
+        if parsed.action in {"llm_mute", "llm_unmute"}:
+            umo = self._event_umo(event)
+            if parsed.action == "llm_unmute":
+                was_muted = self.sessions.llm_muted(await self.sessions.get(umo))
+                await self.sessions.clear_llm_mute(umo)
+                return event.plain_result(
+                    "已开启机器人对话。" if was_muted else "机器人对话当前是开启状态。"
+                )
+            hours = int(parsed.value)
+            await self.sessions.set_llm_mute(umo, int(time.time()) + hours * 3600)
+            return event.plain_result(
+                f"已屏蔽机器人回复 {hours} 小时，{hours} 小时后自动恢复。"
+            )
 
         if parsed.action in {"authorize", "deauthorize", "list_admins"}:
             if not await self._is_session_owner_admin(event):
@@ -1023,6 +1032,20 @@ class Jx3ApiPlugin(Star):
             await self._run_menu_choice(reply_event, choice, ids, list(args))
         await self.jx3cmd.send_command_menu(event, "名片", ids, runner)
 
+    @filter.on_waiting_llm_request()
+    async def on_llm_waiting(self, event: AstrMessageEvent):
+        """静音期间只拦没人点名的请求：主动消息、主动插话、平台内置接话。"""
+        if event.get_platform_name() == "cron":
+            return
+        row = await self.sessions.get(self._event_umo(event))
+        if not self.sessions.llm_muted(row):
+            return
+        segments = getattr(getattr(event, "message_obj", None), "message", None) or []
+        text = (getattr(event, "message_str", "") or "").strip()
+        if (segments or text) and getattr(event, "is_at_or_wake_command", False):
+            return
+        event.stop_event()
+
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def on_all_message(self, event: AstrMessageEvent):
         if not self.command_map:
@@ -1037,6 +1060,10 @@ class Jx3ApiPlugin(Star):
             trigger = normalized[0]
             if trigger.lower() == "token":
                 trigger = "Token"
+            if trigger in {"张嘴", "闭嘴"}:
+                event.stop_event()
+                yield event.plain_result("私聊不受影响，请在群里使用。")
+                return
             if trigger not in PRIVATE_ONLY_COMMAND_IDS:
                 return
             admin_ret = await self._handle_admin_command(event, parts)
@@ -1046,18 +1073,15 @@ class Jx3ApiPlugin(Star):
             return
         if not parts:
             if bot_at:
-                row = await self.sessions.ensure(
+                await self.sessions.ensure(
                     self._event_umo(event),
                     self._event_display_name(event),
                     is_private=self._is_private(event),
                 )
                 # 不 yield 自造 ProviderRequest：那会绕过 AstrBot 的人格、会话历史与技能注入。
-                if self.sessions.is_llm_enabled(row):
-                    event.is_wake = True
-                    event.is_at_or_wake_command = True
-                    event.message_str = clean_text or "你好"
-                else:
-                    event.should_call_llm(True)
+                event.is_wake = True
+                event.is_at_or_wake_command = True
+                event.message_str = clean_text or "你好"
             return
 
         umo = self._event_umo(event)
@@ -1097,12 +1121,9 @@ class Jx3ApiPlugin(Star):
                 yield await self._cmd_rank_direct(event, trigger, rank_kind[1], args, row)
                 return
             if bot_at:
-                if self.sessions.is_llm_enabled(row):
-                    event.is_wake = True
-                    event.is_at_or_wake_command = True
-                    event.message_str = clean_text or "你好"
-                else:
-                    event.should_call_llm(True)
+                event.is_wake = True
+                event.is_at_or_wake_command = True
+                event.message_str = clean_text or "你好"
                 return
             if self._looks_like_command(event.message_str):
                 suggested = suggest_command(self.command_catalog, trigger)

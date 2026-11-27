@@ -359,7 +359,17 @@ def parse_admin_command(
     if cmd == "查询推送令牌":
         return AdminCommand(action="push_token_stats")
     if cmd in {"张嘴", "闭嘴"}:
-        return AdminCommand(action="llm_enabled", value="1" if cmd == "张嘴" else "0")
+        if cmd == "张嘴":
+            return AdminCommand(action="llm_unmute")
+        hours = 1
+        if len(parts) > 1:
+            raw = parts[1].strip()
+            if not raw.isdecimal():
+                return AdminCommand(error="bad_mute_hours")
+            hours = int(raw)
+            if not 1 <= hours <= 168:
+                return AdminCommand(error="bad_mute_hours")
+        return AdminCommand(action="llm_mute", value=str(hours))
     if cmd in {"授权管理", "查看管理", "删除管理"}:
         if is_private:
             return AdminCommand(error="group_manage_only")
